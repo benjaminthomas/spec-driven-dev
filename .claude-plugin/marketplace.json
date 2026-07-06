@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "spec-driven-dev",
+  "description": "Turn planning conversations into parallel-executable specs, implement them wave-by-wave with review gates, verify against the real running app, and ship a PR — plus a portable SEO/GEO operations skill.",
+  "owner": {
+    "name": "benjaminbarnabas"
+  },
+  "plugins": [
+    {
+      "name": "spec-driven-dev",
+      "description": "Spec-driven feature pipeline (create-spec / implement-feature / verify-feature / ship-it) + generative-seo, a portable SEO/GEO skill for any project.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

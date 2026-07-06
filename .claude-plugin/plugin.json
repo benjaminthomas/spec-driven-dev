@@ -1,0 +1,16 @@
+{
+  "name": "spec-driven-dev",
+  "version": "1.0.0",
+  "description": "Parallel-wave spec-driven feature workflow (create-spec, implement-feature, verify-feature, ship-it) plus a portable SEO/GEO operations skill (generative-seo) for any codebase.",
+  "author": {
+    "name": "benjaminbarnabas"
+  },
+  "keywords": [
+    "spec-driven-development",
+    "feature-workflow",
+    "parallel-agents",
+    "seo",
+    "geo",
+    "productivity"
+  ]
+}
