@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "spec-driven-dev",
-      "description": "Spec-driven feature pipeline (create-spec / implement-feature / verify-feature / ship-it) + generative-seo, a portable SEO/GEO skill for any project.",
+      "description": "Spec-driven feature pipeline (create-spec / implement-feature / verify-feature / checkpoint / ship-it) + generative-seo, a portable SEO/GEO skill for any project.",
       "source": "./",
       "category": "productivity"
     }

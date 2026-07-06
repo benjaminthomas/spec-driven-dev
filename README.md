@@ -1,6 +1,6 @@
 # spec-driven-dev
 
-A Claude Code plugin bundling five skills: a parallel-wave, spec-driven feature
+A Claude Code plugin bundling six skills: a parallel-wave, spec-driven feature
 workflow, and a portable SEO/GEO operations skill. Works in any codebase — none
 of these assume a specific framework, stack, or product.
 
@@ -8,11 +8,11 @@ of these assume a specific framework, stack, or product.
 
 ### The feature pipeline
 
-Four skills that work together, each one resumable and each producing an
+Five skills that work together, each one resumable and each producing an
 artifact the next stage (or the next person) can pick up cold:
 
 ```
-create-spec  →  implement-feature  →  verify-feature  →  ship-it
+create-spec  →  implement-feature  →  verify-feature  →  checkpoint  →  ship-it
 ```
 
 | Skill | Trigger | Input | Output |
@@ -20,6 +20,7 @@ create-spec  →  implement-feature  →  verify-feature  →  ship-it
 | `create-spec` | "create a spec", "plan this feature", "break this into tasks" | A planning conversation (or an interview if there wasn't one) | `specs/{feature}/` — `requirements.md`, `action-required.md`, `tasks/task-NN-*.md`, `README.md` with a dependency graph and wave breakdown |
 | `implement-feature` | "implement this feature", "run the spec", "continue implementing" | `specs/{feature}/` | Real code changes — one coder subagent per task per wave, run in parallel within a wave, with a code-review gate before each wave is committed |
 | `verify-feature` | "test this end to end", "does this actually work", right after `implement-feature` finishes | `specs/{feature}/` | `specs/{feature}/verification-report.md` — every acceptance criterion checked against the *real running app* (clicks, API calls, DB reads used only to confirm state), pass/fail with evidence |
+| `checkpoint` | "checkpoint", "commit everything", "save my progress" | A working tree with changes | A local commit — but only after lint, typecheck, and build all pass |
 | `ship-it` | "ship it", "push this", "open a PR" | A committed, verified branch | A pushed branch + an opened GitHub PR |
 
 The insight behind the pipeline: implementation plans that live in one giant
@@ -28,13 +29,13 @@ independent execution. Splitting into one self-contained task file per unit of
 work lets multiple coder agents implement a feature in parallel, safely,
 without anyone needing to re-read the whole plan.
 
-None of these four skills write to a specific stack's config — they read
+None of these five skills write to a specific stack's config — they read
 whatever lint/typecheck/build/dev commands the target repo actually has and
 use those.
 
 ### generative-seo
 
-A standalone fifth skill, unrelated to the pipeline above: runs an
+A standalone sixth skill, unrelated to the pipeline above: runs an
 evidence-based SEO + GEO (Generative Engine Optimization) program — technical
 SEO audits, answer-first content built to get cited by ChatGPT/Perplexity/AI
 Overviews, an AI-citation tracker, competitor research, and draft-only social
@@ -63,9 +64,9 @@ Code at this folder directly as a marketplace source (its own
 2. `/implement-feature` to build it wave-by-wave with review gates between waves.
 3. `/verify-feature` to prove the acceptance criteria hold against the real
    running app — not just that it compiles.
-4. Commit (e.g. with your own `checkpoint`-style workflow), then `/ship-it` to
-   push and open the PR.
-5. Any time, independent of the pipeline: `/generative-seo` for SEO/GEO work
+4. `/checkpoint` to commit locally, once lint/typecheck/build all pass.
+5. `/ship-it` to push and open the PR.
+6. Any time, independent of the pipeline: `/generative-seo` for SEO/GEO work
    on the same project or any other.
 
 ## License
