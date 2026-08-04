@@ -1,22 +1,23 @@
 ---
-name: verify-feature
+name: spec-verify
 description: >
   Verify a completed feature spec by driving the real running app — not just lint/typecheck/build
   — and checking off every acceptance criterion from its specs/{feature}/ folder one by one. Use
-  this after /implement-feature finishes a spec, when the user says "test this end to end",
-  "verify this feature actually works", "did we actually build this right", or "/verify-feature",
-  and before /ship-it or opening a PR. This is the spec-aware sibling of the generic /verify and
+  this after /spec-implement finishes a spec, when the user says "test this end to end",
+  "verify this feature actually works", "did we actually build this right", or "/spec-verify",
+  and before /spec-ship or opening a PR. This is the spec-aware sibling of the generic /verify and
   /run skills — /verify checks an arbitrary diff's runtime behavior and /run just launches the
   app, but this skill specifically reads a spec's requirements.md and task files, builds a master
   checklist of acceptance criteria, and reports pass/fail per criterion with real evidence
   (screenshots, API responses, DB state) instead of a vague "looks good." Always invoke this when
   a specs/{feature}/ folder exists and its implementation just finished, even if the user only
   says "does this work" or "test it."
+license: MIT
 ---
 
 # Verify Feature
 
-Close the loop that `create-spec` → `implement-feature` leaves open: passing lint, typecheck, and
+Close the loop that `spec-create` → `spec-implement` leaves open: passing lint, typecheck, and
 build proves the code compiles, not that the feature does what the spec says it does. This skill
 reads a spec's acceptance criteria and checks each one against the actual running application —
 clicking through the UI, calling the real API routes, or inspecting real database state produced
@@ -24,7 +25,7 @@ by the real code path. It produces a report the user can trust before shipping.
 
 ## When there's no spec folder
 
-If the user asks to verify a feature that wasn't built through `create-spec`, don't refuse —
+If the user asks to verify a feature that wasn't built through `spec-create`, don't refuse —
 interview them briefly for what was built and what "working" means (the golden path, the edge
 cases they care about), then skip to [Step 3](#step-3-prepare-the-environment) treating their
 answers as the criteria list. The spec-driven path below is the common case, not the only one.
@@ -35,7 +36,7 @@ answers as the criteria list. The spec-driven path below is the common case, not
 2. Otherwise look for a `specs/*/README.md` whose Task Status section is fully checked (all
    tasks `- [x]`) but has no `verification-report.md` sibling yet — that's the most recently
    completed, not-yet-verified feature.
-3. If `implement-feature` hasn't finished all waves yet (some tasks still `- [ ]`), tell the user
+3. If `spec-implement` hasn't finished all waves yet (some tasks still `- [ ]`), tell the user
    and ask whether to verify what's done so far or wait for the rest — verifying half a feature
    can produce confusing false failures for criteria that depend on an unbuilt task.
 
@@ -49,7 +50,7 @@ filename).
 Split the merged list into two kinds, because they're verified completely differently:
 
 - **Static criteria** — things like "`npm run check` passes" or "`npx next build` succeeds."
-  `implement-feature`'s review gate already ran these during the build. Re-run them once quickly
+  `spec-implement`'s review gate already ran these during the build. Re-run them once quickly
   to confirm nothing regressed since (uncommitted fix-ups, a rebase, etc.), but don't treat this
   as the interesting part of verification.
 - **Behavioral criteria** — anything that describes what a user, an API caller, or a scheduled
@@ -67,17 +68,17 @@ poll until it's ready.
 Look at what the behavioral criteria actually need before reaching for tools:
 
 - **UI-observable** (a button appears, a page shows a value, a flow completes) → browser
-  automation. Load the Chrome tools via `ToolSearch` if they're deferred (batch every tool you
-  expect to need — navigation, computer, read_page, console/network reading — into one search
-  call, per that tool's own instructions). Take a screenshot as evidence for each criterion you
-  check this way.
+  automation. Use whatever browser-automation capability your host provides — a browser MCP
+  server (Playwright, Puppeteer, etc.), a built-in browser tool, or a browser extension — and
+  enable/load it per your host's own convention if it isn't active by default. Take a screenshot
+  as evidence for each criterion you check this way.
 - **API-only** (no UI surface, e.g. a webhook or a cron route) → call the real route. For
   session-gated routes, log in through the actual UI once (or reuse a session cookie from a
   browser step) rather than fabricating auth state. For routes gated by a bearer secret (like a
   cron's `CRON_SECRET`), call them directly with `curl`.
-  Note: `read_console_messages` and `read_network_requests` are useful when a criterion is best
-  confirmed by watching what the frontend actually sent/received rather than clicking through
-  screenshots.
+  Note: if your browser tool can read console/network logs, that's useful when a criterion is
+  best confirmed by watching what the frontend actually sent/received rather than clicking
+  through screenshots.
 - **DB-state-only** (a column got stamped correctly, a row was scoped the way it should be) →
   drive the real write path first (through the UI or API — never insert the expected state
   directly, that verifies nothing), then read the resulting row back via Prisma or `psql` to
@@ -130,7 +131,7 @@ Verified {feature}: {X}/{Y} criteria passed.
 
 {If all pass:} Ready to ship.
 {If failures:} {N} failing — see specs/{feature}/verification-report.md for exact repro steps.
-Options: loop back to /implement-feature to fix, or fix manually.
+Options: loop back to /spec-implement to fix, or fix manually.
 ```
 
 This skill only verifies and reports — it does not fix failures itself. Mixing "test" and "fix"

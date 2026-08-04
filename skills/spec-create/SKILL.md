@@ -1,12 +1,14 @@
 ---
-name: create-spec
+name: spec-create
 description: >
   Create a structured feature specification with self-contained task files organized into
   parallel execution waves. Use this skill when the user says "create a spec", "plan this feature",
   "write up an implementation plan", "break this into tasks", or after any planning conversation
   where the user wants to capture decisions as actionable spec files. Also use when the user
-  says "/create-spec" or wants to decompose a feature into work items that agents can implement
-  independently. This skill produces local spec files under specs/{feature}/ — no GitHub integration.
+  says "/spec-create" (or their host's equivalent invocation syntax) or wants to decompose a
+  feature into work items that agents can implement independently. This skill produces local
+  spec files under specs/{feature}/ — no GitHub integration.
+license: MIT
 ---
 
 # Create Feature Specification
@@ -119,7 +121,7 @@ Wave breakdown:
 Next steps:
 1. Review action-required.md for tasks you need to complete manually
 2. Review the requirements and task files
-3. Use /implement-feature to start parallel implementation
+3. Use /spec-implement to start parallel implementation
 ```
 
 ## Critical Rules

@@ -1,8 +1,11 @@
 # spec-driven-dev
 
-A Claude Code plugin bundling six skills: a parallel-wave, spec-driven feature
-workflow, and a portable SEO/GEO operations skill. Works in any codebase — none
-of these assume a specific framework, stack, or product.
+Six [Agent Skills](https://agentskills.io) — an open, cross-host standard for packaging agent
+instructions — bundling a parallel-wave, spec-driven feature workflow and a portable SEO/GEO
+operations skill. Works in any codebase — none of these assume a specific framework, stack, or
+product. Packaged as a Claude Code plugin for that host, and installable as plain skill folders
+on any other Agent-Skills-compatible host (see [Compatibility](#compatibility) and
+[Install](#install) below).
 
 ## What's inside
 
@@ -12,16 +15,16 @@ Five skills that work together, each one resumable and each producing an
 artifact the next stage (or the next person) can pick up cold:
 
 ```
-create-spec  →  implement-feature  →  verify-feature  →  checkpoint  →  ship-it
+spec-create  →  spec-implement  →  spec-verify  →  spec-checkpoint  →  spec-ship
 ```
 
 | Skill | Trigger | Input | Output |
 |---|---|---|---|
-| `create-spec` | "create a spec", "plan this feature", "break this into tasks" | A planning conversation (or an interview if there wasn't one) | `specs/{feature}/` — `requirements.md`, `action-required.md`, `tasks/task-NN-*.md`, `README.md` with a dependency graph and wave breakdown |
-| `implement-feature` | "implement this feature", "run the spec", "continue implementing" | `specs/{feature}/` | Real code changes — one coder subagent per task per wave, run in parallel within a wave, with a code-review gate before each wave is committed |
-| `verify-feature` | "test this end to end", "does this actually work", right after `implement-feature` finishes | `specs/{feature}/` | `specs/{feature}/verification-report.md` — every acceptance criterion checked against the *real running app* (clicks, API calls, DB reads used only to confirm state), pass/fail with evidence |
-| `checkpoint` | "checkpoint", "commit everything", "save my progress" | A working tree with changes | A local commit — but only after lint, typecheck, and build all pass |
-| `ship-it` | "ship it", "push this", "open a PR" | A committed, verified branch | A pushed branch + an opened GitHub PR |
+| `spec-create` | "create a spec", "plan this feature", "break this into tasks" | A planning conversation (or an interview if there wasn't one) | `specs/{feature}/` — `requirements.md`, `action-required.md`, `tasks/task-NN-*.md`, `README.md` with a dependency graph and wave breakdown |
+| `spec-implement` | "implement this feature", "run the spec", "continue implementing" | `specs/{feature}/` | Real code changes — one coder subagent per task per wave, run in parallel within a wave, with a code-review gate before each wave is committed |
+| `spec-verify` | "test this end to end", "does this actually work", right after `spec-implement` finishes | `specs/{feature}/` | `specs/{feature}/verification-report.md` — every acceptance criterion checked against the *real running app* (clicks, API calls, DB reads used only to confirm state), pass/fail with evidence |
+| `spec-checkpoint` | "checkpoint", "commit everything", "save my progress" | A working tree with changes | A local commit — but only after lint, typecheck, and build all pass |
+| `spec-ship` | "ship it", "push this", "open a PR" | A committed, verified branch | A pushed branch + an opened GitHub PR |
 
 The insight behind the pipeline: implementation plans that live in one giant
 file are either too large for an agent's context window or too shallow for
@@ -45,9 +48,33 @@ interview, then remembers the answers for every later run. See
 `skills/generative-seo/SKILL.md` for the seven modes
 (`audit`/`content`/`optimize`/`competitors`/`citations`/`report`/`social`).
 
+## Compatibility
+
+Every skill here is a plain `SKILL.md` + `references/` folder conforming to the open
+[Agent Skills](https://agentskills.io) spec, which Claude Code, Codex CLI, Cursor, and Google
+Antigravity all read natively. The `.claude-plugin/` manifest layer (plugin.json,
+marketplace.json) is Claude Code-specific packaging on top of that — none of the other hosts
+have an equivalent plugin/marketplace concept, so on those hosts you install the `skills/`
+folders directly (see Install below).
+
+| Skill | Claude Code | Codex CLI | Cursor | Antigravity | Notes |
+|---|---|---|---|---|---|
+| `spec-create` | ✅ | ✅ | ✅ | ✅ | Planning + file writing only, no host-specific mechanics |
+| `spec-implement` | ✅ | ✅ | ✅ | ✅ | Parallel dispatch uses whichever subagent/background-agent mechanism your host provides; falls back to sequential execution if it has none |
+| `spec-verify` | ✅ | ⚠️ | ⚠️ | ⚠️ | UI-observable criteria need a browser-automation tool available on your host (MCP browser server, built-in browser tool, or extension); API/DB-only criteria work everywhere |
+| `spec-checkpoint` | ✅ | ✅ | ✅ | ✅ | Plain git commands |
+| `spec-ship` | ✅ | ✅ | ✅ | ✅ | Plain git + GitHub CLI (`gh`) commands |
+| `generative-seo` | ✅ | ✅ | ✅ | ✅ | Web search + file writing only |
+
+⚠️ = works, but one step's usefulness depends on a host capability that isn't guaranteed present
+— the skill degrades gracefully (it says so and skips that step) rather than failing outright.
+
+Native Agent Skills support is new on some of these hosts and still settling — if a skill
+doesn't get picked up, check your host's current docs for its exact discovery path.
+
 ## Install
 
-From within Claude Code:
+### Claude Code (plugin)
 
 ```
 /plugin marketplace add <path-or-git-url-to-this-repo>
@@ -58,14 +85,55 @@ Or, for local development/testing without publishing anywhere, point Claude
 Code at this folder directly as a marketplace source (its own
 `.claude-plugin/marketplace.json` lists itself with `source: "./"`).
 
+### Codex CLI, Cursor, Antigravity, or any other Agent-Skills-compatible host
+
+Run `install.sh` from a clone of this repo:
+
+```bash
+./install.sh                        # interactive: pick a host and skills
+./install.sh codex                   # all six skills, into the current project
+./install.sh cursor spec-create      # just one skill, into the current project
+./install.sh --global antigravity    # install globally instead of per-project
+```
+
+Or copy the `skills/<name>/` folders you want by hand — each is fully self-contained. Common
+discovery paths as of this writing (also what `install.sh` targets):
+
+| Host | Project-level | Global |
+|---|---|---|
+| Codex CLI | `.agents/skills/<name>/` | `~/.codex/skills/<name>/` |
+| Cursor | `.cursor/skills/<name>/` (or `.agents/skills/<name>/`) | `~/.cursor/skills/<name>/` |
+| Antigravity | `.agents/skills/<name>/` | `~/.gemini/config/skills/<name>/` |
+
+Note that Codex CLI and Antigravity share the same project-level path, so installing for one
+also covers the other at that scope.
+
+### Fallback: MCP server (for hosts without native Agent Skills support)
+
+If your host speaks MCP but doesn't yet support Agent Skills natively — or only implements MCP
+tools, not prompts — `mcp-server/` exposes the same six skills as MCP tools instead. It reads
+directly from `skills/` at request time, so there's nothing to keep in sync by hand.
+
+```bash
+cd mcp-server && npm install
+```
+
+Then point your host's MCP config at `node /path/to/spec-driven-dev/mcp-server/server.js`
+(stdio transport). Each skill becomes a callable tool (e.g. `spec-create`) that returns the
+skill's instructions as text; supporting files are also exposed as `skill://<name>/<path>`
+resources for hosts that can't otherwise reach the local filesystem.
+
+Treat this as the fallback, not the primary path — prefer native Agent Skills support
+(above) wherever your host has it.
+
 ## Typical flow
 
-1. Plan a feature in conversation, then `/create-spec` to capture it.
-2. `/implement-feature` to build it wave-by-wave with review gates between waves.
-3. `/verify-feature` to prove the acceptance criteria hold against the real
+1. Plan a feature in conversation, then `/spec-create` to capture it.
+2. `/spec-implement` to build it wave-by-wave with review gates between waves.
+3. `/spec-verify` to prove the acceptance criteria hold against the real
    running app — not just that it compiles.
-4. `/checkpoint` to commit locally, once lint/typecheck/build all pass.
-5. `/ship-it` to push and open the PR.
+4. `/spec-checkpoint` to commit locally, once lint/typecheck/build all pass.
+5. `/spec-ship` to push and open the PR.
 6. Any time, independent of the pipeline: `/generative-seo` for SEO/GEO work
    on the same project or any other.
 

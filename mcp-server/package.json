@@ -1,0 +1,20 @@
+{
+  "name": "spec-driven-dev-mcp-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP fallback server exposing spec-driven-dev's Agent Skills as MCP tools/resources, for hosts without native Agent Skills support.",
+  "main": "server.js",
+  "bin": {
+    "spec-driven-dev-mcp": "server.js"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,11 +1,13 @@
 ---
-name: checkpoint
+name: spec-checkpoint
 description: >
   Create a comprehensive checkpoint commit with detailed analysis of all changes. Use this skill
   when the user says "checkpoint", "commit everything", "save my progress", "create a commit",
   or wants to stage and commit all current changes with a well-crafted message. Also use when
-  the user says "/checkpoint" or asks to snapshot current work. This skill stages all changes
-  and creates a descriptive commit — it does not push.
+  the user says "/spec-checkpoint" (or their host's equivalent invocation syntax) or asks to
+  snapshot current work. This skill stages all changes and creates a descriptive commit — it
+  does not push.
+license: MIT
 ---
 
 # Checkpoint Commit
@@ -41,6 +43,12 @@ Stage all changes — tracked modifications, deletions, and new untracked files:
 git add -A
 ```
 
+Then review `git status` again. If anything staged looks like it could hold secrets —
+`.env*`, `*.pem`, `*_rsa`, `credentials.json`, `secrets.*`, or an unfamiliar filename that might
+contain an API key — unstage it (`git restore --staged <file>`) and tell the user what was
+excluded and why, rather than committing it silently. Don't rely on the filename alone for
+anything you don't recognize; skim its diff if you're unsure.
+
 ### Step 4: Craft the Commit Message
 
 Write a commit message following the project's existing conventions (observed from `git log`). Structure:
@@ -48,7 +56,9 @@ Write a commit message following the project's existing conventions (observed fr
 - **First line**: clear, concise summary in imperative mood (50-72 chars)
   - Use conventional commit prefixes where the project uses them: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, etc.
 - **Body** (separated by blank line): a short TL;DR of the changes — 1-3 sentences max. No bullet lists, no file-by-file breakdowns, no lengthy explanations.
-- **Footer**: co-author attribution
+- **Footer**: co-author attribution, naming whichever agent/model is actually running this
+  skill — never hardcode a specific vendor or model name, since this skill runs under many
+  different hosts
 
 ### Step 5: Commit
 
@@ -60,10 +70,12 @@ git commit -m "$(cat <<'EOF'
 
 {tldr}
 
-Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+Co-Authored-By: {agent name} <noreply@example.com>
 EOF
 )"
 ```
+
+Fill in `{agent name}` with whatever the current agent/model actually identifies as (e.g. "Claude", "Codex", "Cursor Agent") — if your host has no clean way to identify itself, omit the footer entirely rather than guessing.
 
 ### Step 6: Report
 
@@ -74,7 +86,7 @@ Display:
 
 ## Important
 
-- Stage and commit everything — do not skip files unless they are clearly sensitive (`.env`, credentials)
+- Stage and commit everything except files that look like secrets or credentials (see Step 3) — check contents, not just filenames, before assuming something is safe to commit
 - If the repo has no git history, run `git init` first
 - All quality checks (lint, type-check, build) MUST pass before committing — fix issues, don't skip them
 - Keep the commit body short — a TL;DR, not an essay

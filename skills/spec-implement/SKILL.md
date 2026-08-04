@@ -1,18 +1,20 @@
 ---
-name: implement-feature
+name: spec-implement
 description: >
   Orchestrate parallel implementation of a feature specification by dispatching coder agents
   wave-by-wave with code review gates between waves. Use this skill when the user says
   "implement this feature", "start implementing", "run the spec", "execute the plan",
   "continue implementing", or wants to begin coding a previously planned feature from a
-  specs/{feature}/ folder. Also use when the user says "/implement-feature" or drags a spec
-  folder into the conversation and asks to implement it. This skill does NOT write code itself —
-  it orchestrates coder subagents that work in parallel.
+  specs/{feature}/ folder. Also use when the user says "/spec-implement" (or their host's
+  equivalent invocation syntax) or drags a spec folder into the conversation and asks to
+  implement it. This skill does NOT write code itself — it orchestrates coder subagents that
+  work in parallel.
+license: MIT
 ---
 
 # Implement Feature
 
-Orchestrate the parallel implementation of a feature specification by dispatching coder agents wave-by-wave. This skill reads a spec folder (created by `create-spec`), identifies the next wave of parallelizable work, spawns coder agents for each task, and runs a code review gate before moving to the next wave.
+Orchestrate the parallel implementation of a feature specification by dispatching coder agents wave-by-wave. This skill reads a spec folder (created by `spec-create`), identifies the next wave of parallelizable work, spawns coder agents for each task, and runs a code review gate before moving to the next wave.
 
 The orchestrator never writes code itself. Its job is to:
 1. Parse the spec and determine what to do next
@@ -21,6 +23,19 @@ The orchestrator never writes code itself. Its job is to:
 4. Manage the fix loop if review finds issues
 5. Track progress and commit completed waves
 
+## Orchestration Model
+
+This skill's parallelism assumes your host can run multiple independent agents at once —
+Claude Code's Agent/Task tool, Codex CLI's `spawn_agent`/`wait_agent`, Cursor's Subagents or
+Background Agents, Antigravity's `invoke_subagent`, or whatever equivalent your host provides.
+Use that mechanism throughout; give each dispatched agent only the context specified in Step 4
+below, never the full conversation history.
+
+If your host has no such mechanism, fall back to processing each wave's tasks sequentially in
+the current session — implement one task fully, then the next — rather than skipping the wave.
+The review gate (Step 6) still applies; run it as a distinct pass with a fresh, unbiased read of
+the diff, even without a separate agent to run it in.
+
 ## Prerequisites
 
 A `specs/{feature}/` directory containing:
@@ -28,7 +43,7 @@ A `specs/{feature}/` directory containing:
 - `requirements.md` with feature context
 - `tasks/task-{nn}-*.md` files (one per task, self-contained)
 
-This structure is produced by the `create-spec` skill. If the user doesn't have a spec folder, suggest they create one first.
+This structure is produced by the `spec-create` skill. If the user doesn't have a spec folder, suggest they create one first.
 
 ## Orchestration
 
@@ -66,7 +81,10 @@ For each wave starting from the current one, execute Steps 3 through 8 below, th
 
 ### Step 4: Dispatch Coder Agents
 
-For each task in the wave, spawn a coder agent using the `Agent` tool with `subagent_type: "coder"`. Spawn all agents for the wave in a **single message** so they run in parallel.
+For each task in the wave, delegate the work to an independent agent using your host's
+parallel-agent mechanism (see Orchestration Model above). Dispatch every task in the wave in
+one batch so they run concurrently — or, without a parallel-agent mechanism, work through them
+one at a time in the current session.
 
 Read `references/coder-prompt-template.md` and construct each agent's prompt by filling in:
 - **{requirements}**: full text of `requirements.md`
@@ -86,7 +104,10 @@ If any agent fails (returns an error or crashes), note the failure and continue 
 
 ### Step 6: Code Review Gate
 
-Spawn a single review agent using the `Agent` tool with `subagent_type: "code-review"`.
+Dispatch a single review pass in a fresh agent/session — not one of the coder agents from
+Step 4, since the review needs an unbiased read of the diff it didn't write. Use your host's
+parallel-agent mechanism if it supports spawning a distinct reviewer agent; otherwise perform
+the review directly in the current session as its own clearly delimited pass.
 
 Read `references/review-prompt-template.md` and construct the review prompt by filling in:
 - **{wave_number}**: current wave number
@@ -107,7 +128,7 @@ If the review returns **FAIL**:
 
 1. Parse the issues from the review (file paths, descriptions, suggested fixes)
 2. Group issues by the task they most closely relate to (match file paths against each task's "Files to Create/Modify")
-3. For each group, spawn a coder agent with a fix prompt. Read `references/fix-prompt-template.md` and fill in:
+3. For each group, dispatch a coder agent (same mechanism as Step 4) with a fix prompt. Read `references/fix-prompt-template.md` and fill in:
    - **{issues}**: the specific issues for this task group
    - **{task_content}**: the original task file for context
 4. After fix agents complete, re-run the review (Step 6)
@@ -119,7 +140,7 @@ Wave {N} review failed after 3 cycles. Outstanding issues:
 {list of remaining issues}
 
 Options:
-1. Fix these manually and re-run /implement-feature
+1. Fix these manually and re-run /spec-implement
 2. Proceed to the next wave anyway
 3. Stop here
 ```
@@ -154,7 +175,7 @@ After the wave passes review (or the user chooses to proceed):
 After all waves are complete:
 
 1. Run lint and typecheck one final time
-2. Spawn a code-review agent to review the full scope of changes (all files modified across all waves)
+2. Dispatch a review pass (same mechanism as Step 6) to review the full scope of changes (all files modified across all waves)
 3. Report the final status:
 
 ```
@@ -178,7 +199,7 @@ Next steps:
 - **Coder agent failure**: mark the task as failed, report to user, continue with remaining tasks in the wave. The review step will catch integration issues.
 - **Lint/typecheck failure after fix attempts**: report the specific errors and ask the user whether to commit anyway or fix manually.
 - **All tasks already complete**: report completion and stop.
-- **Missing spec folder**: ask the user to provide the feature name or suggest creating a spec with `create-spec`.
+- **Missing spec folder**: ask the user to provide the feature name or suggest creating a spec with `spec-create`.
 
 ## Key Principles
 

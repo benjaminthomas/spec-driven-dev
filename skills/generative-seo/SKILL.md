@@ -1,6 +1,7 @@
 ---
 name: generative-seo
 description: Run an evidence-based SEO + GEO (Generative Engine Optimization) program for ANY website or product codebase — auditing technical SEO, writing or retrofitting content so it gets cited by ChatGPT/Perplexity/AI Overviews, tracking AI-citation visibility, refreshing competitor research, and drafting distribution posts. Use whenever the user asks to audit SEO, improve AI-search/AI-citation visibility, write or optimize marketing/blog content for search or GEO, check whether a product shows up in ChatGPT/Perplexity answers, do competitor/keyword research, or wants a monthly SEO performance report — regardless of framework (Next.js, Astro, Remix, plain HTML, WordPress, etc.) or what the product is. Works on any repo; it interviews you once to learn the project's specifics (brand, domain, framework, docs location) and remembers the answers.
+license: MIT
 ---
 
 # Generative SEO (GEO) Operations
