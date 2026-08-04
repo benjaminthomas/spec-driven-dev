@@ -11,7 +11,7 @@ Use this structure for each task file in the `tasks/` subfolder. Each task file 
 
 pending
 
-## Wave
+## Batch
 
 {N}
 
@@ -21,7 +21,7 @@ pending
 
 ## Dependencies
 
-**Depends on:** {Comma-separated list of task filenames, or "None (Wave 1)"}
+**Depends on:** {Comma-separated list of task filenames, or "None (Batch 1)"}
 **Blocks:** {Comma-separated list of task filenames, or "None"}
 
 **Context from dependencies:** {Prose summary of what the dependency tasks produce that this task needs. For example: "task-01-setup-database.md creates the PostgreSQL schema with users and sessions tables. This task builds the API routes that query those tables." This is what makes each file self-contained — the agent does not need to read other task files to understand its inputs.}
@@ -74,6 +74,6 @@ pending
 
 - The **Status** field is updated by the `spec-implement` skill: `pending` → `in-progress` → `complete`.
 - The **Dependencies** section includes prose context (not just filenames) so the agent understands its inputs without reading other files. This is the most important part of making task files self-contained.
-- **Files to Create** and **Files to Modify** make the task's scope explicit. Tasks in the same wave should not overlap on these lists.
+- **Files to Create** and **Files to Modify** make the task's scope explicit. Tasks in the same batch should not overlap on these lists.
 - **Technical Details** captures everything from the planning conversation — CLI commands, schemas, code snippets, file paths, env vars, API endpoints. If it was discussed during planning and is relevant to this task, it belongs here.
 - **Acceptance Criteria** should be specific enough that completion can be verified objectively (by a code review agent or a human).

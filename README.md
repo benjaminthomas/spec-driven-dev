@@ -1,7 +1,7 @@
 # spec-driven-dev
 
 Six [Agent Skills](https://agentskills.io) — an open, cross-host standard for packaging agent
-instructions — bundling a parallel-wave, spec-driven feature workflow and a portable SEO/GEO
+instructions — bundling a parallel-batch, spec-driven feature workflow and a portable SEO/GEO
 operations skill. Works in any codebase — none of these assume a specific framework, stack, or
 product. Packaged as a Claude Code plugin for that host, and installable as plain skill folders
 on any other Agent-Skills-compatible host (see [Compatibility](#compatibility) and
@@ -20,8 +20,8 @@ spec-create  →  spec-implement  →  spec-verify  →  spec-checkpoint  →  s
 
 | Skill | Trigger | Input | Output |
 |---|---|---|---|
-| `spec-create` | "create a spec", "plan this feature", "break this into tasks" | A planning conversation (or an interview if there wasn't one) | `specs/{feature}/` — `requirements.md`, `action-required.md`, `tasks/task-NN-*.md`, `README.md` with a dependency graph and wave breakdown |
-| `spec-implement` | "implement this feature", "run the spec", "continue implementing" | `specs/{feature}/` | Real code changes — one coder subagent per task per wave, run in parallel within a wave, with a code-review gate before each wave is committed |
+| `spec-create` | "create a spec", "plan this feature", "break this into tasks" | A planning conversation (or an interview if there wasn't one) | `specs/{feature}/` — `requirements.md`, `action-required.md`, `tasks/task-NN-*.md`, `README.md` with a dependency graph and batch breakdown |
+| `spec-implement` | "implement this feature", "run the spec", "continue implementing" | `specs/{feature}/` | Real code changes — one coder subagent per task per batch, run in parallel within a batch, with a code-review gate before each batch is committed |
 | `spec-verify` | "test this end to end", "does this actually work", right after `spec-implement` finishes | `specs/{feature}/` | `specs/{feature}/verification-report.md` — every acceptance criterion checked against the *real running app* (clicks, API calls, DB reads used only to confirm state), pass/fail with evidence |
 | `spec-checkpoint` | "checkpoint", "commit everything", "save my progress" | A working tree with changes | A local commit — but only after lint, typecheck, and build all pass |
 | `spec-ship` | "ship it", "push this", "open a PR" | A committed, verified branch | A pushed branch + an opened GitHub PR |
@@ -129,7 +129,7 @@ Treat this as the fallback, not the primary path — prefer native Agent Skills 
 ## Typical flow
 
 1. Plan a feature in conversation, then `/spec-create` to capture it.
-2. `/spec-implement` to build it wave-by-wave with review gates between waves.
+2. `/spec-implement` to build it batch-by-batch with review gates between batches.
 3. `/spec-verify` to prove the acceptance criteria hold against the real
    running app — not just that it compiles.
 4. `/spec-checkpoint` to commit locally, once lint/typecheck/build all pass.

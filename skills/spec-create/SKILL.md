@@ -2,7 +2,7 @@
 name: spec-create
 description: >
   Create a structured feature specification with self-contained task files organized into
-  parallel execution waves. Use this skill when the user says "create a spec", "plan this feature",
+  parallel execution batches. Use this skill when the user says "create a spec", "plan this feature",
   "write up an implementation plan", "break this into tasks", or after any planning conversation
   where the user wants to capture decisions as actionable spec files. Also use when the user
   says "/spec-create" (or their host's equivalent invocation syntax) or wants to decompose a
@@ -45,7 +45,7 @@ Break the implementation into atomic tasks. Each task should:
 - Be completable in a single coding session by one agent
 - Have a clear, specific scope (one concern per task)
 - Produce working, testable code when complete
-- Not overlap in files modified with other tasks in the same wave
+- Not overlap in files modified with other tasks in the same batch
 
 Think carefully about granularity. Too coarse and agents can't work in parallel. Too fine and the overhead of context-switching between tasks dominates. A good task typically creates or modifies 1-5 files around a single concern.
 
@@ -57,9 +57,9 @@ For each task, identify:
 - **What it depends on**: which tasks must complete before this one can start
 - **What depends on it**: which tasks are blocked until this one finishes
 
-Tasks with no dependencies form Wave 1. Tasks whose dependencies are all in Wave 1 form Wave 2. And so on. All tasks within a wave can execute in parallel.
+Tasks with no dependencies form Batch 1. Tasks whose dependencies are all in Batch 1 form Batch 2. And so on. All tasks within a batch can execute in parallel.
 
-When assigning waves, verify that tasks within the same wave do not modify overlapping files. If two tasks in the same wave would touch the same file, move one to a later wave — parallel agents on the same branch cannot safely modify the same file.
+When assigning batches, verify that tasks within the same batch do not modify overlapping files. If two tasks in the same batch would touch the same file, move one to a later batch — parallel agents on the same branch cannot safely modify the same file.
 
 ### Step 5: Create the Spec Folder
 
@@ -77,12 +77,12 @@ specs/{feature-name}/
 ```
 
 Read the templates in `references/` before writing each file:
-- `references/readme-template.md` — for the README (dependency graph, wave table, status tracking)
+- `references/readme-template.md` — for the README (dependency graph, batch table, status tracking)
 - `references/task-template.md` — for each task file (self-contained with all context)
 - `references/requirements-template.md` — for the requirements document
 - `references/action-required-template.md` — for manual human steps
 
-Task files are numbered with zero-padded two-digit prefixes in topological order: Wave 1 tasks first, then Wave 2, etc. Within a wave, order is arbitrary but stable.
+Task files are numbered with zero-padded two-digit prefixes in topological order: Batch 1 tasks first, then Batch 2, etc. Within a batch, order is arbitrary but stable.
 
 ### Step 6: Write Self-Contained Task Files
 
@@ -108,14 +108,14 @@ After creating the spec, display:
 Feature specification created at specs/{feature-name}/
 
 Files created:
-- README.md (dependency graph, {N} waves, {T} tasks)
+- README.md (dependency graph, {N} batches, {T} tasks)
 - requirements.md
 - action-required.md
 - tasks/ ({T} task files)
 
-Wave breakdown:
-- Wave 1: {count} tasks (parallel) — {brief description}
-- Wave 2: {count} tasks (parallel) — {brief description}
+Batch breakdown:
+- Batch 1: {count} tasks (parallel) — {brief description}
+- Batch 2: {count} tasks (parallel) — {brief description}
 - ...
 
 Next steps:
@@ -128,7 +128,7 @@ Next steps:
 
 - Every task file must be fully self-contained — this is the entire point of the spec structure. A coder agent reading only that file must know exactly what to do.
 - Capture ALL technical details from the planning conversation. The spec is the single source of truth — CLI commands, schemas, code snippets, file paths, env vars, API endpoints. Anything not captured here is lost.
-- Tasks within the same wave must not modify overlapping files. Parallel agents on the same branch cannot safely touch the same files.
+- Tasks within the same batch must not modify overlapping files. Parallel agents on the same branch cannot safely touch the same files.
 - Keep tasks atomic — one concern per task. If a task has more than 5-7 files to modify, consider splitting it.
 - Do not create testing tasks unless the user explicitly asks for them.
-- Number task files in topological order (wave 1 first, then wave 2, etc.) for easy scanning.
+- Number task files in topological order (batch 1 first, then batch 2, etc.) for easy scanning.

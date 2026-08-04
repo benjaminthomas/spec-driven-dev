@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "spec-driven-dev",
-  "description": "Turn planning conversations into parallel-executable specs, implement them wave-by-wave with review gates, verify against the real running app, and ship a PR — plus a portable SEO/GEO operations skill.",
+  "description": "Turn planning conversations into parallel-executable specs, implement them batch-by-batch with review gates, verify against the real running app, and ship a PR — plus a portable SEO/GEO operations skill.",
   "owner": {
     "name": "benjaminbarnabas"
   },

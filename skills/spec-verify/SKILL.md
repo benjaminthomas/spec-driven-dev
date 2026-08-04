@@ -36,7 +36,7 @@ answers as the criteria list. The spec-driven path below is the common case, not
 2. Otherwise look for a `specs/*/README.md` whose Task Status section is fully checked (all
    tasks `- [x]`) but has no `verification-report.md` sibling yet — that's the most recently
    completed, not-yet-verified feature.
-3. If `spec-implement` hasn't finished all waves yet (some tasks still `- [ ]`), tell the user
+3. If `spec-implement` hasn't finished all batches yet (some tasks still `- [ ]`), tell the user
    and ask whether to verify what's done so far or wait for the rest — verifying half a feature
    can produce confusing false failures for criteria that depend on an unbuilt task.
 
