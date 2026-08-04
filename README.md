@@ -77,7 +77,7 @@ doesn't get picked up, check your host's current docs for its exact discovery pa
 ### Claude Code (plugin)
 
 ```
-/plugin marketplace add <path-or-git-url-to-this-repo>
+/plugin marketplace add https://github.com/benjaminthomas/spec-driven-dev.git
 /plugin install spec-driven-dev@spec-driven-dev
 ```
 
