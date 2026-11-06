@@ -1,0 +1,13 @@
+{
+  "name": "spec-driven-dev",
+  "version": "1.3.0",
+  "description": "Spec-driven AI development workflow (investigate → spec → implement → verify → ship) as Agent Skills for Claude Code, Cursor, Codex CLI and Antigravity.",
+  "type": "module",
+  "bin": { "spec-driven-dev": "bin/cli.mjs" },
+  "files": ["bin", "skills"],
+  "scripts": { "test": "python3 scripts/check.py && node scripts/test-cli.mjs" },
+  "engines": { "node": ">=18" },
+  "keywords": ["agent-skills", "claude-code", "cursor", "codex", "antigravity", "spec-driven-development", "ai-agents"],
+  "repository": { "type": "git", "url": "git+https://github.com/benjaminthomas/spec-driven-dev.git" },
+  "license": "MIT"
+}

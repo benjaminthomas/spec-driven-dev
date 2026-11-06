@@ -8,7 +8,7 @@ import json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STAGES = {  # README table order and stage labels
-    "spec-investigate": "1 · understand", "spec-create": "2 · plan", "spec-implement": "3 · build",
+    "spec-setup": "0 · configure", "spec-investigate": "1 · understand", "spec-create": "2 · plan", "spec-implement": "3 · build",
     "spec-verify": "4 · prove", "spec-checkpoint": "5 · commit", "spec-ship": "6 · PR",
     "generative-seo": "standalone",
 }
@@ -39,9 +39,9 @@ for name in skills:
     if not (os.path.islink(link) and os.path.realpath(link) == os.path.join(os.path.realpath(ROOT), "skills", name)):
         errors.append(f"{name}: .agents/skills/{name} symlink missing or wrong")
 
-m = re.search(r"^ALL_SKILLS=\((.*)\)", read("install.sh"), re.M)
-if not m or set(m.group(1).split()) != set(skills):
-    errors.append("install.sh ALL_SKILLS does not match skills/")
+pkg = json.loads(read("package.json"))
+if pkg["version"] != json.loads(read(".claude-plugin/plugin.json"))["version"]:
+    errors.append("package.json and .claude-plugin/plugin.json versions differ")
 
 for p in (".claude-plugin/plugin.json", ".claude-plugin/marketplace.json"):
     try:

@@ -5,9 +5,10 @@ without guessing.** It first investigates the problem, then writes a plan you ap
 in parallel with tests and review, then checks the real running app, and finally commits and opens
 the PR.
 
-It's a set of seven [Agent Skills](https://agentskills.io), plain Markdown instruction files that
+It's a set of eight [Agent Skills](https://agentskills.io), plain Markdown instruction files that
 AI coding tools load on demand. It works with Claude Code, Codex CLI, Cursor, and Google Antigravity,
-in any language or framework.
+in any language or framework, and in a single repo, a monorepo, or several repos that change
+together. One command installs it: `npx spec-driven-dev`.
 
 ---
 
@@ -15,6 +16,7 @@ in any language or framework.
 
 - [Why use it](#why-use-it)
 - [Quick start (5 minutes)](#quick-start-5-minutes)
+- [Project setup: your team's rules](#project-setup-your-teams-rules)
 - [How the workflow fits together](#how-the-workflow-fits-together)
 - [The skills, one by one](#the-skills-one-by-one)
 - [What ends up in your repo](#what-ends-up-in-your-repo)
@@ -46,12 +48,18 @@ start a new session and continue where you left off.
 
 ## Quick start (5 minutes)
 
-**1. Install** (Claude Code; for other tools see [Install](#install)):
+**1. Install.** In your project folder (or, for several repos, their shared parent folder), run:
 
+```bash
+npx spec-driven-dev
 ```
-/plugin marketplace add https://github.com/benjaminthomas/spec-driven-dev.git
-/plugin install spec-driven-dev@spec-driven-dev
-```
+
+The installer:
+1. **Finds your AI tools** (Claude Code, Cursor, Codex CLI, Antigravity) and installs the skills
+   into each one you choose, for this project or for all projects.
+2. **Sets up your project** by detecting its layout, issue tracker, branch conventions, and
+   commands, then asking you to confirm. The answers go into `.spec-driven.yml`
+   ([details below](#project-setup-your-teams-rules)).
 
 **2. In your project, run each stage in order.** You can type the slash command or just say the
 words in quotes.
@@ -73,6 +81,43 @@ That's the whole workflow. Every stage can be used on its own as well: use `/spe
 from a planning chat, or `/spec-checkpoint` on any work in progress.
 
 ---
+
+## Project setup: your team's rules
+
+Teams work differently. Some branch from `main`, some from `staging`. Some name branches `STP-123`,
+others `fix/STP-123-short-name`. Some have one repo, others have six. None of this is built into the
+skills. Each project describes its own rules in **`.spec-driven.yml`**, and every skill reads that
+file before doing anything.
+
+**How the file gets created:** `npx spec-driven-dev` (or `npx spec-driven-dev setup` to run only this
+step) detects the answers from your repos and asks you to confirm them. In your AI tool you can also
+say **"run spec-setup"**: that does a deeper version that also reads `CLAUDE.md`/`AGENTS.md`, CI
+config, and recent PRs, and fills in what the installer can't (such as each repo's role, or commands
+for stacks other than Node). If a skill finds no config, it runs this setup first.
+
+**What it asks:**
+
+| Question | Detected from | Example answer |
+|---|---|---|
+| Project layout | git repos and workspace files (`pnpm-workspace.yaml`, `turbo.json`, `nx.json`, `go.work`, …) | `single`, `monorepo`, or `multi-repo` |
+| Which repos belong together (multi-repo) | sibling git repos grouped by GitHub owner | `api`, `web`, `worker` |
+| Issue tracker | ticket keys in branch names and commits | Jira, key `STP` |
+| Base branch / PR target | default branch, `staging`/`develop` branches | `staging` |
+| Branch name pattern | your recent branch names | `{ticket}` → `STP-123` |
+| Commit style | your recent commit messages | `conventional` (`feat: …`) or `ticket` (`STP-123: …`) |
+| Lint / typecheck / test / build / dev commands | `package.json` scripts and lockfile (per repo or package) | `pnpm run lint` |
+| Where specs go | (you choose) | `specs/` |
+
+**Where the file lives, by layout:**
+
+| Layout | What it means | `.spec-driven.yml` goes in | How the workflow adapts |
+|---|---|---|---|
+| **single** | one repo, one app | the repo root (commit it, so the team shares it) | as described below |
+| **monorepo** | one repo, many apps/packages | the repo root (commit it) | tasks name their package, and checks run per package |
+| **multi-repo** | several repos that change together | their shared parent folder (personal to your machine) | investigation searches every listed repo, tasks stay inside one repo each, and `spec-ship` opens one PR per repo, each linking the others |
+
+To change the rules later, edit the file or run setup again. Setup never overwrites the file without
+asking. See [`config-template.yml`](skills/spec-setup/references/config-template.yml) for every field.
 
 ## How the workflow fits together
 
@@ -97,6 +142,13 @@ from a planning chat, or `/spec-checkpoint` on any work in progress.
 
 ## The skills, one by one
 
+### 0. `spec-setup`: learn the project's rules
+
+**Say:** "run spec-setup", "configure the pipeline", "change our branch rules"
+
+**What it does:** see [Project setup](#project-setup-your-teams-rules). It writes `.spec-driven.yml` and
+nothing else: no branches, commits, or code.
+
 ### 1. `spec-investigate`: understand before planning
 
 **Say:** "investigate STP-123", "look into this before we plan it", or `/spec-investigate <input>`
@@ -117,8 +169,9 @@ You can add `--context ./notes.md` to supply extra background, such as meeting n
 **What it does:**
 1. Loads the input. For tickets, that includes comments and linked issues. Free text is read
    carefully: "maybe we should add an endpoint" is recorded as a proposal, not a requirement.
-2. Creates a work branch from the right base branch and never touches existing work. The base
-   branch and branch name follow your repo's convention (see [FAQ](#faq)).
+2. Creates a work branch from the base branch in `.spec-driven.yml`, named by its pattern, and never
+   touches existing work. In a multi-repo setup, it creates the branch only in the repos that need
+   changes.
 3. Traces how the system actually works, naming real files and functions. For bugs, it finds the
    root cause.
 4. Sorts the work into **required / supporting / optional / out of scope**, and lists risks, security
@@ -178,9 +231,10 @@ checks that instead.
 
 **Say:** "checkpoint", "commit everything", "save my progress"
 
-**What it does:** It finds your repo's own lint, typecheck, test, and build commands (from
-`package.json`, `Makefile`, `pyproject.toml`, CI config, and so on), runs them, and fixes failures.
-Then it stages everything and writes a commit message in your repo's existing style.
+**What it does:** It runs the lint, typecheck, test, and build commands from `.spec-driven.yml` (or
+finds them in `package.json`, `Makefile`, `pyproject.toml`, CI config, and so on) and fixes failures.
+Then it stages everything and commits in your configured style (`feat: …` or `STP-123: …`). In a
+multi-repo setup, it makes one commit in each repo that changed.
 
 **It won't:** push. Committing is a local step.
 
@@ -188,9 +242,10 @@ Then it stages everything and writes a commit message in your repo's existing st
 
 **Say:** "ship it", "push this", "open a PR"
 
-**What it does:** It creates a properly named branch if you're on the default branch, **shows you
-exactly what will be pushed and waits for your "yes"**, then pushes and opens a GitHub PR with a
-written description. If a PR already exists for the branch, it pushes the new commits to that PR
+**What it does:** It creates a branch using your naming pattern if you're on the default branch,
+**shows you exactly what will be pushed and waits for your "yes"**, then pushes and opens a GitHub PR
+against your configured PR target, with a written description. In a multi-repo setup, it opens one
+PR per repo, each linking the others. If a PR already exists for the branch, it pushes the new commits to that PR
 instead of opening another one.
 
 **Needs:** the [GitHub CLI](https://cli.github.com) (`gh`), logged in.
@@ -250,10 +305,12 @@ No. Use GitHub Issues, Linear, a transcript, a document, or a sentence of plain 
 one of the options.
 
 **How does it choose the base branch and branch name?**
-In this order: what your repo's `CLAUDE.md` or `AGENTS.md` says → the pattern your recent branches
-follow → the repo's default branch and `feat/…`/`fix/…`-style names. To pin a team rule, add a line
-to `CLAUDE.md`, for example:
-`Base branch: staging. Branch name = ticket ID exactly (e.g. STP-123).`
+From `.spec-driven.yml`, which setup fills in by looking at your recent branches and asking you to
+confirm. To change it, edit `git.base_branch` / `git.branch_name` or run setup again.
+
+**Should I commit `.spec-driven.yml`?**
+For a single repo or monorepo, yes: the whole team then follows the same rules. A multi-repo
+config sits outside any repo, so it stays on your machine.
 
 **Does it work with my stack?**
 Yes. No skill assumes a language or framework. Each one finds the repo's own commands.
@@ -277,34 +334,40 @@ everywhere.
 
 ## Install
 
-### Claude Code (plugin)
+### Any tool: npm (recommended)
+
+```bash
+npx spec-driven-dev                                   # detect tools, install, set up the project
+npx spec-driven-dev setup                             # only (re)run project setup
+npx spec-driven-dev --global                          # install for all projects, not just this one
+npx spec-driven-dev --tools=cursor,codex              # pick tools without being asked
+npx spec-driven-dev --skills=spec-create,spec-ship    # install only some skills
+npx spec-driven-dev --yes                             # accept every detected default (CI-friendly)
+```
+
+Run it again at any time to update: it replaces the installed skill folders with the latest
+version. Before the package is published to npm, `npx github:benjaminthomas/spec-driven-dev` works
+the same way.
+
+### Claude Code (plugin, with automatic updates)
 
 ```
 /plugin marketplace add https://github.com/benjaminthomas/spec-driven-dev.git
 /plugin install spec-driven-dev@spec-driven-dev
 ```
 
-**Updating:** `/plugin marketplace update spec-driven-dev`, then update the plugin from `/plugin`.
+To update, run `/plugin marketplace update spec-driven-dev`, then update the plugin from `/plugin`. If
+you use the plugin, `npx spec-driven-dev` skips Claude Code so you don't get every skill twice. Run
+`npx spec-driven-dev setup` for the project config.
 
-For local development, add this folder itself as a marketplace source. Its
-`.claude-plugin/marketplace.json` points to itself (`source: "./"`).
+### By hand
 
-### Codex CLI, Cursor, Antigravity, or any Agent-Skills-compatible tool
-
-From a clone of this repo:
-
-```bash
-./install.sh                        # interactive: pick a tool and skills
-./install.sh codex                  # all seven skills, into the current project
-./install.sh cursor spec-create     # just one skill
-./install.sh --global antigravity   # install for all projects instead of this one
-```
-
-Or copy the `skills/<name>/` folders by hand. Each one is self-contained. Where each tool looks for
+Copy the `skills/<name>/` folders you want. Each one is self-contained. Where each tool looks for
 skills:
 
 | Tool | This project | All projects |
 |---|---|---|
+| Claude Code | `.claude/skills/<name>/` | `~/.claude/skills/<name>/` |
 | Codex CLI | `.agents/skills/<name>/` | `~/.codex/skills/<name>/` |
 | Cursor | `.cursor/skills/<name>/` (or `.agents/skills/<name>/`) | `~/.cursor/skills/<name>/` |
 | Antigravity | `.agents/skills/<name>/` | `~/.gemini/config/skills/<name>/` |
@@ -313,7 +376,7 @@ Codex CLI and Antigravity share the project path, so installing for one covers b
 
 ### Fallback: MCP server (for tools without Agent Skills support)
 
-If your tool supports MCP but not Agent Skills, `mcp-server/` serves the same seven skills as MCP
+If your tool supports MCP but not Agent Skills, `mcp-server/` serves the same eight skills as MCP
 tools. It reads `skills/` directly, so there's nothing to keep in sync.
 
 ```bash
@@ -330,6 +393,7 @@ Each skill becomes a tool that returns its instructions, and supporting files ar
 
 | Skill | Claude Code | Codex CLI | Cursor | Antigravity | Notes |
 |---|---|---|---|---|---|
+| `spec-setup` | ✅ | ✅ | ✅ | ✅ | Reads git and project files, and writes one config file |
 | `spec-investigate` | ✅ | ✅ | ✅ | ✅ | Fetches tickets via whatever access the tool has (Atlassian/Linear MCP, `gh`); otherwise asks you to paste the ticket. Files and text need nothing extra |
 | `spec-create` | ✅ | ✅ | ✅ | ✅ | Planning and writing files only |
 | `spec-implement` | ✅ | ✅ | ✅ | ✅ | Parallel agents and worktrees where the tool supports them; otherwise one task at a time |
@@ -347,18 +411,20 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-investigate` | 1 · understand | 310 | 2,553 | 1 |
-| `spec-create` | 2 · plan | 136 | 1,195 | 4 |
-| `spec-implement` | 3 · build | 223 | 1,645 | 3 |
-| `spec-verify` | 4 · prove | 140 | 1,336 | 1 |
-| `spec-checkpoint` | 5 · commit | 93 | 598 | 0 |
-| `spec-ship` | 6 · PR | 201 | 1,051 | 0 |
+| `spec-setup` | 0 · configure | 96 | 822 | 1 |
+| `spec-investigate` | 1 · understand | 323 | 2,708 | 1 |
+| `spec-create` | 2 · plan | 149 | 1,328 | 4 |
+| `spec-implement` | 3 · build | 236 | 1,790 | 3 |
+| `spec-verify` | 4 · prove | 153 | 1,459 | 1 |
+| `spec-checkpoint` | 5 · commit | 106 | 762 | 0 |
+| `spec-ship` | 6 · PR | 218 | 1,235 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **1,358** | **10,587** | **16** |
+| **Total** | | **1,536** | **12,313** | **17** |
 
-- **7** skills: **6** workflow stages + **1** standalone
+- **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback
-- **3** ways to install: Claude Code plugin, `install.sh`, MCP server
+- **3** layouts: single repo, monorepo, multi-repo
+- **1** install command, `npx spec-driven-dev`, plus the Claude Code plugin and an MCP fallback
 - **0** stack assumptions: lint, typecheck, test, build, and dev commands come from your repo
 
 _The table is generated by `python3 scripts/check.py --fix`; CI fails if it goes out of date._
@@ -372,20 +438,22 @@ skills/<name>/SKILL.md        the skill itself (frontmatter: name, description, 
 skills/<name>/references/     templates and prompts the skill loads when needed
 .claude-plugin/               Claude Code plugin + marketplace manifests
 .agents/skills/               symlinks so Codex/Antigravity pick the skills up inside this repo
-install.sh                    installer for other tools
+bin/cli.mjs                   the npx installer + project setup (no dependencies)
+package.json                  npm package (ships bin/ and skills/)
 mcp-server/                   MCP fallback server
 scripts/check.py              consistency checks + metrics generator
+scripts/test-cli.mjs          installer self-test (fake HOME, throwaway repos)
 evals/                        `claude plugin eval` cases
 ```
 
-- **Adding a skill:** create `skills/<name>/SKILL.md`, then add the name to `install.sh`
-  (`ALL_SKILLS`), the two manifests, a `.agents/skills/<name>` symlink, the `STAGES` map in
+- **Adding a skill:** create `skills/<name>/SKILL.md`, then add the name to the two manifests, a `.agents/skills/<name>` symlink, the `STAGES` map in
   `scripts/check.py`, and this README. `python3 scripts/check.py` lists anything you missed.
 - **Before pushing:** run `python3 scripts/check.py --fix`. CI (`.github/workflows/check.yml`) runs
-  the same checks plus syntax checks on `install.sh` and the MCP server.
+  the same checks, the installer self-test, and a syntax check on the MCP server.
 - **Evals:** `claude plugin eval . --runs 1` checks that skills trigger on their phrases and stay
   within their own stage. These runs use your Claude credentials, so they aren't part of CI.
-- **Releasing:** increase `version` in `.claude-plugin/plugin.json`, or installed copies won't update.
+- **Releasing:** increase `version` in both `package.json` and `.claude-plugin/plugin.json` (the check
+  fails if they differ), push, then `npm publish`.
 
 ## License
 

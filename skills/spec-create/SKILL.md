@@ -17,6 +17,19 @@ Transform a planning conversation into a structured spec folder that enables par
 
 The key insight: implementation plans that live in a single file are either too large for a context window or too shallow for independent execution. By splitting into one file per task with full context in each, we enable multiple agents to work in parallel while keeping each agent's context focused.
 
+## Project config (read first)
+
+Load `.spec-driven.yml`: walk up from the current directory to the home folder, and the first one
+found wins (a `multi-repo` config only applies inside the repos it lists). Its values beat anything
+you would detect or assume. This skill uses `layout`/`repos` and `specs_dir`.
+
+**Monorepo / multi-repo:** every task names its package or repo, and its file paths are relative to that. Keep each task inside one repo. Cross-repo work becomes separate tasks, with the contract (API shape, event, schema) written into both.
+
+**No config?** If the `spec-setup` skill is available, run it first, then continue here. If it
+isn't, detect what this skill needs from the repo, ask about anything ambiguous, and offer to save
+the answers to `.spec-driven.yml` (keys: `layout`, `repos`, `tracker`, `git`, `commands`,
+`specs_dir`).
+
 ## When to Use
 
 - After a planning conversation where requirements and technical details have been discussed
@@ -27,7 +40,7 @@ The key insight: implementation plans that live in a single file are either too 
 
 ### Step 1: Gather Requirements
 
-If a `specs/*/investigation.md` from `spec-investigate` exists for this work, read it first and treat it as the evidence base: carry its VERIFIED facts, affected files, risks, and acceptance criteria into the spec, reuse its folder (`specs/{feature-slug}/`) instead of naming a new one in Step 2, and turn its open questions/UNKNOWNs into items for the user or `action-required.md` rather than guessing.
+If a `{specs_dir}/*/investigation.md` (default `specs/`) from `spec-investigate` exists for this work, read it first and treat it as the evidence base: carry its VERIFIED facts, affected files, risks, and acceptance criteria into the spec, reuse its folder (`specs/{feature-slug}/`) instead of naming a new one in Step 2, and turn its open questions/UNKNOWNs into items for the user or `action-required.md` rather than guessing.
 
 If the conversation already contains planning context (requirements discussed, technical decisions made, architecture outlined), extract all of it. Review the entire conversation to ensure nothing is lost — the spec is the single source of truth, and anything not captured here disappears.
 

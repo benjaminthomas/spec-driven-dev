@@ -1,7 +1,7 @@
 {
   "name": "spec-driven-dev",
-  "version": "1.2.1",
-  "description": "Parallel-batch spec-driven feature workflow (spec-investigate, spec-create, spec-implement, spec-verify, spec-checkpoint, spec-ship) plus a portable SEO/GEO operations skill (generative-seo) for any codebase.",
+  "version": "1.3.0",
+  "description": "Parallel-batch spec-driven feature workflow (spec-setup, spec-investigate, spec-create, spec-implement, spec-verify, spec-checkpoint, spec-ship) plus a portable SEO/GEO operations skill (generative-seo) for any codebase.",
   "author": {
     "name": "benjaminbarnabas"
   },

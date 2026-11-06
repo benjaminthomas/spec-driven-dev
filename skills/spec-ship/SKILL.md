@@ -16,6 +16,19 @@ Push your work to GitHub and open a pull request — handling prerequisites, bra
 
 This skill complements `spec-checkpoint`. Use `spec-checkpoint` to commit locally (with quality gates), then `spec-ship` to get the code to GitHub for review.
 
+## Project config (read first)
+
+Load `.spec-driven.yml`: walk up from the current directory to the home folder, and the first one
+found wins (a `multi-repo` config only applies inside the repos it lists). Its values beat anything
+you would detect or assume. This skill uses `git.remote`, `git.pr_target`, `git.branch_name`, `tracker` (to link the ticket in the PR), and `layout`/`repos`.
+
+**Multi-repo:** push and open one PR per repo that has unpushed commits, and list the sibling PRs in each PR's body so reviewers see the whole change.
+
+**No config?** If the `spec-setup` skill is available, run it first, then continue here. If it
+isn't, detect what this skill needs from the repo, ask about anything ambiguous, and offer to save
+the answers to `.spec-driven.yml` (keys: `layout`, `repos`, `tracker`, `git`, `commands`,
+`specs_dir`).
+
 ## Instructions
 
 ### Step 0: Prerequisites
@@ -71,7 +84,9 @@ If there are uncommitted changes, stop and tell the user:
 You have uncommitted changes. Run /spec-checkpoint first to commit them, then /spec-ship to push.
 ```
 
-Store the default branch name for use throughout the remaining steps.
+Store the default branch name for use throughout the remaining steps. If `.spec-driven.yml` sets
+`git.pr_target` (anything other than `default`), use that as `{default_branch}` everywhere below,
+including as the PR's `--base`. Use `git.remote` instead of `origin` if it's set.
 
 ### Step 2: Check for Unpushed Commits
 
@@ -101,7 +116,9 @@ Save the list of unpushed commit messages for use in later steps.
 - Skip to Step 4.
 
 **If on the default branch:**
-- Generate a branch name from the unpushed commit messages:
+- If the config sets `git.branch_name`, fill in its placeholders (`{ticket}` from the commits or
+  investigation, `{slug}` and `{type}` as below) and skip the derivation that follows.
+- Otherwise, generate a branch name from the unpushed commit messages:
   - Read the commit subjects
   - Derive a kebab-case branch name with a conventional prefix: `feat/`, `fix/`, `refactor/`, `chore/`, `docs/` based on the commit content
   - Keep it short (3-5 words max after the prefix), e.g., `feat/add-user-auth`, `fix/login-redirect-loop`

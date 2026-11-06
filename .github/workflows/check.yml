@@ -9,5 +9,5 @@ jobs:
         with:
           node-version: 20
       - run: python3 scripts/check.py
-      - run: bash -n install.sh
+      - run: node scripts/test-cli.mjs
       - run: node --check mcp-server/server.js

@@ -14,6 +14,19 @@ license: MIT
 
 Create a checkpoint commit that captures all current changes — but only after the code passes lint, type check, and build.
 
+## Project config (read first)
+
+Load `.spec-driven.yml`: walk up from the current directory to the home folder, and the first one
+found wins (a `multi-repo` config only applies inside the repos it lists). Its values beat anything
+you would detect or assume. This skill uses `commands` (lint/typecheck/test/build), `git.commit_style`, and `layout`/`repos`.
+
+**Multi-repo:** run this in every listed repo that has changes, making one commit per repo with the same subject. **Monorepo:** run the checks for the packages that changed, or the root commands if that's how the repo works.
+
+**No config?** If the `spec-setup` skill is available, run it first, then continue here. If it
+isn't, detect what this skill needs from the repo, ask about anything ambiguous, and offer to save
+the answers to `.spec-driven.yml` (keys: `layout`, `repos`, `tracker`, `git`, `commands`,
+`specs_dir`).
+
 ## Instructions
 
 ### Step 1: Analyze Changes
@@ -27,7 +40,7 @@ Run these commands to understand the full picture:
 
 ### Step 2: Quality Checks
 
-Find this repo's own lint, typecheck, test, and build commands — `package.json` scripts (with the
+Use `commands` from `.spec-driven.yml`. For any that are missing, find the repo's own lint, typecheck, test, and build commands — `package.json` scripts (with the
 repo's package manager), `Makefile`, `pyproject.toml`, `Cargo.toml`, CI config, or `CLAUDE.md`/
 `AGENTS.md`. Run each one the repo has; skip (and say so) any it doesn't. If any fail, fix the
 issues before proceeding — do not skip or ignore failures.
@@ -50,7 +63,7 @@ anything you don't recognize; skim its diff if you're unsure.
 
 ### Step 4: Craft the Commit Message
 
-Write a commit message following the project's existing conventions (observed from `git log`). Structure:
+Write a commit message in the config's `git.commit_style` (`conventional` → `feat: …`, `ticket` → `STP-123: …` using the ticket ID from the branch name, `freeform`). Without config, follow the project's existing conventions (observed from `git log`). Structure:
 
 - **First line**: clear, concise summary in imperative mood (50-72 chars)
   - Use conventional commit prefixes where the project uses them: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, etc.

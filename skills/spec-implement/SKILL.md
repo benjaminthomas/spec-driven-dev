@@ -23,6 +23,19 @@ The orchestrator never writes code itself. Its job is to:
 4. Manage the fix loop if review finds issues
 5. Track progress and commit completed batches
 
+## Project config (read first)
+
+Load `.spec-driven.yml`: walk up from the current directory to the home folder, and the first one
+found wins (a `multi-repo` config only applies inside the repos it lists). Its values beat anything
+you would detect or assume. This skill uses `layout`/`repos`, `commands` (lint/typecheck/test per repo or package), and `git.commit_style`.
+
+**Multi-repo:** create worktrees in each repo a task touches, run each repo's own commands in review, and make the batch commit in every repo that changed, using the same subject line.
+
+**No config?** If the `spec-setup` skill is available, run it first, then continue here. If it
+isn't, detect what this skill needs from the repo, ask about anything ambiguous, and offer to save
+the answers to `.spec-driven.yml` (keys: `layout`, `repos`, `tracker`, `git`, `commands`,
+`specs_dir`).
+
 ## Orchestration Model
 
 This skill's parallelism assumes your host can run multiple independent agents at once —
@@ -126,7 +139,7 @@ Read `references/review-prompt-template.md` and construct the review prompt by f
 - **{batch_number}**: current batch number
 - **{requirements}**: full text of `requirements.md`
 - **{task_summaries}**: for each task in this batch, the task title and the coder agent's completion summary
-- **{verification_commands}**: the project's lint, typecheck, and test commands (e.g., `pnpm lint && pnpm typecheck && pnpm test`)
+- **{verification_commands}**: `commands.lint`/`typecheck`/`test` from `.spec-driven.yml` for each repo or package touched, or the project's own commands if there's no config (e.g., `pnpm lint && pnpm typecheck && pnpm test`)
 
 The review agent should:
 1. Run lint, typecheck, and tests
@@ -167,7 +180,7 @@ After the batch passes review (or the user chooses to proceed):
 3. **Commit the batch**:
    ```
    git add -A
-   git commit -m "feat({feature}): complete batch {N} — {brief summary}"
+   git commit -m "feat({feature}): complete batch {N} — {brief summary}"   # or the config's git.commit_style
    ```
 4. **Report batch completion**:
    ```

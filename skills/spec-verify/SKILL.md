@@ -23,6 +23,19 @@ reads a spec's acceptance criteria and checks each one against the actual runnin
 clicking through the UI, calling the real API routes, or inspecting real database state produced
 by the real code path. It produces a report the user can trust before shipping.
 
+## Project config (read first)
+
+Load `.spec-driven.yml`: walk up from the current directory to the home folder, and the first one
+found wins (a `multi-repo` config only applies inside the repos it lists). Its values beat anything
+you would detect or assume. This skill uses `commands.dev`, `commands.dev_url`, and `layout`/`repos`.
+
+**Monorepo / multi-repo:** start every app or service the criteria need (e.g. the API and the frontend), each with its own `dev` command.
+
+**No config?** If the `spec-setup` skill is available, run it first, then continue here. If it
+isn't, detect what this skill needs from the repo, ask about anything ambiguous, and offer to save
+the answers to `.spec-driven.yml` (keys: `layout`, `repos`, `tracker`, `git`, `commands`,
+`specs_dir`).
+
 ## When there's no spec folder
 
 If the user asks to verify a feature that wasn't built through `spec-create`, don't refuse —
@@ -49,7 +62,7 @@ filename).
 
 Split the merged list into two kinds, because they're verified completely differently:
 
-- **Static criteria** — things like "`npm run check` passes" or "`npx next build` succeeds."
+- **Static criteria** — things like "lint passes" or "the production build succeeds."
   `spec-implement`'s review gate already ran these during the build. Re-run them once quickly
   to confirm nothing regressed since (uncommitted fix-ups, a rebase, etc.), but don't treat this
   as the interesting part of verification.
@@ -60,10 +73,10 @@ Split the merged list into two kinds, because they're verified completely differ
 
 ## Step 3: Prepare the environment
 
-Check whether the dev server is already running (e.g. `curl -sf http://localhost:3000` or the
-port your project's dev script uses) before starting a new one — a stray second instance just
-causes confusing port conflicts. If nothing responds, start `npm run dev` in the background and
-poll until it's ready.
+Check whether the app is already running (`curl -sf {commands.dev_url}`, or the port the
+project's dev script uses) before starting a new one, since a stray second instance just causes
+confusing port conflicts. If nothing responds, start `commands.dev` from the config (or the
+project's own dev script) in the background and poll until it's ready.
 
 Look at what the behavioral criteria actually need before reaching for tools:
 
@@ -81,7 +94,7 @@ Look at what the behavioral criteria actually need before reaching for tools:
   through screenshots.
 - **DB-state-only** (a column got stamped correctly, a row was scoped the way it should be) →
   drive the real write path first (through the UI or API — never insert the expected state
-  directly, that verifies nothing), then read the resulting row back via Prisma or `psql` to
+  directly, that verifies nothing), then read the resulting row back with the project's own DB client or CLI to
   confirm it. This mirrors how you'd sanity-check a migration: trust the app's own code path to
   produce the state, and only use direct DB reads for the *assertion*, never the *setup*.
 - **Timing-dependent** (a reminder email fires N days before expiry, idempotency across cron

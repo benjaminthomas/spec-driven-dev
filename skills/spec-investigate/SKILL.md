@@ -30,6 +30,19 @@ spec-investigate → spec-create → human approval → spec-implement → spec-
 duplicate, or invoke those skills from here.** Your only output is an investigation report plus a
 ready-to-use work branch; a human decides when to run `spec-create` next.
 
+## Project config (read first)
+
+Load `.spec-driven.yml`: walk up from the current directory to the home folder, and the first one
+found wins (a `multi-repo` config only applies inside the repos it lists). Its values beat anything
+you would detect or assume. This skill uses `layout`/`repos` (where to look and what each repo does), `tracker`, `git.remote`, `git.base_branch`, `git.branch_name`, and `specs_dir`.
+
+**Monorepo:** name the package(s) involved. **Multi-repo:** search every listed repo whose role fits the ticket, and create the work branch, with the same name, only in the repos the investigation shows need changes.
+
+**No config?** If the `spec-setup` skill is available, run it first, then continue here. If it
+isn't, detect what this skill needs from the repo, ask about anything ambiguous, and offer to save
+the answers to `.spec-driven.yml` (keys: `layout`, `repos`, `tracker`, `git`, `commands`,
+`specs_dir`).
+
 ## Invocation
 
 ```
@@ -79,7 +92,7 @@ trivial ticket, and don't shortcut a genuinely risky one.
    - `#482`, `owner/repo#482`, or a `github.com/.../issues/482` URL → GitHub Issues
      (`gh issue view 482 --comments --json title,body,labels,comments,...`).
    - `linear.app/.../issue/ENG-91` → Linear (Linear MCP tool or API).
-   - A bare `KEY-123` → use the tracker the project already uses (CLAUDE.md/AGENTS.md, branch
+   - A bare `KEY-123` → use `tracker` from `.spec-driven.yml`; without one, the tracker the project already uses (CLAUDE.md/AGENTS.md, branch
      names, PR links in `git log`); if that's ambiguous, try the trackers this host can reach and
      ask if none resolves. If you can't reach the tracker at all, ask the user to paste the ticket
      rather than guessing its contents.
@@ -111,15 +124,15 @@ trivial ticket, and don't shortcut a genuinely risky one.
    Report exactly what you found and ask how to proceed.
 
 4. **Determine the correct remote and base branch.** Run `git remote -v` — don't assume `origin`
-   is the right remote if there's more than one. Pick the base branch in this order: what
-   `CLAUDE.md`/`AGENTS.md`/memory/prior project context says for this repo → the remote's default
+   is the right remote if there's more than one. Pick the base branch in this order: `git.base_branch` in
+   `.spec-driven.yml` → what `CLAUDE.md`/`AGENTS.md`/memory/prior project context says for this repo → the remote's default
    branch (`git remote show <remote>` or `gh repo view --json defaultBranchRef`). If the repo also
    has an integration branch (`staging`, `develop`) that recent work branches were cut from, and
    nothing says which to use, stop and ask rather than guessing. Fetch it and record its latest
    commit SHA.
 
-5. **Name the branch by the repo's convention, then stick to it exactly.** Use, in order: an
-   explicit rule in `CLAUDE.md`/`AGENTS.md`/memory → the pattern recent branches already follow
+5. **Name the branch by the repo's convention, then stick to it exactly.** Use, in order: `git.branch_name`
+   in `.spec-driven.yml` → an explicit rule in `CLAUDE.md`/`AGENTS.md`/memory → the pattern recent branches already follow
    (`git branch -r --sort=-committerdate | head -20` — e.g. bare `STP-123`, or `fix/STP-123-…`) →
    default `<type>/<TICKET-ID>-<short-slug>` with the same prefixes `spec-ship` uses (`feat/`,
    `fix/`, `refactor/`, `chore/`, `docs/`). Don't invent a new pattern alongside an existing one.
@@ -265,7 +278,7 @@ Tag non-obvious findings so `spec-create` knows how much weight to put on them:
 
 ## Step 9 — Write the report
 
-Write it to `specs/{feature-slug}/investigation.md` in the repo (create the `specs/` folder if
+Write it to `{specs_dir}/{feature-slug}/investigation.md` (`specs_dir` from config, default `specs`) in the repo (create the `specs/` folder if
 needed — this mirrors where `spec-create` already keeps its own output, so the handoff reads
 naturally from the same place; don't commit this folder if the repo's convention already
 gitignores `specs/`, matching whatever this repo already does there). Use the structure in `references/report-template.md`.
