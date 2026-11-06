@@ -12,14 +12,14 @@
 #                                               repo's own .agents/skills/ symlinks
 #
 # Hosts: codex, cursor, antigravity
-# Skills default to all six when none are named:
-#   spec-create spec-implement spec-verify spec-checkpoint spec-ship generative-seo
+# Skills default to all seven when none are named:
+#   spec-investigate spec-create spec-implement spec-verify spec-checkpoint spec-ship generative-seo
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_SRC="$SCRIPT_DIR/skills"
-ALL_SKILLS=(spec-create spec-implement spec-verify spec-checkpoint spec-ship generative-seo)
+ALL_SKILLS=(spec-investigate spec-create spec-implement spec-verify spec-checkpoint spec-ship generative-seo)
 
 usage() {
   sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'

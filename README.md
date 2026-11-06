@@ -1,6 +1,6 @@
 # spec-driven-dev
 
-Six [Agent Skills](https://agentskills.io) — an open, cross-host standard for packaging agent
+Seven [Agent Skills](https://agentskills.io) — an open, cross-host standard for packaging agent
 instructions — bundling a parallel-batch, spec-driven feature workflow and a portable SEO/GEO
 operations skill. Works in any codebase — none of these assume a specific framework, stack, or
 product. Packaged as a Claude Code plugin for that host, and installable as plain skill folders
@@ -11,15 +11,16 @@ on any other Agent-Skills-compatible host (see [Compatibility](#compatibility) a
 
 ### The feature pipeline
 
-Five skills that work together, each one resumable and each producing an
+Six skills that work together, each one resumable and each producing an
 artifact the next stage (or the next person) can pick up cold:
 
 ```
-spec-create  →  spec-implement  →  spec-verify  →  spec-checkpoint  →  spec-ship
+spec-investigate  →  spec-create  →  spec-implement  →  spec-verify  →  spec-checkpoint  →  spec-ship
 ```
 
 | Skill | Trigger | Input | Output |
 |---|---|---|---|
+| `spec-investigate` | "investigate STP-123", "look into this ticket before we plan it" | A Jira ticket ID/URL (plus any optional context) | `specs/{feature}/investigation.md` — evidence-based report of current behaviour, root cause, affected repos/files, risks, and open questions; no code changes |
 | `spec-create` | "create a spec", "plan this feature", "break this into tasks" | A planning conversation (or an interview if there wasn't one) | `specs/{feature}/` — `requirements.md`, `action-required.md`, `tasks/task-NN-*.md`, `README.md` with a dependency graph and batch breakdown |
 | `spec-implement` | "implement this feature", "run the spec", "continue implementing" | `specs/{feature}/` | Real code changes — one coder subagent per task per batch, run in parallel within a batch, with a code-review gate before each batch is committed |
 | `spec-verify` | "test this end to end", "does this actually work", right after `spec-implement` finishes | `specs/{feature}/` | `specs/{feature}/verification-report.md` — every acceptance criterion checked against the *real running app* (clicks, API calls, DB reads used only to confirm state), pass/fail with evidence |
@@ -32,13 +33,13 @@ independent execution. Splitting into one self-contained task file per unit of
 work lets multiple coder agents implement a feature in parallel, safely,
 without anyone needing to re-read the whole plan.
 
-None of these five skills write to a specific stack's config — they read
+None of these six skills write to a specific stack's config — they read
 whatever lint/typecheck/build/dev commands the target repo actually has and
 use those.
 
 ### generative-seo
 
-A standalone sixth skill, unrelated to the pipeline above: runs an
+A standalone seventh skill, unrelated to the pipeline above: runs an
 evidence-based SEO + GEO (Generative Engine Optimization) program — technical
 SEO audits, answer-first content built to get cited by ChatGPT/Perplexity/AI
 Overviews, an AI-citation tracker, competitor research, and draft-only social
@@ -59,6 +60,7 @@ folders directly (see Install below).
 
 | Skill | Claude Code | Codex CLI | Cursor | Antigravity | Notes |
 |---|---|---|---|---|---|
+| `spec-investigate` | ✅ | ✅ | ✅ | ✅ | Reads Jira via whatever access the host has (Atlassian MCP, CLI, or a pasted ticket) |
 | `spec-create` | ✅ | ✅ | ✅ | ✅ | Planning + file writing only, no host-specific mechanics |
 | `spec-implement` | ✅ | ✅ | ✅ | ✅ | Parallel dispatch uses whichever subagent/background-agent mechanism your host provides; falls back to sequential execution if it has none |
 | `spec-verify` | ✅ | ⚠️ | ⚠️ | ⚠️ | UI-observable criteria need a browser-automation tool available on your host (MCP browser server, built-in browser tool, or extension); API/DB-only criteria work everywhere |
@@ -91,7 +93,7 @@ Run `install.sh` from a clone of this repo:
 
 ```bash
 ./install.sh                        # interactive: pick a host and skills
-./install.sh codex                   # all six skills, into the current project
+./install.sh codex                   # all seven skills, into the current project
 ./install.sh cursor spec-create      # just one skill, into the current project
 ./install.sh --global antigravity    # install globally instead of per-project
 ```
@@ -111,7 +113,7 @@ also covers the other at that scope.
 ### Fallback: MCP server (for hosts without native Agent Skills support)
 
 If your host speaks MCP but doesn't yet support Agent Skills natively — or only implements MCP
-tools, not prompts — `mcp-server/` exposes the same six skills as MCP tools instead. It reads
+tools, not prompts — `mcp-server/` exposes the same seven skills as MCP tools instead. It reads
 directly from `skills/` at request time, so there's nothing to keep in sync by hand.
 
 ```bash
@@ -128,13 +130,14 @@ Treat this as the fallback, not the primary path — prefer native Agent Skills 
 
 ## Typical flow
 
-1. Plan a feature in conversation, then `/spec-create` to capture it.
-2. `/spec-implement` to build it batch-by-batch with review gates between batches.
-3. `/spec-verify` to prove the acceptance criteria hold against the real
+1. `/spec-investigate <ticket>` to understand the system before planning (optional for greenfield work).
+2. Plan the feature in conversation, then `/spec-create` to capture it — review and approve the spec before implementing.
+3. `/spec-implement` to build it batch-by-batch with review gates between batches.
+4. `/spec-verify` to prove the acceptance criteria hold against the real
    running app — not just that it compiles.
-4. `/spec-checkpoint` to commit locally, once lint/typecheck/build all pass.
-5. `/spec-ship` to push and open the PR.
-6. Any time, independent of the pipeline: `/generative-seo` for SEO/GEO work
+5. `/spec-checkpoint` to commit locally, once lint/typecheck/build all pass.
+6. `/spec-ship` to push and open the PR.
+7. Any time, independent of the pipeline: `/generative-seo` for SEO/GEO work
    on the same project or any other.
 
 ## License
