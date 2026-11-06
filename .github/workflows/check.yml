@@ -11,3 +11,25 @@ jobs:
       - run: python3 scripts/check.py
       - run: node scripts/test-cli.mjs
       - run: node --check mcp-server/server.js
+  # The CLI must start on every Node version people may have active (nvm projects often pin 14/16).
+  node-versions:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [14, 16, 18, 20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Smoke test (version, install + setup with flags, doctor, refuses without a terminal)
+        run: |
+          set -e
+          node bin/spec-driven-dev.cjs --version
+          d=$(mktemp -d) && git -C "$d" init -q
+          SPEC_DRIVEN_HOME="$d/home" node bin/spec-driven-dev.cjs --yes --tools=cursor,codex --dir="$d"
+          test -f "$d/.cursor/skills/spec-create/SKILL.md"
+          node bin/spec-driven-dev.cjs doctor --dir="$d"
+          e=$(mktemp -d) && git -C "$e" init -q
+          if node bin/spec-driven-dev.cjs setup --dir="$e" </dev/null; then echo "should refuse without a terminal"; exit 1; fi
+          test ! -f "$e/.spec-driven.yml"

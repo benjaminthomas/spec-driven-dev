@@ -121,6 +121,12 @@ cfg = fs.readFileSync(path.join(single, ".spec-driven.yml"), "utf8");
 assert.ok(cfg.includes("layout: monorepo") && cfg.includes('path: "apps/web"') && !cfg.includes("apps/nope"), cfg);
 assert.throws(() => cli("setup", "--yes", `--dir=${single}`, "--layout=mono"), /--layout must be/);
 
+// 10a. no terminal and no answers given: refuse, change nothing
+const quiet = path.join(tmp, "quiet");
+repo(quiet, {}, ["x"]);
+assert.throws(() => cli("setup", `--dir=${quiet}`), /No interactive terminal/);
+assert.ok(!fs.existsSync(path.join(quiet, ".spec-driven.yml")), "wrote a config without a terminal or flags");
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 

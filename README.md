@@ -375,6 +375,13 @@ run one after another, stopping at the first failure. Two steps always wait for 
 spec, and pushing or opening the PR. You don't need slash commands either. Saying "investigate
 STP-123" or "ship it" picks the right skill.
 
+**Setup didn't ask me anything.**
+Update to 1.5.1 or later (`npx @benjaminthomas/spec-driven-dev@latest --version`). Earlier versions
+crashed on Node 14 or 16, which nvm often switches to inside older projects, and wrote a config
+silently when there was no terminal. Now it runs on Node 14+. With no terminal to answer in (a `!`
+command in Claude Code, an editor task, piped input), it stops, changes nothing, and tells you to run
+it in a terminal window or pass flags such as `--layout=multi-repo --repos=…`.
+
 **Setup didn't ask me about repos.**
 It only asks about repos for a multi-repo or monorepo layout. If it detected `single`, type
 `multi-repo` at the layout question, then add your other repos by path. If it asked nothing at all,
@@ -455,7 +462,8 @@ can otherwise reuse an older copy it cached. What changed in each version is in
 `npx github:benjaminthomas/spec-driven-dev` installs straight from GitHub instead, for example to
 try an unreleased commit on `main`.
 
-**Requirements:** Node.js 18 or newer and git. The installer has no dependencies.
+**Requirements:** Node.js 14 or newer and git. The installer has no dependencies, and CI tests it on
+Node 14, 16, 18, 20, 22, and 24.
 
 ### Claude Code (plugin, with automatic updates)
 

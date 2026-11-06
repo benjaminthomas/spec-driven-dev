@@ -13,7 +13,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { createInterface } from "node:readline/promises";
+import { createInterface } from "node:readline";  // callback API: readline/promises needs Node 17+
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -40,8 +40,21 @@ if (flag("version") || flag("v")) {
   console.log(JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version);
   process.exit(0);
 }
-if (["install", "setup"].includes(command) && !process.stdin.isTTY && !flag("yes") && !flag("y"))
-  console.log("• No interactive terminal detected, so no questions will be asked: using the detected values.\n  Run it directly in a terminal to answer them, or pass flags (--layout, --repos, --tools …). Add --yes to hide this note.");
+// No terminal to answer in (e.g. `!` in Claude Code, an IDE task, a pipe) and nothing passed explicitly:
+// stop rather than write a config from guesses.
+const ANSWER_FLAGS = ["yes", "y", "layout", "repos", "packages", "tools", "workspace", "after-approval", "skills", "global", "no-setup"];
+if (["install", "setup"].includes(command) && !process.stdin.isTTY && !args.some((a) => ANSWER_FLAGS.some((f) => a === `--${f}` || a.startsWith(`--${f}=`)))) {
+  console.log(`✗ No interactive terminal, so setup can't ask its questions. Nothing was changed.
+
+  This happens when it runs through another program: a "!" command in Claude Code, an editor task,
+  or piped input. Either:
+    • run it yourself in a terminal window (Terminal, iTerm, or your editor's terminal panel):
+        npx @benjaminthomas/spec-driven-dev@latest ${command === "setup" ? "setup" : ""}
+    • or give the answers as flags, for example:
+        npx @benjaminthomas/spec-driven-dev@latest setup --layout=multi-repo --repos=~/Projects/frontend,~/Projects/backend
+      (add --yes to accept everything it detects)`);
+  process.exit(1);
+}
 
 if (flag("help") || flag("h")) {
   console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 11).join("\n").replace(/^\/\/ ?/gm, ""));
@@ -51,7 +64,7 @@ if (flag("help") || flag("h")) {
 const rl = YES ? null : createInterface({ input: process.stdin, output: process.stdout });
 async function ask(q, def = "") {
   if (YES) return def;
-  const a = (await rl.question(`${q}${def ? ` [${def}]` : ""}: `)).trim();
+  const a = (await new Promise((resolve) => rl.question(`${q}${def ? ` [${def}]` : ""}: `, resolve))).trim();
   return a || def;
 }
 async function pick(q, items, defaults) {
@@ -67,6 +80,17 @@ const run = (cmd, argv, cwd) => {
   try { return execFileSync(cmd, argv, { cwd, stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return ""; }
 };
 const onPath = (bin) => !!run(process.platform === "win32" ? "where" : "which", [bin]);
+
+// fs.cpSync needs Node 16.7+; this keeps Node 14 working. Follows symlinks, skips .DS_Store.
+function copyDir(from, to) {
+  fs.mkdirSync(to, { recursive: true });
+  for (const e of fs.readdirSync(from)) {
+    if (e === ".DS_Store") continue;
+    const src = path.join(from, e), dst = path.join(to, e);
+    if (fs.statSync(src).isDirectory()) copyDir(src, dst);
+    else fs.copyFileSync(src, dst);
+  }
+}
 
 // ---------- install ----------
 async function install() {
@@ -96,7 +120,7 @@ async function install() {
     for (const s of skills) {
       const to = path.join(dest, s);
       fs.rmSync(to, { recursive: true, force: true });
-      fs.cpSync(path.join(SKILLS_DIR, s), to, { recursive: true, dereference: true, filter: (f) => !f.endsWith(".DS_Store") });
+      copyDir(path.join(SKILLS_DIR, s), to);
     }
     console.log(`✓ ${skills.length} skills → ${dest}`);
   }
@@ -247,7 +271,7 @@ async function chooseRepos(d) {
     const found = findRepos(scanRoot);
     if (found.length) {
       const owners = {};
-      for (const r of found) (owners[gitFacts(path.join(scanRoot, r))?.owner || "?"] ||= []).push(r);
+      for (const r of found) { const o = gitFacts(path.join(scanRoot, r))?.owner || "?"; (owners[o] = owners[o] || []).push(r); }
       const biggest = Object.values(owners).sort((a, b) => b.length - a.length)[0] || [];
       const here = insideRepo ? [path.relative(scanRoot, d.root)] : [];
       console.log(`Found ${found.length} git repos under ${scanRoot}. Which ones belong to this workspace?`);
