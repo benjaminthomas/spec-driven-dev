@@ -1,9 +1,11 @@
 ---
 name: spec-investigate
 description: >
-  Deep, evidence-based technical investigation of a Jira ticket BEFORE any specification or
-  implementation begins. Use when the user says "investigate STP-123", "spec-investigate",
-  "look into this ticket before we plan it", or gives a Jira ticket ID/URL and wants the
+  Deep, evidence-based technical investigation of a piece of work BEFORE any specification or
+  implementation begins — starting from a ticket (Jira, GitHub Issues, Linear), a meeting/call
+  transcript, a plain-text description, a doc/PRD file, a Slack/email thread, or an error log.
+  Use when the user says "investigate STP-123", "spec-investigate", "look into this before we
+  plan it", or hands over any of those inputs and wants the
   system understood (current behaviour, root cause, affected repos/files, risks, open
   questions) rather than fixed or built yet. This is the first stage of the
   investigate → create → (human approval) → implement → verify → ship pipeline — it hands off
@@ -26,7 +28,7 @@ spec-investigate → spec-create → human approval → spec-implement → spec-
 `spec-create`, `spec-implement`, `spec-verify`, and `spec-ship` already exist elsewhere (e.g. the
 `spec-driven-dev` plugin, or whatever equivalent this host provides). **Never create, redesign,
 duplicate, or invoke those skills from here.** Your only output is an investigation report plus a
-ready-to-use ticket branch; a human decides when to run `spec-create` next.
+ready-to-use work branch; a human decides when to run `spec-create` next.
 
 ## Invocation
 
@@ -34,20 +36,27 @@ ready-to-use ticket branch; a human decides when to run `spec-create` next.
 spec-investigate STP-123
 spec-investigate https://<org>.atlassian.net/browse/STP-123
 spec-investigate STP-123 --context ./notes.md
+spec-investigate #482                      # GitHub issue in the current repo
+spec-investigate https://github.com/<owner>/<repo>/issues/482
+spec-investigate https://linear.app/<team>/issue/ENG-91
+spec-investigate ./call-transcript.txt          # transcript, notes, PRD, RFC, log — any file
+spec-investigate "Checkout times out for EU users since Tuesday's deploy"   # plain text
+spec-investigate                               # with the material pasted in the same message
 ```
 
-The ticket ID/URL is the only required argument. `--context` (a file path, or pasted text in the
+The only required input is *something that describes the work* — a ticket ID/URL, a file, or text
+pasted into the message. Below, "the ticket" means that primary input, whatever form it took. `--context` (a file path, or pasted text in the
 same message) is optional supplementary evidence — a call transcript, meeting notes, a `.md`/`.txt`
 file. Never block or stall waiting for context that doesn't exist; proceed without it.
 
 Never hardcode a specific ticket ID into your behavior. Everything below must work identically for
-any ticket key this host's Jira uses.
+any ticket key, tracker, or free-form input.
 
 ## The one rule everything else serves
 
 **Do not guess when the answer can be discovered.** Every non-trivial claim in the final report
-must be traceable to something you actually read — code, config, tests, git history, Jira,
-linked docs — not inferred from a plausible-sounding folder name or a guess at convention. Work
+must be traceable to something you actually read — code, config, tests, git history, the
+ticket, linked docs — not inferred from a plausible-sounding folder name or a guess at convention. Work
 the loop:
 
 ```
@@ -63,11 +72,30 @@ trivial ticket, and don't shortcut a genuinely risky one.
 
 ---
 
-## Step 0 — Resolve the ticket and set up the branch safely
+## Step 0 — Resolve the input and set up the branch safely
 
-1. **Parse the ticket ID** from the argument (a bare key like `STP-123`, or the last path segment
-   of a Jira URL). Fetch it via whatever Jira access this host has (an MCP Atlassian tool, `gh`
-   equivalent, or ask the user for the cloud id/site if resolution fails) — pull title, type,
+1. **Identify what kind of input this is and load all of it.** A tracker reference:
+   - `*.atlassian.net/browse/KEY-123` → Jira (Atlassian MCP tool, `jira`/`acli` CLI, or REST).
+   - `#482`, `owner/repo#482`, or a `github.com/.../issues/482` URL → GitHub Issues
+     (`gh issue view 482 --comments --json title,body,labels,comments,...`).
+   - `linear.app/.../issue/ENG-91` → Linear (Linear MCP tool or API).
+   - A bare `KEY-123` → use the tracker the project already uses (CLAUDE.md/AGENTS.md, branch
+     names, PR links in `git log`); if that's ambiguous, try the trackers this host can reach and
+     ask if none resolves. If you can't reach the tracker at all, ask the user to paste the ticket
+     rather than guessing its contents.
+
+   Anything else is free-form input — read it in full:
+   - A file path (`.txt`/`.md`/`.vtt`/`.srt`/`.pdf`/`.docx`/log) → read the whole file.
+   - Pasted text — a transcript, Slack/email thread, PRD excerpt, stack trace, or a one-line
+     description → use it as-is.
+   - A URL to a doc, PR, Sentry/Datadog issue, or design → fetch it with whatever access the host
+     has; ask the user to paste it if you can't.
+   Free-form input has no fields, so extract them: a working title, the type of work, the stated
+   problem and desired outcome, any acceptance criteria actually stated, and who decided what.
+   Apply Step 1's classification to it (requirement vs. proposal vs. question) — a transcript is
+   not a spec. If it references a ticket, fetch that too and treat it as the scope of record.
+
+   For a ticket, pull title, type,
    priority, labels, components, full description, comments, linked/parent/child issues, and
    attachments. Follow meaningful links (a linked ticket that defines the actual contract, a
    linked design doc) rather than stopping at the description.
@@ -83,13 +111,20 @@ trivial ticket, and don't shortcut a genuinely risky one.
    Report exactly what you found and ask how to proceed.
 
 4. **Determine the correct remote and base branch.** Run `git remote -v` — don't assume `origin`
-   is the right remote if there's more than one. Fetch the base branch (this org's convention is
-   `staging` — if a memory, `CLAUDE.md`, or prior project context says otherwise for this repo,
-   follow that instead; if neither exists and there's no `staging` branch, stop and ask rather than
-   guessing a substitute). Record its latest commit SHA after fetching.
+   is the right remote if there's more than one. Pick the base branch in this order: what
+   `CLAUDE.md`/`AGENTS.md`/memory/prior project context says for this repo → the remote's default
+   branch (`git remote show <remote>` or `gh repo view --json defaultBranchRef`). If the repo also
+   has an integration branch (`staging`, `develop`) that recent work branches were cut from, and
+   nothing says which to use, stop and ask rather than guessing. Fetch it and record its latest
+   commit SHA.
 
-5. **Branch naming is exact and non-negotiable:** the branch is named **exactly** the ticket ID —
-   `STP-123`, never `feature/STP-123`, `fix/STP-123`, or any prefixed/suffixed variant.
+5. **Name the branch by the repo's convention, then stick to it exactly.** Use, in order: an
+   explicit rule in `CLAUDE.md`/`AGENTS.md`/memory → the pattern recent branches already follow
+   (`git branch -r --sort=-committerdate | head -20` — e.g. bare `STP-123`, or `fix/STP-123-…`) →
+   default `<type>/<TICKET-ID>-<short-slug>` with the same prefixes `spec-ship` uses (`feat/`,
+   `fix/`, `refactor/`, `chore/`, `docs/`). Don't invent a new pattern alongside an existing one.
+   With no ticket ID (free-form input), use `<type>/<short-slug>` from the working title, and ask
+   whether there's a ticket it should be linked to.
 
 6. **If the branch already exists** (locally or remotely): do not delete, reset, rebase, or
    recreate it. Investigate first — what commit is it on, does it already have commits ahead of
@@ -101,7 +136,8 @@ trivial ticket, and don't shortcut a genuinely risky one.
 7. **If the branch doesn't exist:** create it directly from the fetched base commit. Never modify
    the base branch itself, never force-push.
 
-8. Record for the report: ticket ID, Jira URL, ticket type, branch name, base branch, base commit
+8. Record for the report: source type (ticket / transcript / text / doc / log), ticket ID +
+   tracker + URL or file path, working title, type of work, branch name, base branch, base commit
    SHA.
 
 ## Step 1 — Read the optional context, but don't crown it source of truth
@@ -119,31 +155,31 @@ this mechanically:
 ```
 Repository / actual system behaviour
         ↓
-Jira scope and acceptance criteria
+Ticket scope and acceptance criteria
         ↓
 User-provided context / meeting discussion
         ↓
 Supporting documentation
 ```
 
-When the context introduces something not in Jira at all and it would materially affect scope,
+When the context introduces something not in the ticket at all and it would materially affect scope,
 architecture, data, APIs, security, or effort: don't fold it in silently. Flag it as Confirmed /
 Likely / Proposed / Needs Clarification, and if sources genuinely conflict, document it as:
 
 ```
-Jira says: ...
+Ticket says: ...
 Additional context says: ...
 Repository currently does: ...
 Impact: ...
 Recommended clarification: ...
 ```
 
-No context supplied is a completely normal case — proceed on Jira + repository evidence alone,
+No context supplied is a completely normal case — proceed on ticket + repository evidence alone,
 don't ask for a transcript that may not exist.
 
 ## Step 2 — Understand the ticket itself
 
-From Jira: problem statement, expected behaviour, acceptance criteria, type (bug / feature /
+From the ticket: problem statement, expected behaviour, acceptance criteria, type (bug / feature /
 refactor / security / infra / perf / data / integration / UI / API / DB — whatever it actually is,
 don't force it into a category it isn't). Pull in anything linked that actually defines scope.
 
@@ -170,7 +206,7 @@ config keys, env vars. "The backend handles this" is not an answer; name the fil
 Don't accept the ticket's stated cause at face value — verify it against the code. Classify your
 conclusion as `CONFIRMED ROOT CAUSE`, `LIKELY ROOT CAUSE` (explain the gap), or
 `ROOT CAUSE NOT YET CONFIRMED` (explain what more would nail it down). If the real cause differs
-from what Jira claims, say so plainly and show the evidence.
+from what the ticket claims, say so plainly and show the evidence.
 
 ## Step 5 — Change surface, without scope-creeping it
 
@@ -221,7 +257,7 @@ answer; don't invent one.
 
 Tag non-obvious findings so `spec-create` knows how much weight to put on them:
 
-- **VERIFIED** — confirmed directly in code, config, DB, tests, git history, Jira, or official docs.
+- **VERIFIED** — confirmed directly in code, config, DB, tests, git history, the ticket, or official docs.
 - **INFERRED** — well-supported by multiple signals but not directly confirmed; say why.
 - **ASSUMPTION** — can't currently be proven; keep this list short, never hide one inside a
   recommendation as if it were fact.
@@ -232,56 +268,7 @@ Tag non-obvious findings so `spec-create` knows how much weight to put on them:
 Write it to `specs/{feature-slug}/investigation.md` in the repo (create the `specs/` folder if
 needed — this mirrors where `spec-create` already keeps its own output, so the handoff reads
 naturally from the same place; don't commit this folder if the repo's convention already
-gitignores `specs/`, matching whatever this repo already does there). Use this structure:
-
-```markdown
-# Ticket Investigation
-
-## Ticket
-- Ticket ID:
-- Title:
-- Jira URL:
-- Ticket Type:
-- Priority:
-- Branch:
-- Base Branch:
-- Base Commit:
-
-## Business Context
-## Problem Statement
-## Expected Behaviour
-## Current Behaviour
-## Relevant Repositories
-## Relevant Files / Modules
-## Existing Architecture
-## Current Flow
-## Data Flow
-## Root Cause
-## Evidence
-### Verified
-### Inferred
-### Unknown
-### Assumptions
-## Required Change Surface
-## Supporting Changes
-## Optional Changes
-## Out of Scope
-## Dependencies
-## Risks
-## Security Considerations
-## Performance / Reliability Considerations
-## Testing Context
-## Edge Cases
-## Additional Context
-### Business Decisions
-### Technical Decisions
-### Potential Requirements
-### Proposed Solutions Discussed
-### Open Questions
-### Conflicts / Discrepancies
-## Recommended Implementation Direction
-## References
-```
+gitignores `specs/`, matching whatever this repo already does there). Use the structure in `references/report-template.md`.
 
 Every section should be specific and evidence-backed, or explicitly say "None found" /
 "Not applicable to this ticket" rather than being left looking like an oversight.
@@ -298,11 +285,11 @@ Report completion plainly:
 ```
 Investigation complete.
 
-Ticket: <ID>
-Branch: <ID> (created from <base> @ <sha>)
+Source: <ticket ID, or file / "pasted text">
+Branch: <branch> (created from <base> @ <sha>)
 Report: specs/<feature-slug>/investigation.md
 
-Next step: run spec-create for <ID> — it can read the investigation above directly rather than
+Next step: run spec-create for <feature-slug> — it can read the investigation above directly rather than
 re-discovering the system.
 ```
 

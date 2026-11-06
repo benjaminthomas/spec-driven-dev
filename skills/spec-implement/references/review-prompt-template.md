@@ -18,7 +18,7 @@ You are reviewing the combined output of Batch {batch_number} of a feature imple
 ## Review Checklist
 
 1. **Verification**: Run `{verification_commands}` and report results. Fix nothing — just report.
-2. **Acceptance Criteria**: For each task listed above, check whether the implementation meets the acceptance criteria from its task file.
+2. **Acceptance Criteria & Tests**: For each task listed above, check whether the implementation meets the acceptance criteria from its task file, and that the tests named in its Tests section exist, actually exercise that behaviour, and pass. Flag tests that were deleted, skipped, or weakened.
 3. **Integration**: Verify that files created by different tasks work together:
    - Imports resolve correctly
    - Types match across module boundaries
@@ -47,4 +47,4 @@ Group issues by the task they most closely relate to (based on which task's file
 - **{batch_number}**: the current batch number (e.g., "2")
 - **{requirements}**: full text of `requirements.md`
 - **{task_summaries}**: for each task in the batch, include the task title and the coder agent's completion summary (files created/modified + what was implemented)
-- **{verification_commands}**: the project's lint and typecheck commands. Check for `package.json` scripts — typically `pnpm lint && pnpm typecheck` or similar.
+- **{verification_commands}**: the project's lint, typecheck, and test commands. Check for `package.json` scripts (or the stack's equivalent) — typically `pnpm lint && pnpm typecheck && pnpm test` or similar.

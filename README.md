@@ -20,9 +20,9 @@ spec-investigate  →  spec-create  →  spec-implement  →  spec-verify  →  
 
 | Skill | Trigger | Input | Output |
 |---|---|---|---|
-| `spec-investigate` | "investigate STP-123", "look into this ticket before we plan it" | A Jira ticket ID/URL (plus any optional context) | `specs/{feature}/investigation.md` — evidence-based report of current behaviour, root cause, affected repos/files, risks, and open questions; no code changes |
+| `spec-investigate` | "investigate STP-123", "look into this before we plan it" | A ticket (Jira, GitHub Issues, Linear), a call transcript, a doc/PRD, a log, or plain text — plus any optional context | `specs/{feature}/investigation.md` — evidence-based report of current behaviour, root cause, affected repos/files, risks, test landscape, and open questions, plus a work branch; no code changes |
 | `spec-create` | "create a spec", "plan this feature", "break this into tasks" | A planning conversation (or an interview if there wasn't one) | `specs/{feature}/` — `requirements.md`, `action-required.md`, `tasks/task-NN-*.md`, `README.md` with a dependency graph and batch breakdown |
-| `spec-implement` | "implement this feature", "run the spec", "continue implementing" | `specs/{feature}/` | Real code changes — one coder subagent per task per batch, run in parallel within a batch, with a code-review gate before each batch is committed |
+| `spec-implement` | "implement this feature", "run the spec", "continue implementing" | `specs/{feature}/` | Real code changes plus their tests — one coder subagent per task per batch, run in parallel (each in its own git worktree where the host allows), with a code-review gate before each batch is committed |
 | `spec-verify` | "test this end to end", "does this actually work", right after `spec-implement` finishes | `specs/{feature}/` | `specs/{feature}/verification-report.md` — every acceptance criterion checked against the *real running app* (clicks, API calls, DB reads used only to confirm state), pass/fail with evidence |
 | `spec-checkpoint` | "checkpoint", "commit everything", "save my progress" | A working tree with changes | A local commit — but only after lint, typecheck, and build all pass |
 | `spec-ship` | "ship it", "push this", "open a PR" | A committed, verified branch | A pushed branch + an opened GitHub PR |
@@ -53,14 +53,14 @@ interview, then remembers the answers for every later run. See
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-investigate` | 1 · understand | 323 | 2,278 | 0 |
-| `spec-create` | 2 · plan | 136 | 1,157 | 4 |
-| `spec-implement` | 3 · build | 210 | 1,461 | 3 |
+| `spec-investigate` | 1 · understand | 310 | 2,553 | 1 |
+| `spec-create` | 2 · plan | 136 | 1,195 | 4 |
+| `spec-implement` | 3 · build | 223 | 1,645 | 3 |
 | `spec-verify` | 4 · prove | 140 | 1,336 | 1 |
 | `spec-checkpoint` | 5 · commit | 94 | 599 | 0 |
 | `spec-ship` | 6 · PR | 201 | 1,051 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **1,359** | **10,091** | **15** |
+| **Total** | | **1,359** | **10,588** | **16** |
 
 - **7** skills — **6** pipeline stages + **1** standalone
 - **4** hosts supported natively (Claude Code, Codex CLI, Cursor, Antigravity) + an MCP fallback for any MCP host
@@ -78,7 +78,7 @@ folders directly (see Install below).
 
 | Skill | Claude Code | Codex CLI | Cursor | Antigravity | Notes |
 |---|---|---|---|---|---|
-| `spec-investigate` | ✅ | ✅ | ✅ | ✅ | Reads Jira via whatever access the host has (Atlassian MCP, CLI, or a pasted ticket) |
+| `spec-investigate` | ✅ | ✅ | ✅ | ✅ | Fetches tickets via whatever access the host has (Atlassian/Linear MCP, `gh`, or pasted text); free-form input needs nothing extra |
 | `spec-create` | ✅ | ✅ | ✅ | ✅ | Planning + file writing only, no host-specific mechanics |
 | `spec-implement` | ✅ | ✅ | ✅ | ✅ | Parallel dispatch uses whichever subagent/background-agent mechanism your host provides; falls back to sequential execution if it has none |
 | `spec-verify` | ✅ | ⚠️ | ⚠️ | ⚠️ | UI-observable criteria need a browser-automation tool available on your host (MCP browser server, built-in browser tool, or extension); API/DB-only criteria work everywhere |
@@ -148,7 +148,7 @@ Treat this as the fallback, not the primary path — prefer native Agent Skills 
 
 ## Typical flow
 
-1. `/spec-investigate <ticket>` to understand the system before planning (optional for greenfield work).
+1. `/spec-investigate <ticket | file | text>` to understand the system before planning (optional for greenfield work).
 2. Plan the feature in conversation, then `/spec-create` to capture it — review and approve the spec before implementing.
 3. `/spec-implement` to build it batch-by-batch with review gates between batches.
 4. `/spec-verify` to prove the acceptance criteria hold against the real
@@ -157,6 +157,11 @@ Treat this as the fallback, not the primary path — prefer native Agent Skills 
 6. `/spec-ship` to push and open the PR.
 7. Any time, independent of the pipeline: `/generative-seo` for SEO/GEO work
    on the same project or any other.
+
+## Development
+
+- `python3 scripts/check.py` checks the repo for drift: each skill's frontmatter, `references/` links, `.agents/skills` symlinks, `install.sh`, the manifests, and README mentions. `--fix` regenerates the *By the numbers* table. CI (`.github/workflows/check.yml`) runs it on every push and PR, along with `bash -n install.sh` and `node --check` on the MCP server.
+- `evals/` holds `claude plugin eval` cases that check each pipeline skill fires on its trigger phrases and stays in its lane. Run them with `claude plugin eval . --runs 1`. They use your own Claude credentials, so they aren't part of CI.
 
 ## License
 

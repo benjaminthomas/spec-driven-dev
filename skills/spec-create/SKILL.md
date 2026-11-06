@@ -51,7 +51,7 @@ Break the implementation into atomic tasks. Each task should:
 
 Think carefully about granularity. Too coarse and agents can't work in parallel. Too fine and the overhead of context-switching between tasks dominates. A good task typically creates or modifies 1-5 files around a single concern.
 
-Do NOT include testing tasks (unit tests, e2e tests) unless the user explicitly asks for them.
+Tests ship with the code they cover: fill in each task's **Tests** section (see the task template) instead of creating separate "write tests" tasks. Only add a standalone testing task for cross-cutting suites (e.g. a new E2E harness) or when the user asks for one.
 
 ### Step 4: Build the Dependency Graph
 
@@ -132,5 +132,5 @@ Next steps:
 - Capture ALL technical details from the planning conversation. The spec is the single source of truth — CLI commands, schemas, code snippets, file paths, env vars, API endpoints. Anything not captured here is lost.
 - Tasks within the same batch must not modify overlapping files. Parallel agents on the same branch cannot safely touch the same files.
 - Keep tasks atomic — one concern per task. If a task has more than 5-7 files to modify, consider splitting it.
-- Do not create testing tasks unless the user explicitly asks for them.
+- Put tests in each task's Tests section, not in separate testing tasks (unless the user asks, or it's a cross-cutting suite).
 - Number task files in topological order (batch 1 first, then batch 2, etc.) for easy scanning.

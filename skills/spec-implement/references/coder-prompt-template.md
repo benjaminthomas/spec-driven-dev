@@ -22,13 +22,15 @@ You are implementing a single task from a feature specification. Your job is to 
 ## Instructions
 
 1. Read the relevant parts of the codebase to understand existing patterns, imports, and conventions
-2. Implement everything described in the task's Technical Details and Implementation Steps
-3. Follow the project's existing code patterns and conventions
-4. Run the project's lint and typecheck commands after making changes. Fix any errors before finishing.
-5. Do NOT commit your changes — the orchestrator handles commits after review
+2. Write the tests listed in the task's Tests section first, using the repo's existing test framework, and run them to see them fail for the right reason (skip this only where the task says "None")
+3. Implement everything described in the task's Technical Details and Implementation Steps until those tests pass
+4. Follow the project's existing code patterns and conventions
+5. Run the project's lint, typecheck, and test commands after making changes. Fix any errors before finishing — never delete, skip, or weaken a test to make it pass
+6. Do NOT commit your changes — if you're in your own git worktree, leave the changes uncommitted there too — the orchestrator handles commits after review
 6. When done, report:
    - Files created (with paths)
    - Files modified (with paths)
+   - Tests added and the test command's final result
    - A one-paragraph summary of what you implemented
 ```
 

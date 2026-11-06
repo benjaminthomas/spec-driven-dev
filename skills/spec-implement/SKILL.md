@@ -93,6 +93,19 @@ Read `references/coder-prompt-template.md` and construct each agent's prompt by 
 
 The coder agents should NOT commit their changes — the orchestrator handles commits after review.
 
+**Isolate parallel coders in git worktrees when the host allows it.** Coders sharing one working
+tree can clobber each other's edits and each other's lint/test runs. If your host can run an agent
+in its own worktree (e.g. Claude Code's `isolation: "worktree"`), use it for every coder in a
+batch of 2+ tasks; otherwise create them yourself — `git worktree add -b spec/{feature}/task-{nn}
+../.worktrees/{feature}-task-{nn} HEAD` — and point each coder at its path. A single-task batch, or
+a host with no way to give an agent a different working directory, runs in the main tree as before.
+
+When the batch's coders finish, bring their work back into the main tree before the review gate:
+commit inside each worktree (`wip: task-{nn}`), then `git merge --squash` each task branch into the
+feature branch in task order, leaving the result unstaged. A merge conflict means the batch's tasks
+weren't independent — stop, show the conflicting files, and ask the user how to resolve them. Remove
+the worktrees and their branches (`git worktree remove`, `git branch -D`) once merged.
+
 ### Step 5: Collect Results
 
 Wait for all coder agents in the batch to complete. Each agent should report:
@@ -113,11 +126,11 @@ Read `references/review-prompt-template.md` and construct the review prompt by f
 - **{batch_number}**: current batch number
 - **{requirements}**: full text of `requirements.md`
 - **{task_summaries}**: for each task in this batch, the task title and the coder agent's completion summary
-- **{verification_commands}**: the project's lint and typecheck commands (e.g., `pnpm lint && pnpm typecheck`)
+- **{verification_commands}**: the project's lint, typecheck, and test commands (e.g., `pnpm lint && pnpm typecheck && pnpm test`)
 
 The review agent should:
-1. Run lint and typecheck
-2. Verify acceptance criteria from each task file
+1. Run lint, typecheck, and tests
+2. Verify acceptance criteria and the tests named in each task file
 3. Check that files integrate correctly (imports resolve, types match)
 4. Check for security issues and code quality
 5. Return a structured verdict: **PASS** or **FAIL** with specific issues

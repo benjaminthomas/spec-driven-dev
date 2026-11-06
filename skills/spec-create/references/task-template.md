@@ -59,6 +59,12 @@ pending
 {If applicable:}
 - `METHOD /path` — {Request/response shape}
 
+## Tests
+
+{Which tests prove this task works, following the repo's existing test framework and layout (an investigation's Testing Context is the best source). For each: file path, type (unit/integration/E2E), and the behaviour it pins down. Write "None — {reason}" only for tasks with nothing testable (pure config, docs).}
+
+- `path/to/thing.test.ts` — {behaviour under test}
+
 ## Acceptance Criteria
 
 - [ ] {Criterion 1 — specific and verifiable}
@@ -76,4 +82,5 @@ pending
 - The **Dependencies** section includes prose context (not just filenames) so the agent understands its inputs without reading other files. This is the most important part of making task files self-contained.
 - **Files to Create** and **Files to Modify** make the task's scope explicit. Tasks in the same batch should not overlap on these lists.
 - **Technical Details** captures everything from the planning conversation — CLI commands, schemas, code snippets, file paths, env vars, API endpoints. If it was discussed during planning and is relevant to this task, it belongs here.
+- **Tests** names the tests the coder writes alongside the code. A behavioural acceptance criterion without a matching test is a gap — add the test or explain why it can only be checked by `spec-verify`.
 - **Acceptance Criteria** should be specific enough that completion can be verified objectively (by a code review agent or a human).
