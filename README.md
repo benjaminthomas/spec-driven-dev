@@ -476,8 +476,13 @@ evals/                        `claude plugin eval` cases
 - **Releasing:**
   1. Increase `version` in both `package.json` and `.claude-plugin/plugin.json` (the check fails if
      they differ).
-  2. Add a `CHANGELOG.md` entry.
-  3. Push, then `npm publish`.
+  2. Add a `CHANGELOG.md` entry, then commit and push.
+  3. Tag the release and push the tag: `git tag v1.4.1 && git push origin v1.4.1`.
+
+  `.github/workflows/publish.yml` then runs the tests and publishes to npm through
+  [trusted publishing](https://docs.npmjs.com/trusted-publishers). No npm token or passkey is
+  needed, and the package page shows a provenance badge linking the release to the exact commit.
+  The workflow refuses to publish if the tag doesn't match `package.json`.
 
 ## License
 
