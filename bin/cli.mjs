@@ -235,22 +235,30 @@ function toYaml(c) {
   out += `tracker:\n  type: ${c.tracker.type}\n  key: ${y(c.tracker.key)}\n  url: ${y(c.tracker.url)}\n`;
   out += `git:\n${cmds(c.git, "  ")}\n`;
   out += `commands:\n${cmds(c.commands, "  ")}\n  dev_url: ${y(c.devUrl)}\n`;
-  out += "models:   # model per task tier (light / standard / deep); \"default\" = the session's model\n" + Object.entries(MODEL_DEFAULTS)
-    .map(([tool, m]) => `  ${tool}:\n` + TIERS.map((t) => `    ${t}: ${m[t]}\n`).join("")).join("");
+  out += "models:   # model per task tier; \"default\" = the session's model; escalate = last resort for repeat failures\n" + Object.entries(MODEL_DEFAULTS)
+    .map(([tool, m]) => `  ${tool}:\n` + MODEL_KEYS.map((t) => `    ${t}: ${m[t]}\n`).join("")).join("");
+  out += "effort:   # effort / reasoning level per tier (Claude Code, Codex): low | medium | high | xhigh | max | default\n"
+    + MODEL_KEYS.map((t) => `  ${t}: ${EFFORT_DEFAULTS[t]}\n`).join("");
   out += `pipeline:\n  after_approval: ${c.afterApproval || "stop"}   # stop | run-through (implement → verify → checkpoint; ship always asks)\n`;
   return out + `specs_dir: ${y(c.specsDir)}\n`;
 }
 
 const LAYOUTS = ["single", "monorepo", "multi-repo"];
 const TIERS = ["light", "standard", "deep"];
-// Aliases, not dated model IDs, so they keep pointing at the current models. Other tools default to
-// the session's own model; spec-implement then tells you when to switch.
+const MODEL_KEYS = [...TIERS, "escalate"]; // escalate: optional last resort when a deep task keeps failing
+const EFFORTS = ["low", "medium", "high", "xhigh", "max", "default"];
+// Checked against the vendors' docs on 2026-11-06 (Claude Code model-config, OpenAI Codex config,
+// Cursor models page). Claude Code aliases track the newest model per family on your provider.
+// Cursor's models depend on your plan, so it defaults to the session's model.
+// shortcut: model names go stale; refresh these defaults (and the README table) when vendors ship new lines.
 const MODEL_DEFAULTS = {
-  claude: { light: "haiku", standard: "sonnet", deep: "opus" },
-  cursor: { light: "default", standard: "default", deep: "default" },
-  codex: { light: "default", standard: "default", deep: "default" },
-  antigravity: { light: "default", standard: "default", deep: "default" },
+  claude: { light: "haiku", standard: "sonnet", deep: "opus", escalate: "fable" },
+  codex: { light: "gpt-6-luna", standard: "gpt-6.1-sol", deep: "gpt-6.1-sol", escalate: "default" },
+  cursor: { light: "default", standard: "default", deep: "default", escalate: "default" },
+  antigravity: { light: "default", standard: "default", deep: "default", escalate: "default" },
 };
+// Effort / reasoning level per tier, for tools that support it (Claude Code, Codex).
+const EFFORT_DEFAULTS = { light: "low", standard: "medium", deep: "high", escalate: "xhigh" };
 const splitList = (v) => (v || "").split(",").map((x) => x.trim()).filter(Boolean);
 // Paths are stored relative to the config's folder when inside it, absolute otherwise.
 const real = (p) => { try { return fs.realpathSync(p); } catch { return p; } }; // /var vs /private/var etc.
@@ -514,7 +522,11 @@ function doctor() {
   for (const [tool, m] of Object.entries(c.models || {})) {
     if (typeof m !== "object") { problems.push(`models.${tool} must list light / standard / deep`); continue; }
     for (const t of TIERS) if (!m[t]) problems.push(`models.${tool}.${t} is missing (use "default" for the session's model)`);
-    for (const k of Object.keys(m)) if (!TIERS.includes(k)) problems.push(`models.${tool}.${k}: unknown tier (use light, standard, deep)`);
+    for (const k of Object.keys(m)) if (!MODEL_KEYS.includes(k)) problems.push(`models.${tool}.${k}: unknown tier (use light, standard, deep, escalate)`);
+  }
+  for (const [k, v] of Object.entries(c.effort || {})) {
+    if (!MODEL_KEYS.includes(k)) problems.push(`effort.${k}: unknown tier (use light, standard, deep, escalate)`);
+    else if (!EFFORTS.includes(v)) problems.push(`effort.${k} "${v}" must be one of ${EFFORTS.join(", ")}`);
   }
   if (c.pipeline?.after_approval && !["stop", "run-through"].includes(c.pipeline.after_approval)) problems.push(`pipeline.after_approval "${c.pipeline.after_approval}" must be stop or run-through`);
   if (c.git?.branch_name && !/\{(ticket|slug)\}/.test(c.git.branch_name)) problems.push(`git.branch_name "${c.git.branch_name}" needs {ticket} or {slug}`);

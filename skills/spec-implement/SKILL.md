@@ -108,14 +108,17 @@ Read `references/coder-prompt-template.md` and construct each agent's prompt by 
 
 The coder agents should NOT commit their changes — the orchestrator handles commits after review.
 
-**Pick each coder's model from the task's tier.** Read the task's `## Complexity` tier (treat a
-missing tier as `standard`) and look up the model in `.spec-driven.yml` → `models.<tool>.<tier>`,
-where `<tool>` is the host you're running in (`claude`, `codex`, `cursor`, `antigravity`). Without a
-`models` section, use `models.claude` defaults: `light → haiku`, `standard → sonnet`,
-`deep → opus`.
+**Pick each coder's model and effort from the task's tier.** Read the task's `## Complexity` tier
+(treat a missing tier as `standard`), then look up `.spec-driven.yml` → `models.<tool>.<tier>` and
+`effort.<tier>`, where `<tool>` is the host you're running in (`claude`, `codex`, `cursor`,
+`antigravity`). Without those sections, use these defaults: Claude Code `light → haiku/low`,
+`standard → sonnet/medium`, `deep → opus/high`; other hosts use the session's model.
 
-- **Host can set a model per agent** (e.g. Claude Code's Agent tool `model` parameter): dispatch
-  each coder with its tier's model.
+- **Host can set a model per agent** (e.g. Claude Code's Agent tool `model` and `effort`
+  parameters): dispatch each coder with its tier's model and effort.
+- **Model not available** (not on your plan or provider, or rejected by the host): fall back to the
+  session's model, say which task fell back and why, and suggest fixing `models:`. Don't stop the
+  batch for this.
 - **Host can't** (one model per session, as in Cursor or Codex): don't silently run deep tasks on a
   light model. Before dispatching a batch, compare its highest tier with the model you're running
   on. If the batch needs a stronger one, stop and say:
@@ -183,8 +186,10 @@ If the review returns **FAIL**:
    - **{task_content}**: the original task file for context
 4. After fix agents complete, re-run the review (Step 6)
 5. **Escalate on repeat failure.** If a task's issues survive a fix cycle, run its next fix one tier
-   higher (`light → standard → deep`). Note the escalation in the batch report. When a task needed
-   escalating, its tier was probably wrong, which is useful feedback for future specs.
+   higher (`light → standard → deep`). A `deep` task that still fails goes to `models.<tool>.escalate`
+   (e.g. `fable`) at `effort.escalate`, if it's set and not `default`. Ask first if that model can
+   bill to usage credits, as Fable can on some plans. Note every escalation in the batch report:
+   a task that needed escalating was probably under-rated, which is useful feedback for future specs.
 
 **Cap at 3 review cycles per batch.** If the third review still fails, stop and report to the user:
 

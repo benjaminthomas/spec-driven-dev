@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.8.0 — 2026-11-06
+- **Model defaults checked against the vendors' current docs** (2026-11-06) instead of written from memory.
+  - Claude Code keeps family aliases (`haiku`/`sonnet`/`opus`), which follow the newest model on your provider, and gains `escalate: fable` for deep tasks that keep failing. It asks first, because Fable can bill to usage credits.
+  - Codex gets real defaults (`gpt-6-luna` / `gpt-6.1-sol`).
+  - Cursor stays on your session's model, because its models depend on your plan.
+- **Effort per tier** (`effort:` in `.spec-driven.yml`: light `low`, standard `medium`, deep `high`, escalate `xhigh`), passed to coders on hosts that support it.
+- If a configured model isn't available, that task falls back to the session's model and the report says why.
+- `doctor` validates `effort:` and the `escalate` tier.
+
 ## 1.7.0 — 2026-11-06
 - **Model routing by task complexity.** `spec-create` rates every task `light`, `standard`, or `deep` using a shared rubric (`references/complexity-rubric.md`): spread, new design, data, concurrency, security, public contract, ambiguity, and hard to verify. `spec-implement` runs each coder on that tier's model from `.spec-driven.yml` → `models:` (Claude Code defaults `haiku`/`sonnet`/`opus`). Reviews run on at least `standard`, and repeat failures escalate one tier. Tools that can't pick a model per agent pause and say which model to switch to.
 - `spec-investigate` adds a complexity estimate and the model worth planning on.

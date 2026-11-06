@@ -97,14 +97,26 @@ words in quotes.
 **deep**, based on how much it touches and how risky it is (data, security, concurrency, public
 contracts, unclear requirements). `spec-implement` then runs each task on the model for its tier:
 
-| Tier | Typical task | Claude Code default |
-|---|---|---|
-| light | copy change, config value, small UI tweak following an existing pattern | `haiku` |
-| standard | a normal feature slice: route + service + tests | `sonnet` |
-| deep | migrations with backfills, auth/permissions, concurrency, cross-repo contracts | `opus` |
+| Tier | Typical task | Claude Code | Codex CLI | Effort |
+|---|---|---|---|---|
+| light | copy change, config value, small UI tweak following an existing pattern | `haiku` | `gpt-6-luna` | low |
+| standard | a normal feature slice: route + service + tests | `sonnet` | `gpt-6.1-sol` | medium |
+| deep | migrations with backfills, auth/permissions, concurrency, cross-repo contracts | `opus` | `gpt-6.1-sol` | high |
+| escalate | a deep task that still fails after a fix round | `fable` (asks first, as it may use usage credits) | (session model) | xhigh |
 
 - **Reviews:** each batch's review runs on at least `standard`, and on the batch's highest tier.
-- **Escalation:** a task that still fails after a fix round is retried one tier up.
+- **Escalation:** a task that still fails after a fix round is retried one tier up. A deep task
+  that still fails goes to the `escalate` model.
+- **Fallback:** if a model isn't available on your plan or provider, that task runs on your current
+  model and the report says so.
+- **Where the defaults come from:** they were checked on 2026-11-06 against
+  [Claude Code's model docs](https://code.claude.com/docs/en/model-config) (on Bedrock, Google Cloud,
+  and Foundry, `sonnet`/`haiku` point to older versions),
+  [Anthropic's model overview](https://platform.claude.com/docs/en/about-claude/models/overview),
+  [Codex's config docs](https://developers.openai.com/codex/config-basic), and
+  [Cursor's model list](https://cursor.com/help/models-and-usage/available-models). Claude Code
+  uses family aliases, which always point to the newest model. Cursor's models depend on your plan,
+  so it uses your current model until you fill in the models you can see in its picker.
 - **Tools that run one model per session** (Cursor, Codex) don't switch silently. Before a heavier
   batch, they pause and tell you which model to switch to.
 - **Changing the models:** edit the `models:` section of `.spec-driven.yml`, for example to use a
@@ -156,7 +168,7 @@ straight away, so you can fix it before moving on. Press Enter on an empty line 
 | Lint / typecheck / test / build / dev commands | `package.json` scripts and lockfile (per repo or package) | `pnpm run lint` |
 | Where specs go | (you choose) | `specs/` |
 | After you approve a spec | (you choose) | `stop` (wait at each stage) or `run-through` |
-| Model per task tier | written with defaults: Claude Code `haiku`/`sonnet`/`opus`, others `default` | edit `models:` later |
+| Model and effort per task tier | written with the defaults above | edit `models:` / `effort:` later |
 
 **Where the file lives, by layout:**
 
@@ -563,12 +575,12 @@ skips that step rather than failing.
 | `spec-setup` | 0 · configure | 117 | 1,068 | 1 |
 | `spec-investigate` | 1 · understand | 330 | 2,794 | 1 |
 | `spec-create` | 2 · plan | 166 | 1,503 | 5 |
-| `spec-implement` | 3 · build | 298 | 2,375 | 3 |
+| `spec-implement` | 3 · build | 303 | 2,458 | 3 |
 | `spec-verify` | 4 · prove | 155 | 1,492 | 1 |
 | `spec-checkpoint` | 5 · commit | 108 | 795 | 0 |
 | `spec-ship` | 6 · PR | 220 | 1,268 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **1,649** | **13,504** | **18** |
+| **Total** | | **1,654** | **13,587** | **18** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback

@@ -129,10 +129,11 @@ assert.ok(!fs.existsSync(path.join(quiet, ".spec-driven.yml")), "wrote a config 
 
 // 10b. models block: written by setup, parsed and validated by doctor
 cfg = fs.readFileSync(path.join(quiet, "..", "ws", ".spec-driven.yml"), "utf8");
-assert.ok(/models:[\s\S]*claude:\n    light: haiku\n    standard: sonnet\n    deep: opus/.test(cfg), cfg);
-fs.writeFileSync(path.join(quiet, ".spec-driven.yml"), "layout: single\nmodels:\n  claude:\n    light: haiku\n    huge: x\n");
+assert.ok(/models:[\s\S]*claude:\n    light: haiku\n    standard: sonnet\n    deep: opus\n    escalate: fable/.test(cfg), cfg);
+assert.ok(/effort:[^\n]*\n  light: low\n  standard: medium\n  deep: high\n  escalate: xhigh/.test(cfg), cfg);
+fs.writeFileSync(path.join(quiet, ".spec-driven.yml"), "layout: single\nmodels:\n  claude:\n    light: haiku\n    huge: x\neffort:\n  deep: turbo\n");
 d = doctor(quiet);
-assert.ok(d.code === 1 && d.out.includes("models.claude.standard is missing") && d.out.includes("models.claude.huge: unknown tier"), d.out);
+assert.ok(d.code === 1 && d.out.includes("models.claude.standard is missing") && d.out.includes("models.claude.huge: unknown tier") && d.out.includes('effort.deep "turbo"'), d.out);
 fs.rmSync(path.join(quiet, ".spec-driven.yml"));
 
 // 10. --version
