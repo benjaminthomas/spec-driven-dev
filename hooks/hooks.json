@@ -1,0 +1,13 @@
+{
+  "description": "On session start, list specs with unfinished tasks (prints nothing when there are none).",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/cli.mjs\" status --dir=\"${CLAUDE_PROJECT_DIR:-.}\"", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}

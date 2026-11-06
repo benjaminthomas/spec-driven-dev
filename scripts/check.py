@@ -28,8 +28,19 @@ for name in skills:
     fm = fm.group(1)
     if not re.search(rf"^name:\s*{re.escape(name)}\s*$", fm, re.M):
         errors.append(f"{name}: frontmatter name must equal folder name")
-    if not re.search(r"^description:\s*\S", fm, re.M):
+    # Anthropic's skill rules: lowercase-hyphen name <=64, description 1-1024 chars, no XML, no reserved words, body <500 lines
+    if not re.fullmatch(r"[a-z0-9-]{1,64}", name) or re.search(r"anthropic|claude", name):
+        errors.append(f"{name}: name must be lowercase letters/digits/hyphens, <=64 chars, without 'anthropic'/'claude'")
+    dm = re.search(r"^description:[ \t]*(?:[>|]-?)?[ \t]*\n?((?:.|\n)*?)(?=^[\w-]+:|\Z)", fm, re.M)
+    desc = " ".join(l.strip() for l in (dm.group(1) if dm else "").splitlines()).strip()
+    if not desc:
         errors.append(f"{name}: missing description")
+    elif len(desc) > 1024:
+        errors.append(f"{name}: description is {len(desc)} chars (max 1024)")
+    elif re.search(r"<[a-zA-Z/][^>]*>", desc):
+        errors.append(f"{name}: description contains an XML/HTML tag")
+    if text.count("\n") - fm.count("\n") > 500:
+        errors.append(f"{name}: SKILL.md body is over 500 lines — move detail into references/")
     if not re.search(r"^license:", fm, re.M):
         errors.append(f"{name}: missing license")
     for ref in set(re.findall(r"`(references/[\w./-]+)`", text)):

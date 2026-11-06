@@ -64,7 +64,26 @@ cli("--yes", "--global", "--no-setup", "--tools=cursor,codex,antigravity", `--di
 for (const d of [".cursor/skills", ".agents/skills", ".gemini/config/skills"])
   assert.ok(fs.existsSync(path.join(home, d, "spec-ship/SKILL.md")), `global install missing in ${d}`);
 
-// 6. bad input fails loudly
+// 6. doctor: passes on a good config, fails on a missing base branch / script
+const doctor = (dir) => { try { return { code: 0, out: cli("doctor", `--dir=${dir}`) }; } catch (e) { return { code: e.status, out: e.stdout.toString() }; } };
+fs.writeFileSync(path.join(single, ".spec-driven.yml"), 'layout: single\ngit:\n  base_branch: "staging"\ncommands:\n  lint: "npm run lint"\n');
+assert.equal(doctor(single).code, 0, doctor(single).out);
+fs.writeFileSync(path.join(single, ".spec-driven.yml"), 'layout: single\ngit:\n  base_branch: "nope"\ncommands:\n  build: "npm run build"\n');
+let d = doctor(single);
+assert.equal(d.code, 1);
+assert.ok(d.out.includes('"nope" doesn\'t exist') && d.out.includes('"build", which isn\'t in package.json'), d.out);
+assert.equal(doctor(ws).code, 0, doctor(ws).out);  // setup's own output must pass doctor
+
+// 7. status: silent with nothing open, lists unfinished specs
+assert.equal(cli("status", `--dir=${single}`), "");
+fs.mkdirSync(path.join(single, "specs/a"), { recursive: true });
+fs.writeFileSync(path.join(single, "specs/a/README.md"), "- [x] one\n- [ ] two\n");
+fs.mkdirSync(path.join(single, "specs/b"));
+fs.writeFileSync(path.join(single, "specs/b/investigation.md"), "x");
+const st = cli("status", `--dir=${single}`);
+assert.ok(st.includes("specs/a: 1/2 tasks done") && st.includes("specs/b: investigated"), st);
+
+// 8. bad input fails loudly
 assert.throws(() => cli("--yes", "--tools=nope", "--no-setup", `--dir=${single}`));
 
 fs.rmSync(tmp, { recursive: true, force: true });

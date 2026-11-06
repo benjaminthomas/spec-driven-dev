@@ -79,7 +79,10 @@ for the rest.
    under `repos:` where they differ from the top level.
 2. If it's inside a repo, tell the user it's meant to be committed (so teammates get the same
    rules) — don't commit it yourself.
-3. Report: the file path, a one-line summary per section, and "re-run spec-setup any time these
+3. If `npx` is available, run `npx -y spec-driven-dev doctor` from the config's folder. It checks
+   that every branch, folder, and `npm run` script in the file really exists. Fix anything it
+   reports before finishing.
+4. Report: the file path, a one-line summary per section, and "re-run spec-setup any time these
    change".
 
 ## Updating

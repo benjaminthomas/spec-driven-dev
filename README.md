@@ -116,7 +116,8 @@ for stacks other than Node). If a skill finds no config, it runs this setup firs
 | **monorepo** | one repo, many apps/packages | the repo root (commit it) | tasks name their package, and checks run per package |
 | **multi-repo** | several repos that change together | their shared parent folder (personal to your machine) | investigation searches every listed repo, tasks stay inside one repo each, and `spec-ship` opens one PR per repo, each linking the others |
 
-To change the rules later, edit the file or run setup again. Setup never overwrites the file without
+To change the rules later, edit the file or run setup again, then run `npx spec-driven-dev doctor`
+to confirm the file still matches your repos. Setup never overwrites the file without
 asking. See [`config-template.yml`](skills/spec-setup/references/config-template.yml) for every field.
 
 ## How the workflow fits together
@@ -343,7 +344,13 @@ npx spec-driven-dev --global                          # install for all projects
 npx spec-driven-dev --tools=cursor,codex              # pick tools without being asked
 npx spec-driven-dev --skills=spec-create,spec-ship    # install only some skills
 npx spec-driven-dev --yes                             # accept every detected default (CI-friendly)
+npx spec-driven-dev doctor                            # check .spec-driven.yml against the real repos
+npx spec-driven-dev status                            # list specs with unfinished work
 ```
+
+`doctor` checks that every branch, folder, and `npm run` script named in the config exists, and
+that each value is one the skills understand. It exits 1 if anything is wrong, so you can run it in
+CI. `status` prints nothing when all specs are finished.
 
 Run it again at any time to update: it replaces the installed skill folders with the latest
 version. Before the package is published to npm, `npx github:benjaminthomas/spec-driven-dev` works
@@ -356,7 +363,12 @@ the same way.
 /plugin install spec-driven-dev@spec-driven-dev
 ```
 
-To update, run `/plugin marketplace update spec-driven-dev`, then update the plugin from `/plugin`. If
+To update, run `/plugin marketplace update spec-driven-dev`, then update the plugin from `/plugin`.
+
+The plugin also adds a **session-start reminder**. When you open Claude Code in a project with
+unfinished specs, Claude is told which ones and what the next step is (for example,
+`specs/stp-123: 3/5 tasks done → next: spec-implement`). It prints nothing when everything is
+finished. If
 you use the plugin, `npx spec-driven-dev` skips Claude Code so you don't get every skill twice. Run
 `npx spec-driven-dev setup` for the project config.
 
@@ -411,7 +423,7 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 96 | 822 | 1 |
+| `spec-setup` | 0 · configure | 99 | 857 | 1 |
 | `spec-investigate` | 1 · understand | 323 | 2,708 | 1 |
 | `spec-create` | 2 · plan | 149 | 1,328 | 4 |
 | `spec-implement` | 3 · build | 236 | 1,790 | 3 |
@@ -419,7 +431,7 @@ skips that step rather than failing.
 | `spec-checkpoint` | 5 · commit | 106 | 762 | 0 |
 | `spec-ship` | 6 · PR | 218 | 1,235 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **1,536** | **12,313** | **17** |
+| **Total** | | **1,539** | **12,348** | **17** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback
@@ -441,6 +453,8 @@ skills/<name>/references/     templates and prompts the skill loads when needed
 bin/cli.mjs                   the npx installer + project setup (no dependencies)
 package.json                  npm package (ships bin/ and skills/)
 mcp-server/                   MCP fallback server
+hooks/hooks.json              Claude Code session-start hook (runs `cli.mjs status`)
+CHANGELOG.md                  what changed in each version
 scripts/check.py              consistency checks + metrics generator
 scripts/test-cli.mjs          installer self-test (fake HOME, throwaway repos)
 evals/                        `claude plugin eval` cases
@@ -452,8 +466,18 @@ evals/                        `claude plugin eval` cases
   the same checks, the installer self-test, and a syntax check on the MCP server.
 - **Evals:** `claude plugin eval . --runs 1` checks that skills trigger on their phrases and stay
   within their own stage. These runs use your Claude credentials, so they aren't part of CI.
-- **Releasing:** increase `version` in both `package.json` and `.claude-plugin/plugin.json` (the check
-  fails if they differ), push, then `npm publish`.
+- **Skill rules** (from [Anthropic's skill authoring guide](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices),
+  enforced by `scripts/check.py`):
+  - Names are lowercase with hyphens.
+  - Descriptions are 1,024 characters or fewer, in the third person, and say both what the skill
+    does and when to use it.
+  - `SKILL.md` stays under 500 lines, with detail in `references/` one link deep.
+  - Facts are read from the repo, not assumed.
+- **Releasing:**
+  1. Increase `version` in both `package.json` and `.claude-plugin/plugin.json` (the check fails if
+     they differ).
+  2. Add a `CHANGELOG.md` entry.
+  3. Push, then `npm publish`.
 
 ## License
 

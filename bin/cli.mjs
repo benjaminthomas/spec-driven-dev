@@ -4,6 +4,8 @@
 //
 //   npx spec-driven-dev                 install + project setup (interactive)
 //   npx spec-driven-dev setup           project setup only
+//   npx spec-driven-dev doctor          check .spec-driven.yml against the real repos (exit 1 on problems)
+//   npx spec-driven-dev status          list specs with unfinished tasks (used by the session-start hook)
 //   flags: --yes  --global  --tools=claude,cursor  --skills=spec-create,...  --no-setup  --dir=<path>
 import fs from "node:fs";
 import os from "node:os";
@@ -29,11 +31,11 @@ const args = process.argv.slice(2);
 const flag = (n) => args.includes(`--${n}`);
 const opt = (n) => args.find((a) => a.startsWith(`--${n}=`))?.split("=")[1];
 const command = args.find((a) => !a.startsWith("-")) || "install";
-const YES = flag("yes") || flag("y") || !process.stdin.isTTY;
+const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status"].includes(command);
 const DIR = path.resolve(opt("dir") || process.cwd());
 
 if (flag("help") || flag("h")) {
-  console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 7).join("\n").replace(/^\/\/ ?/gm, ""));
+  console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 9).join("\n").replace(/^\/\/ ?/gm, ""));
   process.exit(0);
 }
 
@@ -221,7 +223,8 @@ async function setup() {
     commands: layout === "single" ? commandsFor(repoDirs[0]) : commandsFor(root),
     repos: layout === "single" ? [] : (layout === "multi-repo" ? repos : d.repos).map((r) => {
       const f = layout === "multi-repo" ? gitFacts(path.join(root, r)) : null;
-      return { path: r, role: "", base: f?.integration || "", commands: commandsFor(path.join(root, r)) };
+      // a repo without an integration branch must say so, or it inherits the top-level base (e.g. staging) it doesn't have
+      return { path: r, role: "", base: f ? f.integration || "default" : "", commands: commandsFor(path.join(root, r)) };
     }),
   };
   fs.writeFileSync(file, toYaml(config));
@@ -230,13 +233,122 @@ async function setup() {
   console.log('  Fill in repo roles, dev_url, and non-Node commands by asking your AI tool to "run spec-setup".');
 }
 
+// ---------- reading the config ----------
+// shortcut: parses the YAML subset setup writes (nested maps, lists of maps, scalars); a full YAML parser if users start hand-writing anchors/flow style.
+function parseYaml(text) {
+  const root = {};
+  const stack = [{ indent: -1, node: root }];
+  const scalar = (v) => {
+    v = v.replace(/\s+#.*$/, "").trim();
+    if (/^".*"$/.test(v)) return JSON.parse(v);
+    if (/^'.*'$/.test(v)) return v.slice(1, -1);
+    return v;
+  };
+  for (const raw of text.split("\n")) {
+    if (!raw.trim() || raw.trim().startsWith("#")) continue;
+    const indent = raw.search(/\S/);
+    let line = raw.trim();
+    while (stack.length > 1 && indent <= stack[stack.length - 1].indent) stack.pop();
+    let parent = stack[stack.length - 1].node;
+    if (line.startsWith("- ")) {
+      const item = {};
+      parent.push(item);
+      stack.push({ indent, node: item });
+      parent = item;
+      line = line.slice(2);
+    }
+    const m = line.match(/^([\w-]+):\s*(.*)$/);
+    if (!m) continue;
+    const [, key, val] = m;
+    if (val === "") {
+      const next = text.split("\n").slice(text.split("\n").indexOf(raw) + 1).find((l) => l.trim() && !l.trim().startsWith("#"));
+      parent[key] = next && next.trim().startsWith("- ") ? [] : {};
+      stack.push({ indent: line === raw.trim() ? indent : indent + 2, node: parent[key] });
+    } else parent[key] = scalar(val);
+  }
+  return root;
+}
+
+function findConfig(dir) {
+  for (let d = dir; ; d = path.dirname(d)) {
+    const f = path.join(d, ".spec-driven.yml");
+    if (fs.existsSync(f)) return f;
+    if (d === path.dirname(d) || d === HOME) return null;
+  }
+}
+
+function doctor() {
+  const file = findConfig(DIR);
+  if (!file) throw new Error(`No .spec-driven.yml in ${DIR} or above. Run: npx spec-driven-dev setup`);
+  const root = path.dirname(file);
+  let c;
+  try { c = parseYaml(fs.readFileSync(file, "utf8")); } catch (e) { throw new Error(`${file} could not be read: ${e.message}`); }
+  const problems = [], notes = [];
+  if (!["single", "monorepo", "multi-repo"].includes(c.layout)) problems.push(`layout "${c.layout}" must be single, monorepo, or multi-repo`);
+  if (c.tracker && !["jira", "github", "linear", "none"].includes(c.tracker.type)) problems.push(`tracker.type "${c.tracker.type}" must be jira, github, linear, or none`);
+  if (c.git?.commit_style && !["conventional", "ticket", "freeform"].includes(c.git.commit_style)) problems.push(`git.commit_style "${c.git.commit_style}" must be conventional, ticket, or freeform`);
+  if (c.git?.branch_name && !/\{(ticket|slug)\}/.test(c.git.branch_name)) problems.push(`git.branch_name "${c.git.branch_name}" needs {ticket} or {slug}`);
+  const repos = c.layout === "single" ? [{ path: "." }] : Array.isArray(c.repos) ? c.repos : [];
+  if (c.layout !== "single" && !repos.length) problems.push(`layout is ${c.layout} but repos: is empty`);
+  for (const r of repos) {
+    const dir = path.join(root, r.path || "");
+    const label = r.path === "." ? "repo" : r.path;
+    if (!fs.existsSync(dir)) { problems.push(`${label}: folder not found`); continue; }
+    const gitDir = c.layout === "monorepo" ? root : dir;
+    if (c.layout !== "monorepo" && !isRepo(gitDir)) { problems.push(`${label}: not a git repo`); continue; }
+    if (c.layout === "multi-repo" && !r.role) notes.push(`${label}: no role — investigations search better with one`);
+    if (/\(role inferred, verify\)/.test(r.role || "")) notes.push(`${label}: role is still marked "inferred, verify"`);
+    for (const k of ["base_branch", "pr_target"]) {
+      const b = r.git?.[k] || c.git?.[k];
+      if (b && b !== "default" && isRepo(gitDir) && !run("git", ["rev-parse", "--verify", "--quiet", `refs/remotes/${c.git?.remote || "origin"}/${b}`], gitDir) && !run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${b}`], gitDir))
+        problems.push(`${label}: git.${k} "${b}" doesn't exist (locally or on ${c.git?.remote || "origin"})`);
+    }
+    const pkg = readJson(path.join(dir, "package.json"));
+    const cmds = { ...(c.layout === "single" ? c.commands : {}), ...(r.commands || {}) };
+    for (const [k, v] of Object.entries(cmds)) {
+      const script = typeof v === "string" && v.match(/^(?:npm|pnpm|yarn|bun) run ([\w:.-]+)$/)?.[1];
+      if (script && pkg && !pkg.scripts?.[script]) problems.push(`${label}: commands.${k} runs "${script}", which isn't in package.json scripts`);
+    }
+  }
+  const specs = path.join(root, c.specs_dir || "specs");
+  if (!fs.existsSync(specs)) notes.push(`${c.specs_dir || "specs"}/ doesn't exist yet — created on first spec`);
+  console.log(`Checked ${file}`);
+  for (const n of notes) console.log(`  • ${n}`);
+  for (const p of problems) console.log(`  ✗ ${p}`);
+  if (problems.length) { process.exitCode = 1; console.log(`${problems.length} problem(s). Fix the file, or ask your AI tool to "run spec-setup".`); }
+  else console.log("✓ Config matches the repos.");
+}
+
+// Silent unless something is unfinished, so it costs no context in a session start hook.
+function status() {
+  const file = findConfig(DIR);
+  const root = file ? path.dirname(file) : DIR;
+  const specsName = (file && parseYaml(fs.readFileSync(file, "utf8")).specs_dir) || "specs";
+  const specs = path.join(root, specsName);
+  const lines = [];
+  for (const name of subdirs(specs)) {
+    const readme = path.join(specs, name, "README.md");
+    if (!fs.existsSync(readme)) {
+      if (fs.existsSync(path.join(specs, name, "investigation.md"))) lines.push(`- ${specsName}/${name}: investigated, no spec yet → next: spec-create`);
+      continue;
+    }
+    const t = fs.readFileSync(readme, "utf8");
+    const done = (t.match(/^\s*- \[x\]/gim) || []).length, todo = (t.match(/^\s*- \[ \]/gm) || []).length;
+    if (todo) lines.push(`- ${specsName}/${name}: ${done}/${done + todo} tasks done → next: spec-implement`);
+    else if (done && !fs.existsSync(path.join(specs, name, "verification-report.md"))) lines.push(`- ${specsName}/${name}: all tasks done, not verified → next: spec-verify`);
+  }
+  if (lines.length) console.log(`spec-driven-dev: unfinished work in ${root}\n${lines.join("\n")}`);
+}
+
 try {
-  if (command === "install") {
+  if (command === "doctor") doctor();
+  else if (command === "status") status();
+  else if (command === "install") {
     await install();
     if (!flag("no-setup") && (YES || (await ask("\nSet up this project now? (y/n)", "y")) === "y")) await setup();
   } else if (command === "setup") await setup();
-  else throw new Error(`Unknown command "${command}" — use install (default) or setup`);
-  console.log('\nNext: in your AI tool, say "investigate <ticket>" or "create a spec".');
+  else throw new Error(`Unknown command "${command}" — use install (default), setup, doctor, or status`);
+  if (["install", "setup"].includes(command)) console.log('\nNext: in your AI tool, say "investigate <ticket>" or "create a spec".');
 } catch (e) {
   console.error(`✗ ${e.message}`);
   process.exitCode = 1;
