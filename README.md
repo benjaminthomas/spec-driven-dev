@@ -1,96 +1,279 @@
 # spec-driven-dev
 
-Seven [Agent Skills](https://agentskills.io) — an open, cross-host standard for packaging agent
-instructions — bundling a parallel-batch, spec-driven feature workflow and a portable SEO/GEO
-operations skill. Works in any codebase — none of these assume a specific framework, stack, or
-product. Packaged as a Claude Code plugin for that host, and installable as plain skill folders
-on any other Agent-Skills-compatible host (see [Compatibility](#compatibility) and
-[Install](#install) below).
+**A step-by-step workflow that gets AI coding agents from "here's a ticket" to "here's a reviewed PR"
+without guessing.** It first investigates the problem, then writes a plan you approve, then builds it
+in parallel with tests and review, then checks the real running app, and finally commits and opens
+the PR.
 
-## What's inside
+It's a set of seven [Agent Skills](https://agentskills.io), plain Markdown instruction files that
+AI coding tools load on demand. It works with Claude Code, Codex CLI, Cursor, and Google Antigravity,
+in any language or framework.
 
-### The feature pipeline
+---
 
-Six skills that work together, each one resumable and each producing an
-artifact the next stage (or the next person) can pick up cold:
+## Contents
+
+- [Why use it](#why-use-it)
+- [Quick start (5 minutes)](#quick-start-5-minutes)
+- [How the workflow fits together](#how-the-workflow-fits-together)
+- [The skills, one by one](#the-skills-one-by-one)
+- [What ends up in your repo](#what-ends-up-in-your-repo)
+- [Safety rails](#safety-rails)
+- [FAQ](#faq)
+- [Install](#install)
+- [Compatibility](#compatibility)
+- [By the numbers](#by-the-numbers)
+- [Working on this repo](#working-on-this-repo)
+
+---
+
+## Why use it
+
+Asking an AI agent to "just build it" tends to fail in predictable ways:
+
+| Problem | What this workflow does instead |
+|---|---|
+| The agent guesses how your system works and builds on a wrong assumption | **`spec-investigate`** reads the real code first and labels every finding as verified, inferred, assumed, or unknown |
+| A big plan won't fit in the agent's context, or is too vague to act on | **`spec-create`** splits the work into small, self-contained task files, so each agent reads only its own |
+| One agent working alone is slow | **`spec-implement`** runs several coder agents in parallel, each in its own copy of the repo |
+| "It compiles" gets treated as "it works" | **`spec-verify`** drives the real running app and checks every acceptance criterion, with evidence |
+| Broken code gets committed, or a PR is pushed by accident | **`spec-checkpoint`** commits only once lint, types, tests, and build all pass. **`spec-ship`** asks before it pushes |
+
+Each stage writes its result to a file, so you can stop at any point, hand over to a teammate, or
+start a new session and continue where you left off.
+
+---
+
+## Quick start (5 minutes)
+
+**1. Install** (Claude Code; for other tools see [Install](#install)):
 
 ```
-spec-investigate  →  spec-create  →  spec-implement  →  spec-verify  →  spec-checkpoint  →  spec-ship
+/plugin marketplace add https://github.com/benjaminthomas/spec-driven-dev.git
+/plugin install spec-driven-dev@spec-driven-dev
 ```
 
-| Skill | Trigger | Input | Output |
-|---|---|---|---|
-| `spec-investigate` | "investigate STP-123", "look into this before we plan it" | A ticket (Jira, GitHub Issues, Linear), a call transcript, a doc/PRD, a log, or plain text — plus any optional context | `specs/{feature}/investigation.md` — evidence-based report of current behaviour, root cause, affected repos/files, risks, test landscape, and open questions, plus a work branch; no code changes |
-| `spec-create` | "create a spec", "plan this feature", "break this into tasks" | A planning conversation (or an interview if there wasn't one) | `specs/{feature}/` — `requirements.md`, `action-required.md`, `tasks/task-NN-*.md`, `README.md` with a dependency graph and batch breakdown |
-| `spec-implement` | "implement this feature", "run the spec", "continue implementing" | `specs/{feature}/` | Real code changes plus their tests — one coder subagent per task per batch, run in parallel (each in its own git worktree where the host allows), with a code-review gate before each batch is committed |
-| `spec-verify` | "test this end to end", "does this actually work", right after `spec-implement` finishes | `specs/{feature}/` | `specs/{feature}/verification-report.md` — every acceptance criterion checked against the *real running app* (clicks, API calls, DB reads used only to confirm state), pass/fail with evidence |
-| `spec-checkpoint` | "checkpoint", "commit everything", "save my progress" | A working tree with changes | A local commit — but only after lint, typecheck, and build all pass |
-| `spec-ship` | "ship it", "push this", "open a PR" | A committed, verified branch | A pushed branch + an opened GitHub PR |
+**2. In your project, run each stage in order.** You can type the slash command or just say the
+words in quotes.
 
-The insight behind the pipeline: implementation plans that live in one giant
-file are either too large for an agent's context window or too shallow for
-independent execution. Splitting into one self-contained task file per unit of
-work lets multiple coder agents implement a feature in parallel, safely,
-without anyone needing to re-read the whole plan.
+```
+/spec-investigate STP-123          "look into STP-123 before we plan it"
+                                   → read specs/stp-123-…/investigation.md
 
-None of these six skills write to a specific stack's config — they read
-whatever lint/typecheck/build/dev commands the target repo actually has and
-use those.
+/spec-create                       "turn this into a spec"
+                                   → review specs/stp-123-…/  ← YOU APPROVE HERE
 
-### generative-seo
+/spec-implement                    "implement the spec"
+/spec-verify                       "does it actually work?"
+/spec-checkpoint                   "checkpoint"
+/spec-ship                         "ship it"
+```
 
-A standalone seventh skill, unrelated to the pipeline above: runs an
-evidence-based SEO + GEO (Generative Engine Optimization) program — technical
-SEO audits, answer-first content built to get cited by ChatGPT/Perplexity/AI
-Overviews, an AI-citation tracker, competitor research, and draft-only social
-distribution. First use in a project spends a few minutes learning that
-project's specifics (brand, domain, framework, content location) via a short
-interview, then remembers the answers for every later run. See
-`skills/generative-seo/SKILL.md` for the seven modes
-(`audit`/`content`/`optimize`/`competitors`/`citations`/`report`/`social`).
+That's the whole workflow. Every stage can be used on its own as well: use `/spec-create` straight
+from a planning chat, or `/spec-checkpoint` on any work in progress.
 
-## By the numbers
+---
 
-| Skill | Stage | SKILL.md lines | Words | Supporting files |
-|---|---|---:|---:|---:|
-| `spec-investigate` | 1 · understand | 310 | 2,553 | 1 |
-| `spec-create` | 2 · plan | 136 | 1,195 | 4 |
-| `spec-implement` | 3 · build | 223 | 1,645 | 3 |
-| `spec-verify` | 4 · prove | 140 | 1,336 | 1 |
-| `spec-checkpoint` | 5 · commit | 94 | 599 | 0 |
-| `spec-ship` | 6 · PR | 201 | 1,051 | 0 |
-| `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **1,359** | **10,588** | **16** |
+## How the workflow fits together
 
-- **7** skills — **6** pipeline stages + **1** standalone
-- **4** hosts supported natively (Claude Code, Codex CLI, Cursor, Antigravity) + an MCP fallback for any MCP host
-- **3** install paths: Claude Code plugin, `install.sh`, MCP server (121 lines, 1 dependency)
-- **0** stack-specific assumptions — lint/typecheck/build/dev commands are read from the target repo
+```
+ ┌──────────────────┐   ┌─────────────┐   ┌──────────┐   ┌────────────────┐   ┌─────────────┐   ┌─────────────────┐   ┌───────────┐
+ │ spec-investigate │ → │ spec-create │ → │ YOU      │ → │ spec-implement │ → │ spec-verify │ → │ spec-checkpoint │ → │ spec-ship │
+ │ understand       │   │ plan        │   │ approve  │   │ build + test   │   │ prove       │   │ commit          │   │ open PR   │
+ └──────────────────┘   └─────────────┘   └──────────┘   └────────────────┘   └─────────────┘   └─────────────────┘   └───────────┘
+   investigation.md       specs/<feature>/                   code + tests,       verification-      local commit         pushed branch
+   + work branch          task files                         one commit/batch    report.md                               + GitHub PR
+```
 
-## Compatibility
+- **The approval step is yours.** Nothing builds until you've read the spec and run `spec-implement`
+  yourself. `spec-investigate` never moves on to the next stage by itself.
+- **Each stage reads the previous stage's files.** `spec-create` uses `investigation.md` as its
+  evidence, `spec-implement` works through the task files, and `spec-verify` checks against their
+  acceptance criteria.
+- **Stages can be skipped.** For new projects with nothing to investigate, start at `spec-create`.
+  For a quick fix, use only `spec-checkpoint` and `spec-ship`.
 
-Every skill here is a plain `SKILL.md` + `references/` folder conforming to the open
-[Agent Skills](https://agentskills.io) spec, which Claude Code, Codex CLI, Cursor, and Google
-Antigravity all read natively. The `.claude-plugin/` manifest layer (plugin.json,
-marketplace.json) is Claude Code-specific packaging on top of that — none of the other hosts
-have an equivalent plugin/marketplace concept, so on those hosts you install the `skills/`
-folders directly (see Install below).
+---
 
-| Skill | Claude Code | Codex CLI | Cursor | Antigravity | Notes |
-|---|---|---|---|---|---|
-| `spec-investigate` | ✅ | ✅ | ✅ | ✅ | Fetches tickets via whatever access the host has (Atlassian/Linear MCP, `gh`, or pasted text); free-form input needs nothing extra |
-| `spec-create` | ✅ | ✅ | ✅ | ✅ | Planning + file writing only, no host-specific mechanics |
-| `spec-implement` | ✅ | ✅ | ✅ | ✅ | Parallel dispatch uses whichever subagent/background-agent mechanism your host provides; falls back to sequential execution if it has none |
-| `spec-verify` | ✅ | ⚠️ | ⚠️ | ⚠️ | UI-observable criteria need a browser-automation tool available on your host (MCP browser server, built-in browser tool, or extension); API/DB-only criteria work everywhere |
-| `spec-checkpoint` | ✅ | ✅ | ✅ | ✅ | Plain git commands |
-| `spec-ship` | ✅ | ✅ | ✅ | ✅ | Plain git + GitHub CLI (`gh`) commands |
-| `generative-seo` | ✅ | ✅ | ✅ | ✅ | Web search + file writing only |
+## The skills, one by one
 
-⚠️ = works, but one step's usefulness depends on a host capability that isn't guaranteed present
-— the skill degrades gracefully (it says so and skips that step) rather than failing outright.
+### 1. `spec-investigate`: understand before planning
 
-Native Agent Skills support is new on some of these hosts and still settling — if a skill
-doesn't get picked up, check your host's current docs for its exact discovery path.
+**Say:** "investigate STP-123", "look into this before we plan it", or `/spec-investigate <input>`
+
+**Give it any of these:**
+
+| Input | Example |
+|---|---|
+| Jira ticket | `STP-123` or `https://acme.atlassian.net/browse/STP-123` |
+| GitHub issue | `#482` or `https://github.com/acme/app/issues/482` |
+| Linear issue | `https://linear.app/acme/issue/ENG-91` |
+| Transcript / notes / PRD / log file | `./call-transcript.txt`, `./prd.md`, `./error.log` |
+| Plain text | `"Checkout times out for EU users since Tuesday's deploy"` |
+| Pasted material | a Slack thread or stack trace pasted into the same message |
+
+You can add `--context ./notes.md` to supply extra background, such as meeting notes.
+
+**What it does:**
+1. Loads the input. For tickets, that includes comments and linked issues. Free text is read
+   carefully: "maybe we should add an endpoint" is recorded as a proposal, not a requirement.
+2. Creates a work branch from the right base branch and never touches existing work. The base
+   branch and branch name follow your repo's convention (see [FAQ](#faq)).
+3. Traces how the system actually works, naming real files and functions. For bugs, it finds the
+   root cause.
+4. Sorts the work into **required / supporting / optional / out of scope**, and lists risks, security
+   and performance concerns, and existing tests.
+
+**You get:** `specs/<feature>/investigation.md`, with every finding labelled **VERIFIED**,
+**INFERRED**, **ASSUMPTION**, or **UNKNOWN**.
+
+**It won't:** write code, write tests, or start `spec-create` without being asked.
+
+### 2. `spec-create`: turn the plan into tasks
+
+**Say:** "create a spec", "plan this feature", "break this into tasks"
+
+**What it does:** It reads `investigation.md` if one exists, plus your planning conversation. If
+there's no conversation, it asks you a few questions first. It then splits the work into tasks,
+each touching 1–5 files, and groups them into **batches**. Tasks in the same batch don't depend on
+each other and don't touch the same files, so they can be built at the same time.
+
+**You get:** a `specs/<feature>/` folder (see [What ends up in your repo](#what-ends-up-in-your-repo)).
+Each task file is complete on its own: description, files to change, implementation steps, **tests
+to write**, and acceptance criteria.
+
+**Then:** read it, edit anything you disagree with, and only then run `spec-implement`.
+
+### 3. `spec-implement`: build it, batch by batch
+
+**Say:** "implement this feature", "run the spec", "continue implementing"
+
+**What it does, for each batch:**
+1. Starts one coder agent per task, running at the same time. Each one works in its **own git
+   worktree** (a separate copy of the repo) so they can't overwrite each other's work.
+2. Each coder **writes the task's tests first**, then writes code until they pass, and then runs
+   lint and typecheck.
+3. Merges the worktrees back. If two tasks conflict, it stops and asks you.
+4. A **separate reviewer agent** runs lint, typecheck, and tests and checks every acceptance
+   criterion. If anything fails, fix agents are sent in, for up to 3 rounds before it stops and
+   asks you.
+5. Commits the batch and ticks it off in the spec's README.
+
+**It can resume:** if you stop halfway, run it again and it carries on from the first unfinished
+batch. If your tool can't run agents in parallel, it does the tasks one at a time instead.
+
+### 4. `spec-verify`: prove it works
+
+**Say:** "verify this", "test it end to end", "does this actually work?"
+
+**What it does:** It collects every acceptance criterion from the spec, starts your app, and checks
+each one the way a user would: clicking through the UI, calling real API routes, and reading the
+database only to confirm the result.
+
+**You get:** `specs/<feature>/verification-report.md`, with pass or fail for each criterion and the
+evidence (screenshots, responses, data). If there's no spec, it asks you what "working" means and
+checks that instead.
+
+### 5. `spec-checkpoint`: commit safely
+
+**Say:** "checkpoint", "commit everything", "save my progress"
+
+**What it does:** It finds your repo's own lint, typecheck, test, and build commands (from
+`package.json`, `Makefile`, `pyproject.toml`, CI config, and so on), runs them, and fixes failures.
+Then it stages everything and writes a commit message in your repo's existing style.
+
+**It won't:** push. Committing is a local step.
+
+### 6. `spec-ship`: open the PR
+
+**Say:** "ship it", "push this", "open a PR"
+
+**What it does:** It creates a properly named branch if you're on the default branch, **shows you
+exactly what will be pushed and waits for your "yes"**, then pushes and opens a GitHub PR with a
+written description. If a PR already exists for the branch, it pushes the new commits to that PR
+instead of opening another one.
+
+**Needs:** the [GitHub CLI](https://cli.github.com) (`gh`), logged in.
+
+### Bonus: `generative-seo`, a separate skill for SEO
+
+This one isn't part of the workflow. It runs SEO and **GEO** (Generative Engine Optimization: getting
+your content cited by ChatGPT, Perplexity, and Google AI Overviews) for any website codebase. It has
+seven modes: `audit`, `content`, `optimize`, `competitors`, `citations`, `report`, and `social`. The
+first time, it asks a few questions about your brand, domain, and framework, and remembers the
+answers. See `skills/generative-seo/SKILL.md`.
+
+---
+
+## What ends up in your repo
+
+```
+specs/
+└── stp-123-csv-export-missing-rows/
+    ├── investigation.md          ← spec-investigate: what's true today, with evidence
+    ├── requirements.md           ← spec-create: what we're building and why
+    ├── action-required.md        ← spec-create: things only a human can do (API keys, DNS, accounts)
+    ├── README.md                 ← spec-create: batches, dependency graph, progress checkboxes
+    ├── tasks/
+    │   ├── task-01-fix-pagination.md
+    │   ├── task-02-add-export-test-fixtures.md
+    │   └── …
+    └── verification-report.md    ← spec-verify: pass/fail per acceptance criterion
+```
+
+These are plain Markdown files, so you can review them in a PR, edit them, or hand them to a
+teammate. If your repo gitignores `specs/`, the skills respect that.
+
+---
+
+## Safety rails
+
+Built into the skills, not left to the agent's judgment:
+
+- **You approve before anything is built.** Nothing goes from investigation to implementation by
+  itself.
+- **Your work is never destroyed.** No stash, reset, force-push, or branch deletion without your
+  say-so. If there are uncommitted changes it doesn't recognise, it stops and asks.
+- **No guessing.** Gaps are marked UNKNOWN, and missing tickets are asked for rather than made up.
+- **Tests can't be cheated.** Coders may not delete, skip, or weaken a test to make it pass, and the
+  reviewer checks for this.
+- **Pushing needs an explicit "yes".**
+- **Investigation stays in scope.** Ideas that come up along the way go under "optional" or "out of
+  scope" instead of being folded into the work.
+
+---
+
+## FAQ
+
+**Do I need Jira?**
+No. Use GitHub Issues, Linear, a transcript, a document, or a sentence of plain text. Jira is just
+one of the options.
+
+**How does it choose the base branch and branch name?**
+In this order: what your repo's `CLAUDE.md` or `AGENTS.md` says → the pattern your recent branches
+follow → the repo's default branch and `feat/…`/`fix/…`-style names. To pin a team rule, add a line
+to `CLAUDE.md`, for example:
+`Base branch: staging. Branch name = ticket ID exactly (e.g. STP-123).`
+
+**Does it work with my stack?**
+Yes. No skill assumes a language or framework. Each one finds the repo's own commands.
+
+**Can I skip stages?**
+Yes. Every skill works on its own. `spec-verify` even works without a spec: it asks what to check.
+
+**What if my tool can't run agents in parallel?**
+`spec-implement` builds tasks one at a time instead. You get the same results, just more slowly.
+
+**Can I stop halfway?**
+Yes. Progress is saved in the spec's `README.md` checkboxes and the commit for each batch. Run
+`spec-implement` again to continue.
+
+**`spec-verify` says it skipped some UI checks.**
+Your tool needs browser automation (an MCP browser server, a built-in browser tool, or an
+extension) for checks that involve the UI. Checks that only touch the API or database work
+everywhere.
+
+---
 
 ## Install
 
@@ -101,68 +284,109 @@ doesn't get picked up, check your host's current docs for its exact discovery pa
 /plugin install spec-driven-dev@spec-driven-dev
 ```
 
-Or, for local development/testing without publishing anywhere, point Claude
-Code at this folder directly as a marketplace source (its own
-`.claude-plugin/marketplace.json` lists itself with `source: "./"`).
+**Updating:** `/plugin marketplace update spec-driven-dev`, then update the plugin from `/plugin`.
 
-### Codex CLI, Cursor, Antigravity, or any other Agent-Skills-compatible host
+For local development, add this folder itself as a marketplace source. Its
+`.claude-plugin/marketplace.json` points to itself (`source: "./"`).
 
-Run `install.sh` from a clone of this repo:
+### Codex CLI, Cursor, Antigravity, or any Agent-Skills-compatible tool
+
+From a clone of this repo:
 
 ```bash
-./install.sh                        # interactive: pick a host and skills
-./install.sh codex                   # all seven skills, into the current project
-./install.sh cursor spec-create      # just one skill, into the current project
-./install.sh --global antigravity    # install globally instead of per-project
+./install.sh                        # interactive: pick a tool and skills
+./install.sh codex                  # all seven skills, into the current project
+./install.sh cursor spec-create     # just one skill
+./install.sh --global antigravity   # install for all projects instead of this one
 ```
 
-Or copy the `skills/<name>/` folders you want by hand — each is fully self-contained. Common
-discovery paths as of this writing (also what `install.sh` targets):
+Or copy the `skills/<name>/` folders by hand. Each one is self-contained. Where each tool looks for
+skills:
 
-| Host | Project-level | Global |
+| Tool | This project | All projects |
 |---|---|---|
 | Codex CLI | `.agents/skills/<name>/` | `~/.codex/skills/<name>/` |
 | Cursor | `.cursor/skills/<name>/` (or `.agents/skills/<name>/`) | `~/.cursor/skills/<name>/` |
 | Antigravity | `.agents/skills/<name>/` | `~/.gemini/config/skills/<name>/` |
 
-Note that Codex CLI and Antigravity share the same project-level path, so installing for one
-also covers the other at that scope.
+Codex CLI and Antigravity share the project path, so installing for one covers both.
 
-### Fallback: MCP server (for hosts without native Agent Skills support)
+### Fallback: MCP server (for tools without Agent Skills support)
 
-If your host speaks MCP but doesn't yet support Agent Skills natively — or only implements MCP
-tools, not prompts — `mcp-server/` exposes the same seven skills as MCP tools instead. It reads
-directly from `skills/` at request time, so there's nothing to keep in sync by hand.
+If your tool supports MCP but not Agent Skills, `mcp-server/` serves the same seven skills as MCP
+tools. It reads `skills/` directly, so there's nothing to keep in sync.
 
 ```bash
 cd mcp-server && npm install
 ```
 
-Then point your host's MCP config at `node /path/to/spec-driven-dev/mcp-server/server.js`
-(stdio transport). Each skill becomes a callable tool (e.g. `spec-create`) that returns the
-skill's instructions as text; supporting files are also exposed as `skill://<name>/<path>`
-resources for hosts that can't otherwise reach the local filesystem.
+Point your tool's MCP config at `node /path/to/spec-driven-dev/mcp-server/server.js` (stdio).
+Each skill becomes a tool that returns its instructions, and supporting files are available as
+`skill://<name>/<path>` resources. Prefer native skills support where your tool has it.
 
-Treat this as the fallback, not the primary path — prefer native Agent Skills support
-(above) wherever your host has it.
+---
 
-## Typical flow
+## Compatibility
 
-1. `/spec-investigate <ticket | file | text>` to understand the system before planning (optional for greenfield work).
-2. Plan the feature in conversation, then `/spec-create` to capture it — review and approve the spec before implementing.
-3. `/spec-implement` to build it batch-by-batch with review gates between batches.
-4. `/spec-verify` to prove the acceptance criteria hold against the real
-   running app — not just that it compiles.
-5. `/spec-checkpoint` to commit locally, once lint/typecheck/build all pass.
-6. `/spec-ship` to push and open the PR.
-7. Any time, independent of the pipeline: `/generative-seo` for SEO/GEO work
-   on the same project or any other.
+| Skill | Claude Code | Codex CLI | Cursor | Antigravity | Notes |
+|---|---|---|---|---|---|
+| `spec-investigate` | ✅ | ✅ | ✅ | ✅ | Fetches tickets via whatever access the tool has (Atlassian/Linear MCP, `gh`); otherwise asks you to paste the ticket. Files and text need nothing extra |
+| `spec-create` | ✅ | ✅ | ✅ | ✅ | Planning and writing files only |
+| `spec-implement` | ✅ | ✅ | ✅ | ✅ | Parallel agents and worktrees where the tool supports them; otherwise one task at a time |
+| `spec-verify` | ✅ | ⚠️ | ⚠️ | ⚠️ | UI checks need browser automation; API and database checks work everywhere |
+| `spec-checkpoint` | ✅ | ✅ | ✅ | ✅ | Plain git plus your repo's own check commands |
+| `spec-ship` | ✅ | ✅ | ✅ | ✅ | git plus the GitHub CLI (`gh`) |
+| `generative-seo` | ✅ | ✅ | ✅ | ✅ | Web search and writing files |
 
-## Development
+⚠️ = works, but one step depends on a capability your tool might not have. The skill tells you and
+skips that step rather than failing.
 
-- `python3 scripts/check.py` checks the repo for drift: each skill's frontmatter, `references/` links, `.agents/skills` symlinks, `install.sh`, the manifests, and README mentions. `--fix` regenerates the *By the numbers* table. CI (`.github/workflows/check.yml`) runs it on every push and PR, along with `bash -n install.sh` and `node --check` on the MCP server.
-- `evals/` holds `claude plugin eval` cases that check each pipeline skill fires on its trigger phrases and stays in its lane. Run them with `claude plugin eval . --runs 1`. They use your own Claude credentials, so they aren't part of CI.
+---
+
+## By the numbers
+
+| Skill | Stage | SKILL.md lines | Words | Supporting files |
+|---|---|---:|---:|---:|
+| `spec-investigate` | 1 · understand | 310 | 2,553 | 1 |
+| `spec-create` | 2 · plan | 136 | 1,195 | 4 |
+| `spec-implement` | 3 · build | 223 | 1,645 | 3 |
+| `spec-verify` | 4 · prove | 140 | 1,336 | 1 |
+| `spec-checkpoint` | 5 · commit | 93 | 598 | 0 |
+| `spec-ship` | 6 · PR | 201 | 1,051 | 0 |
+| `generative-seo` | standalone | 255 | 2,209 | 7 |
+| **Total** | | **1,358** | **10,587** | **16** |
+
+- **7** skills: **6** workflow stages + **1** standalone
+- **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback
+- **3** ways to install: Claude Code plugin, `install.sh`, MCP server
+- **0** stack assumptions: lint, typecheck, test, build, and dev commands come from your repo
+
+_The table is generated by `python3 scripts/check.py --fix`; CI fails if it goes out of date._
+
+---
+
+## Working on this repo
+
+```
+skills/<name>/SKILL.md        the skill itself (frontmatter: name, description, license)
+skills/<name>/references/     templates and prompts the skill loads when needed
+.claude-plugin/               Claude Code plugin + marketplace manifests
+.agents/skills/               symlinks so Codex/Antigravity pick the skills up inside this repo
+install.sh                    installer for other tools
+mcp-server/                   MCP fallback server
+scripts/check.py              consistency checks + metrics generator
+evals/                        `claude plugin eval` cases
+```
+
+- **Adding a skill:** create `skills/<name>/SKILL.md`, then add the name to `install.sh`
+  (`ALL_SKILLS`), the two manifests, a `.agents/skills/<name>` symlink, the `STAGES` map in
+  `scripts/check.py`, and this README. `python3 scripts/check.py` lists anything you missed.
+- **Before pushing:** run `python3 scripts/check.py --fix`. CI (`.github/workflows/check.yml`) runs
+  the same checks plus syntax checks on `install.sh` and the MCP server.
+- **Evals:** `claude plugin eval . --runs 1` checks that skills trigger on their phrases and stay
+  within their own stage. These runs use your Claude credentials, so they aren't part of CI.
+- **Releasing:** increase `version` in `.claude-plugin/plugin.json`, or installed copies won't update.
 
 ## License
 
-MIT — see `LICENSE`.
+MIT. See `LICENSE`.

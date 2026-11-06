@@ -27,13 +27,12 @@ Run these commands to understand the full picture:
 
 ### Step 2: Quality Checks
 
-Run all three checks. If any fail, fix the issues before proceeding — do not skip or ignore failures.
+Find this repo's own lint, typecheck, test, and build commands — `package.json` scripts (with the
+repo's package manager), `Makefile`, `pyproject.toml`, `Cargo.toml`, CI config, or `CLAUDE.md`/
+`AGENTS.md`. Run each one the repo has; skip (and say so) any it doesn't. If any fail, fix the
+issues before proceeding — do not skip or ignore failures.
 
-1. `npm run lint` — fix any lint errors
-2. `npm run type-check` — fix any type errors (if the script doesn't exist, try `npx tsc --noEmit`)
-3. `npm run build` — fix any build errors
-
-Iterate until all three pass cleanly. Only then move to the next step.
+Iterate until every check passes cleanly. Only then move to the next step.
 
 ### Step 3: Stage Everything
 
