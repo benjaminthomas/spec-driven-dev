@@ -11,7 +11,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sdd-test-"));
 const home = path.join(tmp, "home");
 fs.mkdirSync(path.join(home, ".cursor"), { recursive: true });
 const sh = (cwd, ...a) => execFileSync("git", a, { cwd, stdio: "ignore" });
-const cli = (...a) => execFileSync("node", [CLI, ...a], { env: { ...process.env, SPEC_DRIVEN_HOME: home }, stdio: "pipe" }).toString();
+const cli = (...a) => { try { return execFileSync("node", [CLI, ...a], { env: { ...process.env, SPEC_DRIVEN_HOME: home }, stdio: "pipe" }).toString(); } catch (e) { e.message += `\n${e.stdout}${e.stderr}`; throw e; } };
 
 function repo(dir, scripts, subjects, branches = []) {
   fs.mkdirSync(dir, { recursive: true });
@@ -83,7 +83,28 @@ fs.writeFileSync(path.join(single, "specs/b/investigation.md"), "x");
 const st = cli("status", `--dir=${single}`);
 assert.ok(st.includes("specs/a: 1/2 tasks done") && st.includes("specs/b: investigated"), st);
 
-// 8. bad input fails loudly
+// 8. multi-repo chosen from inside one repo: workspace = parent folder, extra repos added by path
+const ws2 = path.join(tmp, "ws2"), elsewhere = path.join(tmp, "elsewhere", "billing");
+repo(path.join(ws2, "app"), { test: "jest" }, ["feat: a"]);
+repo(elsewhere, { build: "tsc" }, ["feat: b"], ["develop"]);
+fs.mkdirSync(path.join(tmp, "not-a-repo"));
+cli("setup", "--yes", `--dir=${path.join(ws2, "app")}`, "--layout=multi-repo", `--repos=app,${elsewhere},../not-a-repo,missing`);
+cfg = fs.readFileSync(path.join(ws2, ".spec-driven.yml"), "utf8");
+for (const want of ["layout: multi-repo", 'path: "app"', `path: ${JSON.stringify(elsewhere)}`, 'base_branch: "develop"'])
+  assert.ok(cfg.includes(want), `multi-repo (paths) config missing ${want}\n${cfg}`);
+assert.ok(!cfg.includes("not-a-repo") && !cfg.includes("missing"), "invalid repo paths were saved");
+assert.equal(doctor(ws2).code, 0, doctor(ws2).out);  // absolute paths outside the workspace must resolve
+assert.throws(() => cli("setup", "--yes", `--dir=${ws2}`, "--layout=multi-repo", "--repos=missing"), /at least one git repo/);
+
+// 9. monorepo chosen for a repo setup saw as single: package folders given, missing ones skipped
+fs.rmSync(path.join(single, ".spec-driven.yml"));
+fs.mkdirSync(path.join(single, "apps/web"), { recursive: true });
+cli("setup", "--yes", `--dir=${single}`, "--layout=monorepo", "--packages=apps/web,apps/nope");
+cfg = fs.readFileSync(path.join(single, ".spec-driven.yml"), "utf8");
+assert.ok(cfg.includes("layout: monorepo") && cfg.includes('path: "apps/web"') && !cfg.includes("apps/nope"), cfg);
+assert.throws(() => cli("setup", "--yes", `--dir=${single}`, "--layout=mono"), /--layout must be/);
+
+// 10. bad input fails loudly
 assert.throws(() => cli("--yes", "--tools=nope", "--no-setup", `--dir=${single}`));
 
 fs.rmSync(tmp, { recursive: true, force: true });

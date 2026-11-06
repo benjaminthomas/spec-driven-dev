@@ -41,7 +41,13 @@ Read, don't guess. Collect a draft of every field in `references/config-template
      `monorepo`; list the packages.
    - Not inside a git repo, but sibling folders are git repos → candidate `multi-repo`. Group them
      by remote owner (`git remote get-url origin`) and show the groups — the user picks which repos
-     belong together. Never assume every folder in the parent belongs.
+     belong together. Never assume every folder in the parent belongs. Always also ask whether
+     repos in **other folders** belong (e.g. `~/clients/billing`). Check each path is a git repo,
+     and store paths inside the workspace as relative and paths outside it as absolute.
+   - The user can override the detected layout. If they choose `multi-repo` from inside one repo,
+     the workspace folder defaults to that repo's parent, with the current repo pre-selected. If
+     they choose `monorepo`, ask for the package folders. Never write a `multi-repo` config with
+     no repos.
    - Otherwise → `single`.
 2. **Existing written rules.** `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, PR templates,
    `.github/workflows`. Anything stated there is a strong default — quote it back to the user.

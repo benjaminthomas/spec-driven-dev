@@ -107,12 +107,18 @@ say **"run spec-setup"**: that does a deeper version that also reads `CLAUDE.md`
 config, and recent PRs, and fills in what the installer can't (such as each repo's role, or commands
 for stacks other than Node). If a skill finds no config, it runs this setup first.
 
-**What it asks:**
+**What `spec-driven-dev` asks, in order** (every answer comes pre-filled with what it detected, so you
+can usually just press Enter):
 
 | Question | Detected from | Example answer |
 |---|---|---|
+| Which AI tools get the skills | tool folders in your home directory and commands on your `PATH` | Claude Code, Cursor |
+| This project only, or all projects | (you choose) | `project` |
 | Project layout | git repos and workspace files (`pnpm-workspace.yaml`, `turbo.json`, `nx.json`, `go.work`, …) | `single`, `monorepo`, or `multi-repo` |
-| Which repos belong together (multi-repo) | sibling git repos grouped by GitHub owner | `api`, `web`, `worker` |
+| *multi-repo:* workspace folder (where the config goes) | the folder you ran it in, or the parent of the repo you're in | `~/work` |
+| *multi-repo:* which repos belong together | git repos in the workspace folder, grouped by GitHub owner | `api`, `web` |
+| *multi-repo:* repos from other folders | (you type paths) | `~/clients/billing, ../shared-lib` |
+| *monorepo:* package folders | the workspaces your `package.json`/`pnpm-workspace.yaml` declares, or `apps/*`, `packages/*` | `apps/web, packages/ui` |
 | Issue tracker | ticket keys in branch names and commits | Jira, key `STP` |
 | Base branch / PR target | default branch, `staging`/`develop` branches | `staging` |
 | Branch name pattern | your recent branch names | `{ticket}` → `STP-123` |
@@ -127,6 +133,16 @@ for stacks other than Node). If a skill finds no config, it runs this setup firs
 | **single** | one repo, one app | the repo root (commit it, so the team shares it) | as described below |
 | **monorepo** | one repo, many apps/packages | the repo root (commit it) | tasks name their package, and checks run per package |
 | **multi-repo** | several repos that change together | their shared parent folder (personal to your machine) | investigation searches every listed repo, tasks stay inside one repo each, and `spec-ship` opens one PR per repo, each linking the others |
+
+Repos outside the workspace folder are saved with their full path. Paths that don't exist or
+aren't git repos are skipped with a message, and setup stops if a multi-repo workspace ends up with
+no repos. You can choose a different layout from the one detected: for example, choose
+`multi-repo` from inside one repo and it uses the parent folder as the workspace, with your current
+repo pre-selected.
+
+Every question also has a flag, for scripts and CI:
+`--layout=multi-repo --repos=api,web,~/clients/billing`, `--layout=monorepo --packages=apps/web,packages/ui`,
+`--tools=cursor,codex`, `--global`, `--yes` (accept everything detected).
 
 To change the rules later, edit the file or run setup again, then run `spec-driven-dev doctor`
 to confirm the file still matches your repos. Setup never overwrites the file without
@@ -471,7 +487,7 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 99 | 857 | 1 |
+| `spec-setup` | 0 · configure | 105 | 935 | 1 |
 | `spec-investigate` | 1 · understand | 323 | 2,708 | 1 |
 | `spec-create` | 2 · plan | 149 | 1,328 | 4 |
 | `spec-implement` | 3 · build | 236 | 1,790 | 3 |
@@ -479,7 +495,7 @@ skips that step rather than failing.
 | `spec-checkpoint` | 5 · commit | 106 | 762 | 0 |
 | `spec-ship` | 6 · PR | 218 | 1,235 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **1,539** | **12,348** | **17** |
+| **Total** | | **1,545** | **12,426** | **17** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback

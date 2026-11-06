@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.1 — 2026-11-06
+- Setup asks for repos in other folders (multi-repo) and for package folders (monorepo). It checks
+  each path, skips ones that don't exist or aren't git repos, and stores outside paths as absolute.
+- Choosing a different layout from the one detected now works. For example, `multi-repo` from inside
+  a repo uses the parent folder as the workspace. Invalid layouts are re-asked, and an empty
+  multi-repo workspace is refused instead of written.
+- New flags: `--layout`, `--repos`, `--packages`.
+- README leads with `npm install -g @benjaminthomas/spec-driven-dev` and the `spec-driven-dev` command.
+
 ## 1.4.0 — 2026-11-06
 - Published to npm as `@benjaminthomas/spec-driven-dev` (npm rejected the unscoped name as too close to another package). Run it with `npx @benjaminthomas/spec-driven-dev`.
 - `npx spec-driven-dev doctor` checks `.spec-driven.yml` against the real repos: branches exist, `npm run` scripts exist, values are valid. Exits 1 on problems.

@@ -7,6 +7,7 @@
 //   spec-driven-dev doctor          check .spec-driven.yml against the real repos (exit 1 on problems)
 //   spec-driven-dev status          list specs with unfinished tasks (used by the session-start hook)
 //   flags: --yes  --global  --tools=claude,cursor  --skills=spec-create,...  --no-setup  --dir=<path>
+//          --layout=single|monorepo|multi-repo  --repos=api,../web,/abs/path  --packages=apps/web,packages/ui
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -35,7 +36,7 @@ const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "stat
 const DIR = path.resolve(opt("dir") || process.cwd());
 
 if (flag("help") || flag("h")) {
-  console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 9).join("\n").replace(/^\/\/ ?/gm, ""));
+  console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 10).join("\n").replace(/^\/\/ ?/gm, ""));
   process.exit(0);
 }
 
@@ -184,26 +185,83 @@ function toYaml(c) {
   return out + `specs_dir: ${y(c.specsDir)}\n`;
 }
 
+const LAYOUTS = ["single", "monorepo", "multi-repo"];
+const splitList = (v) => (v || "").split(",").map((x) => x.trim()).filter(Boolean);
+// Paths are stored relative to the config's folder when inside it, absolute otherwise.
+const relOrAbs = (root, p) => { const r = path.relative(root, p); return r.startsWith("..") || path.isAbsolute(r) ? p : r || "."; };
+
+async function chooseLayout(detected) {
+  const forced = opt("layout");
+  if (forced && !LAYOUTS.includes(forced)) throw new Error(`--layout must be one of ${LAYOUTS.join(", ")}`);
+  if (forced) return forced;
+  for (;;) {
+    const a = await ask(`Layout — single, monorepo, or multi-repo (detected: ${detected})`, detected);
+    if (LAYOUTS.includes(a)) return a;
+    console.log(`  Please type one of: ${LAYOUTS.join(", ")}`);
+  }
+}
+
+// multi-repo: pick from repos found in the workspace folder, then add any others by path.
+async function chooseRepos(d) {
+  // Inside one repo but multi-repo chosen → the workspace is the folder that holds this repo.
+  const insideRepo = d.layout !== "multi-repo";
+  const defRoot = insideRepo ? path.dirname(d.root) : d.root;
+  const root = path.resolve(DIR, await ask("Workspace folder (where .spec-driven.yml goes)", defRoot));
+  const found = detectLayout(root).layout === "multi-repo" ? detectLayout(root).repos : [];
+  let picked = [];
+  const fromFlag = opt("repos");
+  if (fromFlag) {
+    picked = splitList(fromFlag).map((p) => path.resolve(root, p));
+  } else {
+    if (found.length) {
+      const owners = {};
+      for (const r of found) (owners[gitFacts(path.join(root, r))?.owner || "?"] ||= []).push(r);
+      const biggest = Object.values(owners).sort((a, b) => b.length - a.length)[0] || [];
+      const here = insideRepo ? [path.relative(root, d.root)] : [];
+      console.log(`Found ${found.length} git repos in ${root}. Which ones change together as one workspace?`);
+      picked = (await pick("Repos", found.map((r) => ({ value: r, label: `${r}  (${Object.keys(owners).find((o) => owners[o].includes(r))})` })), [...new Set([...here, ...biggest])]))
+        .map((r) => path.join(root, r));
+    } else if (insideRepo) picked = [d.root];
+    const extra = await ask("Add repos from other folders? Paths, comma-separated (absolute, ~/…, or relative to the workspace folder); empty for none", "");
+    picked.push(...splitList(extra).map((p) => path.resolve(root, p.replace(/^~(?=$|\/)/, HOME))));
+  }
+  const repos = [];
+  for (const p of [...new Set(picked)]) {
+    if (!fs.existsSync(p)) console.log(`  ✗ ${p}: folder not found — skipped`);
+    else if (!isRepo(p)) console.log(`  ✗ ${p}: not a git repo — skipped`);
+    else repos.push(relOrAbs(root, p));
+  }
+  if (!repos.length) throw new Error("A multi-repo workspace needs at least one git repo. Re-run setup and pick or add repos (or use --repos=a,b).");
+  console.log(`  Workspace repos: ${repos.join(", ")}`);
+  return { root, repos };
+}
+
+// monorepo: confirm or edit the package folders (relative to the repo root).
+async function choosePackages(d) {
+  const root = d.root;
+  const fromFlag = opt("packages");
+  const answer = fromFlag || (await ask("Package folders, comma-separated, relative to the repo root (empty if none yet)", d.repos.join(",")));
+  const pkgs = [];
+  for (const p of splitList(answer)) {
+    if (fs.existsSync(path.resolve(root, p))) pkgs.push(relOrAbs(root, path.resolve(root, p)));
+    else console.log(`  ✗ ${p}: folder not found in ${root} — skipped`);
+  }
+  return { root, repos: pkgs };
+}
+
 async function setup() {
   console.log("\nProject setup — detecting how this project works…");
   const d = detectLayout(DIR);
-  let repos = d.repos;
-  if (d.layout === "multi-repo") {
-    const owners = {};
-    for (const r of repos) (owners[gitFacts(path.join(d.root, r))?.owner || "?"] ||= []).push(r);
-    const biggest = Object.values(owners).sort((a, b) => b.length - a.length)[0] || [];
-    console.log(`Found ${repos.length} git repos in ${d.root}. Which ones change together as one workspace?`);
-    repos = await pick("Repos", repos.map((r) => ({ value: r, label: `${r}  (${Object.keys(owners).find((o) => owners[o].includes(r))})` })), biggest);
-  }
-  const layout = await ask(`Layout — single, monorepo, or multi-repo (detected: ${d.layout})`, d.layout);
-  const root = d.root;
+  const layout = await chooseLayout(d.layout);
+  const { root, repos } = layout === "multi-repo" ? await chooseRepos(d) : layout === "monorepo" ? await choosePackages(d) : { root: d.layout === "multi-repo" ? DIR : d.root, repos: [] };
+  if (layout === "single" && !isRepo(root)) console.log(`  • ${root} isn't a git repo — run setup inside the repo, or choose multi-repo.`);
   const file = path.join(root, ".spec-driven.yml");
   if (fs.existsSync(file) && (await ask(`${file} exists — overwrite? (y/n)`, "n")) !== "y") {
     console.log("• Kept the existing config. Run the spec-setup skill in your AI tool to review it.");
     return;
   }
 
-  const repoDirs = layout === "multi-repo" ? repos.map((r) => path.join(root, r)) : [isRepo(root) ? root : DIR];
+  const repoDirs = layout === "multi-repo" ? repos.map((r) => path.resolve(root, r)) : [root];
   const facts = repoDirs.map(gitFacts).filter(Boolean);
   const g = infer(facts);
   if (facts.length) console.log(`Detected: tracker ${g.trackerType}${g.key ? ` (${g.key}-…)` : ""}, base ${g.base}, branches "${g.branchName}", commits ${g.commitStyle}`);
@@ -221,10 +279,10 @@ async function setup() {
     layout, tracker: { type: trackerType, key, url }, specsDir, devUrl: "",
     git: { remote: "origin", base_branch: base, pr_target: pr, branch_name: branchName, commit_style: commitStyle },
     commands: layout === "single" ? commandsFor(repoDirs[0]) : commandsFor(root),
-    repos: layout === "single" ? [] : (layout === "multi-repo" ? repos : d.repos).map((r) => {
-      const f = layout === "multi-repo" ? gitFacts(path.join(root, r)) : null;
+    repos: repos.map((r) => {
+      const f = layout === "multi-repo" ? gitFacts(path.resolve(root, r)) : null;
       // a repo without an integration branch must say so, or it inherits the top-level base (e.g. staging) it doesn't have
-      return { path: r, role: "", base: f ? f.integration || "default" : "", commands: commandsFor(path.join(root, r)) };
+      return { path: r, role: "", base: f ? f.integration || "default" : "", commands: commandsFor(path.resolve(root, r)) };
     }),
   };
   fs.writeFileSync(file, toYaml(config));
@@ -291,7 +349,7 @@ function doctor() {
   const repos = c.layout === "single" ? [{ path: "." }] : Array.isArray(c.repos) ? c.repos : [];
   if (c.layout !== "single" && !repos.length) problems.push(`layout is ${c.layout} but repos: is empty`);
   for (const r of repos) {
-    const dir = path.join(root, r.path || "");
+    const dir = path.resolve(root, r.path || ".");
     const label = r.path === "." ? "repo" : r.path;
     if (!fs.existsSync(dir)) { problems.push(`${label}: folder not found`); continue; }
     const gitDir = c.layout === "monorepo" ? root : dir;
