@@ -1,5 +1,9 @@
 # spec-driven-dev
 
+[![npm](https://img.shields.io/npm/v/@benjaminthomas/spec-driven-dev?label=npm)](https://www.npmjs.com/package/@benjaminthomas/spec-driven-dev)
+[![check](https://github.com/benjaminthomas/spec-driven-dev/actions/workflows/check.yml/badge.svg)](https://github.com/benjaminthomas/spec-driven-dev/actions/workflows/check.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 **A step-by-step workflow that gets AI coding agents from "here's a ticket" to "here's a reviewed PR"
 without guessing.** It first investigates the problem, then writes a plan you approve, then builds it
 in parallel with tests and review, then checks the real running app, and finally commits and opens
@@ -26,6 +30,7 @@ together. One command installs it: `npx @benjaminthomas/spec-driven-dev`.
 - [Compatibility](#compatibility)
 - [By the numbers](#by-the-numbers)
 - [Working on this repo](#working-on-this-repo)
+- [Changelog](CHANGELOG.md)
 
 ---
 
@@ -326,6 +331,23 @@ Yes. Every skill works on its own. `spec-verify` even works without a spec: it a
 Yes. Progress is saved in the spec's `README.md` checkboxes and the commit for each batch. Run
 `spec-implement` again to continue.
 
+**How do I update?**
+Run `npx @benjaminthomas/spec-driven-dev@latest`. Claude Code plugin users run
+`/plugin marketplace update spec-driven-dev` and then update the plugin. Your config is never
+touched by an update.
+
+**Can I trust the npm package?**
+Releases are published by this repo's GitHub Actions workflow, not from anyone's laptop, through
+npm [trusted publishing](https://docs.npmjs.com/trusted-publishers). Each version's npm page shows
+a provenance badge linking it to the exact commit and workflow run that built it. The package has
+no dependencies, and it contains only `bin/cli.mjs` and the `skills/` folder.
+
+**Something isn't working. Where do I start?**
+Run `npx @benjaminthomas/spec-driven-dev doctor` in your project. It checks the config against your
+repos and names anything that doesn't match. If that passes, open an
+[issue](https://github.com/benjaminthomas/spec-driven-dev/issues) with the doctor output and the
+skill you were running.
+
 **`spec-verify` says it skipped some UI checks.**
 Your tool needs browser automation (an MCP browser server, a built-in browser tool, or an
 extension) for checks that involve the UI. Checks that only touch the API or database work
@@ -352,9 +374,15 @@ npx @benjaminthomas/spec-driven-dev status                            # list spe
 that each value is one the skills understand. It exits 1 if anything is wrong, so you can run it in
 CI. `status` prints nothing when all specs are finished.
 
-Run it again at any time to update: it replaces the installed skill folders with the latest
-version. `npx github:benjaminthomas/spec-driven-dev` installs straight from GitHub (for example, an unreleased
-commit on `main`).
+**Updating:** run `npx @benjaminthomas/spec-driven-dev@latest`. The `@latest` matters because
+`npx` can otherwise reuse an older copy it cached. The installer replaces the installed skill
+folders and leaves your `.spec-driven.yml` alone. What changed in each version is in
+[CHANGELOG.md](CHANGELOG.md).
+
+`npx github:benjaminthomas/spec-driven-dev` installs straight from GitHub instead, for example to
+try an unreleased commit on `main`.
+
+**Requirements:** Node.js 18 or newer and git. The installer has no dependencies.
 
 ### Claude Code (plugin, with automatic updates)
 
@@ -457,12 +485,15 @@ hooks/hooks.json              Claude Code session-start hook (runs `cli.mjs stat
 CHANGELOG.md                  what changed in each version
 scripts/check.py              consistency checks + metrics generator
 scripts/test-cli.mjs          installer self-test (fake HOME, throwaway repos)
+.github/workflows/check.yml   CI: consistency checks + installer self-test on every push and PR
+.github/workflows/publish.yml publishes to npm when a vX.Y.Z tag is pushed
 evals/                        `claude plugin eval` cases
 ```
 
 - **Adding a skill:** create `skills/<name>/SKILL.md`, then add the name to the two manifests, a `.agents/skills/<name>` symlink, the `STAGES` map in
   `scripts/check.py`, and this README. `python3 scripts/check.py` lists anything you missed.
-- **Before pushing:** run `python3 scripts/check.py --fix`. CI (`.github/workflows/check.yml`) runs
+- **Before pushing:** run `python3 scripts/check.py --fix`, then `npm test` (which runs the checks
+  and the installer self-test). CI (`.github/workflows/check.yml`) runs
   the same checks, the installer self-test, and a syntax check on the MCP server.
 - **Evals:** `claude plugin eval . --runs 1` checks that skills trigger on their phrases and stay
   within their own stage. These runs use your Claude credentials, so they aren't part of CI.
@@ -478,6 +509,8 @@ evals/                        `claude plugin eval` cases
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
   3. Tag the release and push the tag: `git tag v1.4.1 && git push origin v1.4.1`.
+  4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
+     npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 
   `.github/workflows/publish.yml` then runs the tests and publishes to npm through
   [trusted publishing](https://docs.npmjs.com/trusted-publishers). No npm token or passkey is
