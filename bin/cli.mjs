@@ -13,7 +13,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { createInterface } from "node:readline";  // callback API: readline/promises needs Node 17+
+import prompts from "prompts";  // arrow-key menus that work in PowerShell, cmd, macOS and Linux terminals
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -61,19 +61,25 @@ if (flag("help") || flag("h")) {
   process.exit(0);
 }
 
-const rl = YES ? null : createInterface({ input: process.stdin, output: process.stdout });
-async function ask(q, def = "") {
-  if (YES) return def;
-  const a = (await new Promise((resolve) => rl.question(`${q}${def ? ` [${def}]` : ""}: `, resolve))).trim();
-  return a || def;
+// Every question goes through these helpers. With --yes (or answers given as flags) they return the default.
+const cancelled = () => { console.log("\n✗ Setup cancelled. Nothing was changed."); process.exit(1); };
+async function ask(q) { const r = await prompts({ name: "v", ...q }, { onCancel: cancelled }); return r.v; }
+async function askText(message, initial = "", validate) {
+  if (YES) return initial;
+  return String((await ask({ type: "text", message, initial, validate })) ?? "").trim();
 }
-async function pick(q, items, defaults) {
-  items.forEach((it, i) => console.log(`  ${i + 1}. ${it.label}`));
-  const defIdx = items.map((it, i) => (defaults.includes(it.value) ? i + 1 : null)).filter(Boolean).join(",");
-  const a = await ask(`${q} (comma-separated numbers, "all", or "none")`, defIdx || "none");
-  if (a === "all") return items.map((it) => it.value);
-  if (a === "none") return [];
-  return a.split(",").map((n) => items[Number(n.trim()) - 1]?.value).filter(Boolean);
+async function askSelect(message, choices, initialValue) {
+  if (YES) return initialValue;
+  const initial = Math.max(0, choices.findIndex((c) => c.value === initialValue));
+  return ask({ type: "select", message, choices, initial, hint: "↑/↓ then Enter" });
+}
+async function askMulti(message, choices) {
+  if (YES) return choices.filter((c) => c.selected).map((c) => c.value);
+  return ask({ type: "multiselect", message, choices, instructions: false, hint: "↑/↓ move · Space select · A all · Enter confirm" });
+}
+async function askConfirm(message, initial = true) {
+  if (YES) return initial;
+  return ask({ type: "toggle", message, initial, active: "yes", inactive: "no" });
 }
 
 const run = (cmd, argv, cwd) => {
@@ -96,10 +102,8 @@ function copyDir(from, to) {
 async function install() {
   const detected = Object.keys(TOOLS).filter((t) => fs.existsSync(path.join(HOME, TOOLS[t].home)) || onPath(TOOLS[t].bin));
   let tools = opt("tools")?.split(",");
-  if (!tools) {
-    console.log("\nWhich AI coding tools should get the skills? (detected ones are pre-selected)");
-    tools = await pick("Tools", Object.entries(TOOLS).map(([value, t]) => ({ value, label: t.label + (detected.includes(value) ? "  ✓ detected" : "") })), detected);
-  }
+  if (!tools) tools = await askMulti("Which AI coding tools should get the skills?",
+    Object.entries(TOOLS).map(([value, t]) => ({ value, title: t.label + (detected.includes(value) ? "  (installed)" : ""), selected: detected.includes(value) })));
   const bad = tools.filter((t) => !TOOLS[t]);
   if (bad.length) throw new Error(`Unknown tool(s): ${bad.join(", ")} — expected ${Object.keys(TOOLS).join(", ")}`);
 
@@ -110,7 +114,10 @@ async function install() {
     tools = tools.filter((t) => t !== "claude");
   }
 
-  const global = flag("global") || (!YES && (await ask("Install for this project only, or globally for all projects? (project/global)", "project")) === "global");
+  const global = flag("global") || (await askSelect("Install the skills for…", [
+    { title: "This project only", value: false, description: "skills go in this folder, e.g. .cursor/skills/" },
+    { title: "All my projects", value: true, description: "skills go in your home folder, e.g. ~/.cursor/skills/" },
+  ], false));
   const skills = opt("skills")?.split(",") || ALL_SKILLS;
   const unknown = skills.filter((s) => !ALL_SKILLS.includes(s));
   if (unknown.length) throw new Error(`Unknown skill(s): ${unknown.join(", ")} — expected ${ALL_SKILLS.join(", ")}`);
@@ -152,7 +159,7 @@ function findRepos(dir, depth = 2, prefix = "") {
 
 function detectLayout(dir) {
   if (isRepo(dir)) {
-    const top = run("git", ["rev-parse", "--show-toplevel"], dir);
+    const top = path.resolve(run("git", ["rev-parse", "--show-toplevel"], dir));  // C:/x → C:\x on Windows
     const pkg = readJson(path.join(top, "package.json"));
     const cargo = fs.existsSync(path.join(top, "Cargo.toml")) && fs.readFileSync(path.join(top, "Cargo.toml"), "utf8").includes("[workspace]");
     const hasManifest = (rel) => MANIFESTS.some((m) => fs.existsSync(path.join(top, rel, m)));
@@ -242,14 +249,25 @@ async function chooseLayout(detected) {
   const forced = opt("layout");
   if (forced && !LAYOUTS.includes(forced)) throw new Error(`--layout must be one of ${LAYOUTS.join(", ")}`);
   if (forced) return forced;
-  for (;;) {
-    const a = await ask(`Layout — single, monorepo, or multi-repo (detected: ${detected})`, detected);
-    if (LAYOUTS.includes(a)) return a;
-    console.log(`  Please type one of: ${LAYOUTS.join(", ")}`);
-  }
+  const tag = (v) => (v === detected ? "  (detected)" : "");
+  return askSelect("How is this project organised?", [
+    { title: `Single repo${tag("single")}`, value: "single", description: "one git repo, one app" },
+    { title: `Monorepo${tag("monorepo")}`, value: "monorepo", description: "one git repo with several apps or packages" },
+    { title: `Multiple repos${tag("multi-repo")}`, value: "multi-repo", description: "several git repos that change together, in any folders" },
+  ], detected);
 }
 
-const expandHome = (p) => p.replace(/^~(?=$|\/)/, HOME);
+const expandHome = (p) => p.replace(/^~(?=$|[\\/])/, HOME);
+// Accept what people paste: surrounding quotes, ~, relative paths, Windows or POSIX separators.
+const cleanPath = (v) => path.resolve(DIR, expandHome(String(v).trim().replace(/^(["'])(.*)\1$/, "$2").trim()));
+const gitTop = (p) => { const t = run("git", ["rev-parse", "--show-toplevel"], p); return t ? path.resolve(t) : p; }; // git prints C:/x on Windows
+function repoPathProblem(v) {
+  if (!String(v || "").trim()) return null;
+  const p = cleanPath(v);
+  if (!fs.existsSync(p)) return `Folder not found: ${p}`;
+  if (!isRepo(p)) return `Not a git repo: ${p}`;
+  return null;
+}
 
 function commonParent(paths) {
   if (!paths.length) return "";
@@ -266,7 +284,7 @@ async function chooseRepos(d) {
   let picked = [];
   const fromFlag = opt("repos");
   if (fromFlag) {
-    picked = splitList(fromFlag).map((p) => path.resolve(DIR, expandHome(p)));
+    picked = splitList(fromFlag).map(cleanPath);
   } else {
     const found = findRepos(scanRoot);
     if (found.length) {
@@ -274,19 +292,25 @@ async function chooseRepos(d) {
       for (const r of found) { const o = gitFacts(path.join(scanRoot, r))?.owner || "?"; (owners[o] = owners[o] || []).push(r); }
       const biggest = Object.values(owners).sort((a, b) => b.length - a.length)[0] || [];
       const here = insideRepo ? [path.relative(scanRoot, d.root)] : [];
-      console.log(`Found ${found.length} git repos under ${scanRoot}. Which ones belong to this workspace?`);
-      picked = (await pick("Repos", found.map((r) => ({ value: r, label: `${r}  (${Object.keys(owners).find((o) => owners[o].includes(r))})` })), [...new Set([...here, ...(insideRepo ? [] : biggest)])]))
+      const pre = new Set([...here, ...(insideRepo ? [] : biggest)]);
+      picked = (await askMulti(`Which of these repos (found under ${scanRoot}) belong to this workspace?`,
+        found.map((r) => { const o = Object.keys(owners).find((k) => owners[k].includes(r)); return { value: r, title: r + (o && o !== "?" ? `  (${o})` : ""), selected: pre.has(r) }; })))
         .map((r) => path.join(scanRoot, r));
     } else if (insideRepo) picked = [d.root];
-    console.log("Repos in other places can be part of the same workspace (e.g. ~/Work/backend, /srv/database).");
-    const extra = await ask("Other repo paths, comma-separated (empty for none)", "");
-    picked.push(...splitList(extra).map((p) => path.resolve(DIR, expandHome(p))));
+    // Repos elsewhere: one path at a time, checked as you type, so a typo can be fixed straight away.
+    if (!YES) for (;;) {
+      const v = await askText(`Add a repo from another folder — paste its path, or press Enter to finish${picked.length ? ` (${picked.length} selected)` : ""}`, "",
+        (x) => repoPathProblem(x) || true);
+      if (!v) break;
+      picked.push(cleanPath(v));
+      console.log(`  ✓ added ${gitTop(cleanPath(v))}`);
+    }
   }
   const abs = [];
   for (const p of [...new Set(picked)]) {
     if (!fs.existsSync(p)) console.log(`  ✗ ${p}: folder not found — skipped`);
     else if (!isRepo(p)) console.log(`  ✗ ${p}: not a git repo — skipped`);
-    else abs.push(run("git", ["rev-parse", "--show-toplevel"], p) || p);
+    else abs.push(gitTop(p));
   }
   if (!abs.length) throw new Error("A multi-repo workspace needs at least one git repo. Re-run setup and pick or add repos (or use --repos=a,b).");
 
@@ -299,7 +323,7 @@ async function chooseRepos(d) {
   const defRoot = opt("workspace") ? path.resolve(DIR, expandHome(opt("workspace")))
     : allUnderScan ? scanRoot
     : tooBroad ? path.join(HOME, ".spec-driven", path.basename(abs[0]) + "-workspace") : parent;
-  const root = path.resolve(DIR, expandHome(await ask("Where should this workspace's .spec-driven.yml live", defRoot)));
+  const root = cleanPath(await askText("Folder for this workspace's settings file (.spec-driven.yml)", defRoot));
   fs.mkdirSync(root, { recursive: true });
   const repos = [...new Set(abs)].map((p) => relOrAbs(root, p));
   console.log(`  Workspace repos: ${repos.join(", ")}`);
@@ -321,9 +345,17 @@ function register(file, repoPaths) {
 async function choosePackages(d) {
   const root = d.root;
   const fromFlag = opt("packages");
-  const answer = fromFlag || (await ask("Package folders, comma-separated, relative to the repo root (empty if none yet)", d.repos.join(",")));
+  let chosen = fromFlag ? splitList(fromFlag) : d.repos.length
+    ? await askMulti("Which packages are part of this monorepo?", d.repos.map((r) => ({ value: r, title: r, selected: true })))
+    : [];
+  if (!fromFlag && !YES) for (;;) {
+    const v = await askText("Add another package folder (relative to the repo root), or press Enter to finish", "",
+      (x) => !String(x || "").trim() || fs.existsSync(path.resolve(root, String(x).trim())) || `Folder not found in ${root}`);
+    if (!v) break;
+    chosen.push(v);
+  }
   const pkgs = [];
-  for (const p of splitList(answer)) {
+  for (const p of chosen) {
     if (fs.existsSync(path.resolve(root, p))) pkgs.push(relOrAbs(root, path.resolve(root, p)));
     else console.log(`  ✗ ${p}: folder not found in ${root} — skipped`);
   }
@@ -342,7 +374,7 @@ async function setup() {
   const { root, repos } = layout === "multi-repo" ? await chooseRepos(d) : layout === "monorepo" ? await choosePackages(d) : { root: d.layout === "multi-repo" ? DIR : d.root, repos: [] };
   if (layout === "single" && !isRepo(root)) console.log(`  • ${root} isn't a git repo — run setup inside the repo, or choose multi-repo.`);
   const file = path.join(root, ".spec-driven.yml");
-  if (fs.existsSync(file) && (await ask(`${file} exists — overwrite? (y/n)`, "n")) !== "y") {
+  if (fs.existsSync(file) && !(await askConfirm(`${file} already exists. Replace it?`, false))) {
     console.log("• Kept the existing config. Run the spec-setup skill in your AI tool to review it.");
     return;
   }
@@ -352,22 +384,44 @@ async function setup() {
   const g = infer(facts);
   if (facts.length) console.log(`Detected: tracker ${g.trackerType}${g.key ? ` (${g.key}-…)` : ""}, base ${g.base}, branches "${g.branchName}", commits ${g.commitStyle}`);
 
-  const trackerType = await ask("Issue tracker (jira/github/linear/none)", g.trackerType);
-  const key = trackerType === "jira" || trackerType === "linear" ? await ask("Ticket key prefix (e.g. STP)", g.key) : "";
-  const url = trackerType === "none" ? "" : await ask("Tracker URL (optional)", "");
-  const base = await ask('Base branch work is cut from ("default" = repo default branch)', g.base);
-  const pr = await ask("Branch PRs target", base);
-  const branchName = await ask("Branch name pattern ({ticket} {slug} {type})", g.branchName);
-  const commitStyle = await ask("Commit style (conventional/ticket/freeform)", g.commitStyle);
-  const specsDir = await ask("Where specs/<feature>/ folders go", "specs");
-  console.log("After you approve a spec, the workflow can stop and wait for you at each stage, or run");
-  console.log("implement → verify → checkpoint in one go (it stops at any failure, and never pushes without asking).");
-  let afterApproval = opt("after-approval");
-  if (!afterApproval) for (;;) {
-    afterApproval = await ask("After approval: stop or run-through", "stop");
-    if (["stop", "run-through"].includes(afterApproval)) break;
-    console.log("  Please type stop or run-through");
-  }
+  const det = (v, d) => (v === d ? "  (detected)" : "");
+  const trackerType = await askSelect("Where do your tickets live?", [
+    { title: `Jira${det("jira", g.trackerType)}`, value: "jira" },
+    { title: `GitHub Issues${det("github", g.trackerType)}`, value: "github" },
+    { title: `Linear${det("linear", g.trackerType)}`, value: "linear" },
+    { title: `No tracker${det("none", g.trackerType)}`, value: "none", description: "work from transcripts, docs, or plain descriptions" },
+  ], g.trackerType);
+  const key = trackerType === "jira" || trackerType === "linear" ? (await askText("Ticket key prefix (the STP in STP-123)", g.key)).toUpperCase() : "";
+  const url = trackerType === "none" ? "" : await askText("Tracker URL (optional, press Enter to skip)", "");
+  const branchChoices = (initial) => [
+    { title: "Each repo's default branch", value: "default", description: "e.g. main or master" },
+    ...[...new Set(facts.map((f) => f.integration).filter(Boolean).concat(initial !== "default" ? [initial] : []))].map((b) => ({ title: b, value: b })),
+    { title: "Another branch…", value: "__other" },
+  ];
+  const pickBranch = async (message, initial) => {
+    const v = await askSelect(message, branchChoices(initial), initial);
+    return v === "__other" ? askText("Branch name", "") : v;
+  };
+  const base = await pickBranch("Which branch is new work started from?", g.base);
+  const pr = await pickBranch("Which branch do pull requests go into?", base);
+  const ex = key || "STP";
+  let branchName = await askSelect("How are work branches named?", [
+    { title: `${ex}-123${det("{ticket}", g.branchName)}`, value: "{ticket}", description: "just the ticket ID" },
+    { title: `feat/${ex}-123-add-login${det("{type}/{ticket}-{slug}", g.branchName)}`, value: "{type}/{ticket}-{slug}" },
+    { title: `feat/add-login${det("{type}/{slug}", g.branchName)}`, value: "{type}/{slug}", description: "no ticket ID" },
+    { title: "Custom pattern…", value: "__custom" },
+  ], g.branchName);
+  if (branchName === "__custom") branchName = await askText("Pattern using {ticket}, {slug}, {type}", g.branchName, (x) => /\{(ticket|slug)\}/.test(x) || "Include {ticket} or {slug}");
+  const commitStyle = await askSelect("How are commit messages written?", [
+    { title: `feat: add login${det("conventional", g.commitStyle)}`, value: "conventional", description: "conventional commits" },
+    { title: `${ex}-123: add login${det("ticket", g.commitStyle)}`, value: "ticket", description: "ticket ID first" },
+    { title: `Add login${det("freeform", g.commitStyle)}`, value: "freeform", description: "no fixed format" },
+  ], g.commitStyle);
+  const specsDir = await askText("Folder for specs (one sub-folder per feature)", "specs");
+  const afterApproval = opt("after-approval") || await askSelect("After you approve a spec…", [
+    { title: "Stop after each stage", value: "stop", description: "you start implement, verify and checkpoint yourself" },
+    { title: "Run straight through", value: "run-through", description: "implement → verify → commit in one go; stops at any failure, never pushes without asking" },
+  ], "stop");
 
   const config = {
     layout, tracker: { type: trackerType, key, url }, specsDir, devUrl: "", afterApproval,
@@ -504,7 +558,7 @@ try {
   else if (command === "status") status();
   else if (command === "install") {
     await install();
-    if (!flag("no-setup") && (YES || (await ask("\nSet up this project now? (y/n)", "y")) === "y")) await setup();
+    if (!flag("no-setup") && (await askConfirm("Set up this project now?", true))) await setup();
   } else if (command === "setup") await setup();
   else throw new Error(`Unknown command "${command}" — use install (default), setup, doctor, or status`);
   if (["install", "setup"].includes(command)) console.log('\nNext: in your AI tool, say "investigate <ticket>" or "create a spec".');
@@ -512,5 +566,4 @@ try {
   console.error(`✗ ${e.message}`);
   process.exitCode = 1;
 } finally {
-  rl?.close();
 }

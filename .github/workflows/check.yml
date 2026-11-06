@@ -8,20 +8,30 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - run: npm ci
       - run: python3 scripts/check.py
       - run: node scripts/test-cli.mjs
       - run: node --check mcp-server/server.js
   # The CLI must start on every Node version people may have active (nvm projects often pin 14/16).
   node-versions:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         node: [14, 16, 18, 20, 22, 24]
+        include:
+          - { os: windows-latest, node: 20 }
+          - { os: macos-latest, node: 20 }
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+      - run: npm install --no-package-lock --no-audit --no-fund   # npm 6 (Node 14) can't read lockfile v3
       - name: Smoke test (version, install + setup with flags, doctor, refuses without a terminal)
         run: |
           set -e

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.0 — 2026-11-06
+- **Setup uses menus.** Arrow keys and Enter to choose, Space to tick, instead of typing words and comma-separated numbers. Detected values are pre-selected and marked *(detected)*. Branch-naming and commit-style questions show real examples (`STP-123`, `feat: add login`) instead of patterns. Ctrl+C cancels cleanly.
+- **Repo paths are added one at a time and checked as you go.** A wrong path shows an error and lets you fix it, instead of being skipped after the fact. Pasted paths can have quotes, `~`, or Windows form (`"C:\personal\society-app"` now works).
+- **Windows fixes:** git paths are normalised (`C:/x` → `C:\x`), and `~\` is expanded. CI now also runs on Windows and macOS.
+- Adds one dependency, `prompts` (works on Node 6+, so Node 14 support is unchanged).
+
 ## 1.5.1 — 2026-11-06
 - **Fix: setup crashed on Node 14 and 16** (common inside nvm-pinned projects) before asking anything. The CLI now runs on Node 14+, through a small launcher that also explains when Node is too old. CI runs it on Node 14, 16, 18, 20, 22, and 24.
 - **Fix: no silent setup.** With no terminal to answer in and no answers passed as flags, setup now stops, changes nothing, and says how to run it (in a terminal window, or with `--layout`/`--repos`/`--yes`). Previously it wrote a config from guesses.

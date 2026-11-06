@@ -21,6 +21,7 @@ jobs:
         run: |
           v=$(node -p "require('./package.json').version")
           [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "Tag $GITHUB_REF_NAME does not match package.json version $v"; exit 1; }
+      - run: npm ci
       - run: npm test
       - run: node --check mcp-server/server.js
       - run: npm publish

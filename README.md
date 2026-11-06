@@ -116,8 +116,12 @@ say **"run spec-setup"**: that does a deeper version that also reads `CLAUDE.md`
 config, and recent PRs, and fills in what the installer can't (such as each repo's role, or commands
 for stacks other than Node). If a skill finds no config, it runs this setup first.
 
-**What `spec-driven-dev` asks, in order** (every answer comes pre-filled with what it detected, so you
-can usually just press Enter):
+**What `spec-driven-dev` asks, in order.** Each question is a menu: move with **↑/↓**, tick with
+**Space**, and confirm with **Enter**. What it detected is pre-selected and marked *(detected)*, so you
+can usually just press Enter. Repo paths are added one at a time: paste a path (quotes, `~`, and
+Windows paths like `C:\work\api` all work). A path that doesn't exist or isn't a git repo is flagged
+straight away, so you can fix it before moving on. Press Enter on an empty line when you're done.
+**Ctrl+C** cancels without changing anything.
 
 | Question | Detected from | Example answer |
 |---|---|---|
@@ -148,12 +152,16 @@ can usually just press Enter):
 example, from inside `/Projects/frontend`:
 
 ```
-Layout — single, monorepo, or multi-repo (detected: single) [single]: multi-repo
-Found 1 git repos under /Projects. Which ones belong to this workspace?
-  1. frontend
-Repos [1]:
-Other repo paths, comma-separated (empty for none): ~/Work/backend, /srv/database
-Where should this workspace's .spec-driven.yml live [~/.spec-driven/frontend-workspace]:
+✔ How is this project organised? › Multiple repos
+✔ Which of these repos (found under /Projects) belong to this workspace? › frontend
+? Add a repo from another folder — paste its path, or press Enter to finish (1 selected) › ~/Work/nope
+  › Folder not found: /Users/you/Work/nope
+? Add a repo from another folder — paste its path, or press Enter to finish (1 selected) › ~/Work/backend
+  ✓ added /Users/you/Work/backend
+? Add a repo from another folder — paste its path, or press Enter to finish (2 selected) › /srv/database
+  ✓ added /srv/database
+? Add a repo from another folder — paste its path, or press Enter to finish (3 selected) ›
+✔ Folder for this workspace's settings file (.spec-driven.yml) › ~/.spec-driven/frontend-workspace
 ```
 
 - **Where the config goes:** the repos' shared parent folder, or `~/.spec-driven/<name>/` when that
@@ -408,7 +416,8 @@ touched by an update.
 Releases are published by this repo's GitHub Actions workflow, not from anyone's laptop, through
 npm [trusted publishing](https://docs.npmjs.com/trusted-publishers). Each version's npm page shows
 a provenance badge linking it to the exact commit and workflow run that built it. The package has
-no dependencies, and it contains only `bin/cli.mjs` and the `skills/` folder.
+one small dependency (`prompts`, for the setup menus), and it contains only `bin/` and the `skills/`
+folder.
 
 **Something isn't working. Where do I start?**
 Run `spec-driven-dev doctor` in your project. It checks the config against your
@@ -462,8 +471,9 @@ can otherwise reuse an older copy it cached. What changed in each version is in
 `npx github:benjaminthomas/spec-driven-dev` installs straight from GitHub instead, for example to
 try an unreleased commit on `main`.
 
-**Requirements:** Node.js 14 or newer and git. The installer has no dependencies, and CI tests it on
-Node 14, 16, 18, 20, 22, and 24.
+**Requirements:** Node.js 14 or newer and git, on macOS, Linux, or Windows (PowerShell or cmd). The
+installer has one small dependency, [`prompts`](https://www.npmjs.com/package/prompts), for its menus.
+CI tests it on Node 14, 16, 18, 20, 22, and 24, and on Windows and macOS.
 
 ### Claude Code (plugin, with automatic updates)
 
@@ -559,7 +569,8 @@ skills/<name>/SKILL.md        the skill itself (frontmatter: name, description, 
 skills/<name>/references/     templates and prompts the skill loads when needed
 .claude-plugin/               Claude Code plugin + marketplace manifests
 .agents/skills/               symlinks so Codex/Antigravity pick the skills up inside this repo
-bin/cli.mjs                   the `spec-driven-dev` CLI: installer, setup, doctor, status (no dependencies)
+bin/spec-driven-dev.cjs       launcher (runs on any Node, explains if it's too old)
+bin/cli.mjs                   the `spec-driven-dev` CLI: installer, setup menus, doctor, status
 package.json                  npm package (ships bin/ and skills/)
 mcp-server/                   MCP fallback server
 hooks/hooks.json              Claude Code session-start hook (runs `cli.mjs status`)
