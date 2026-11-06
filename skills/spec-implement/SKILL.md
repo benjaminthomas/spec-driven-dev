@@ -4,7 +4,7 @@ description: >
   Orchestrate parallel implementation of a feature specification by dispatching coder agents
   batch-by-batch with code review gates between batches. Use this skill when the user says
   "implement this feature", "start implementing", "run the spec", "execute the plan",
-  "continue implementing", or wants to begin coding a previously planned feature from a
+  "continue implementing", "approved, run it through", or wants to begin coding a previously planned feature from a
   specs/{feature}/ folder. Also use when the user says "/spec-implement" (or their host's
   equivalent invocation syntax) or drags a spec folder into the conversation and asks to
   implement it. This skill does NOT write code itself — it orchestrates coder subagents that
@@ -26,7 +26,9 @@ The orchestrator never writes code itself. Its job is to:
 ## Project config (read first)
 
 Load `.spec-driven.yml`: walk up from the current directory to the home folder, and the first one
-found wins (a `multi-repo` config only applies inside the repos it lists). Its values beat anything
+found wins (a `multi-repo` config only applies inside the repos it lists). If none is found, check
+`~/.spec-driven/workspaces.json`, which maps each multi-repo config to its repo paths. Use the config
+whose repos contain the current directory, because a workspace's repos can live in unrelated folders. Its values beat anything
 you would detect or assume. This skill uses `layout`/`repos`, `commands` (lint/typecheck/test per repo or package), and `git.commit_style`.
 
 **Multi-repo:** create worktrees in each repo a task touches, run each repo's own commands in review, and make the batch commit in every repo that changed, using the same subject line.
@@ -218,6 +220,41 @@ Verification:
 Next steps:
 - Review the changes
 - Push and create a PR when ready
+```
+
+## Run-through mode (after approval)
+
+Run-through applies when the user asks for it ("approved, run it through", "build, verify and
+commit it") or when `.spec-driven.yml` has `pipeline.after_approval: run-through` and the user has
+approved the spec. In that case, don't stop after Step 9. Continue:
+
+```
+Run-through progress:
+- [ ] Implement all batches (Steps 1–9) — every review gate passed
+- [ ] Verify — follow the spec-verify skill; every acceptance criterion PASS
+- [ ] Checkpoint — follow the spec-checkpoint skill; every check passes, commit made
+- [ ] Stop and hand off to spec-ship
+```
+
+1. **Gate on each stage.** Move on only if the previous stage fully passed. On any failure (a review
+   gate exhausted its 3 cycles, a criterion FAILed or was SKIPPED, a check failed), stop the
+   run-through and report where it stopped, why, and the command to resume (e.g. "fix X, then say
+   'continue the run-through'").
+2. **Verify, then checkpoint.** Follow those skills' own instructions in full, including the
+   verification report. Don't shortcut them because you're running them in sequence.
+3. **Never push.** The run-through ends at a local commit. Finish with the summary below and ask
+   whether to run `spec-ship`. `spec-ship` still shows exactly what will be pushed and waits for a
+   yes.
+4. **No approval, no run-through.** If the spec hasn't been reviewed and approved in this
+   conversation, or the user only said "implement", do the normal Steps 1–9 and stop.
+
+```
+Run-through complete for "{feature}":
+- Implement: {N} batches, all review gates PASS
+- Verify: {P}/{P} criteria PASS (specs/{feature}/verification-report.md)
+- Checkpoint: {commit hash} — {subject}
+
+Ready to push and open a PR. Run spec-ship? (it will show exactly what gets pushed first)
 ```
 
 ## Error Handling

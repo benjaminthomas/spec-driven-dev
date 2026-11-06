@@ -42,4 +42,10 @@ commands:
   dev: ""                       # how spec-verify starts the app
   dev_url: ""                   # where it answers, e.g. http://localhost:3000
 
+pipeline:
+  # stop        — every stage waits for you (default)
+  # run-through — after you approve a spec: implement → verify → checkpoint in one go,
+  #               stopping at any failure. Pushing / opening the PR (spec-ship) always asks first.
+  after_approval: stop
+
 specs_dir: specs                # where specs/<feature>/ folders go (relative to this file)

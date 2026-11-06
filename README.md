@@ -12,8 +12,8 @@ the PR.
 It's a set of eight [Agent Skills](https://agentskills.io), plain Markdown instruction files that
 AI coding tools load on demand. It works with Claude Code, Codex CLI, Cursor, and Google Antigravity,
 in any language or framework, and in a single repo, a monorepo, or several repos that change
-together. Install it from npm with `npm install -g @benjaminthomas/spec-driven-dev`, then run
-`spec-driven-dev` in your project.
+together, even when those repos live in different folders. To set it up, run
+`npx @benjaminthomas/spec-driven-dev@latest` in your project.
 
 ---
 
@@ -54,17 +54,21 @@ start a new session and continue where you left off.
 
 ## Quick start (5 minutes)
 
-**1. Install the CLI from npm** (once per machine):
+**1. Run the installer in your project** (for several repos, run it inside any one of them):
 
 ```bash
-npm install -g @benjaminthomas/spec-driven-dev
+npx @benjaminthomas/spec-driven-dev@latest
 ```
 
-**2. Run it in your project folder** (or, for several repos, in their shared parent folder):
+This one command downloads the tool, installs the skills, and sets up the project. It asks its
+questions in your terminal, so run it in a real terminal, not through another tool. If there's no
+terminal to answer in, it says so and uses the detected values.
 
-```bash
-spec-driven-dev
-```
+> **Why not `npm install -g`?** npm doesn't let a package ask questions while it installs, and an
+> install doesn't know which project it's for. That's why setup is a separate step you run inside
+> the project. If you'll use the `doctor`/`status` commands often, you can also install it
+> globally: `npm install -g @benjaminthomas/spec-driven-dev`, then run `spec-driven-dev` in place of
+> the `npx …` command.
 
 It:
 1. **Finds your AI tools** (Claude Code, Cursor, Codex CLI, Antigravity) and installs the skills
@@ -88,6 +92,11 @@ words in quotes.
 /spec-checkpoint                   "checkpoint"
 /spec-ship                         "ship it"
 ```
+
+**Fewer stops:** after reviewing the spec, say **"approved, run it through"**. The workflow then
+implements, verifies, and commits in one go. It stops at the first failure, and it always asks
+before pushing or opening a PR. To make this the default after approval, choose `run-through` during
+setup (`pipeline.after_approval` in `.spec-driven.yml`).
 
 That's the whole workflow. Every stage can be used on its own as well: use `/spec-create` straight
 from a planning chat, or `/spec-checkpoint` on any work in progress.
@@ -115,9 +124,9 @@ can usually just press Enter):
 | Which AI tools get the skills | tool folders in your home directory and commands on your `PATH` | Claude Code, Cursor |
 | This project only, or all projects | (you choose) | `project` |
 | Project layout | git repos and workspace files (`pnpm-workspace.yaml`, `turbo.json`, `nx.json`, `go.work`, …) | `single`, `monorepo`, or `multi-repo` |
-| *multi-repo:* workspace folder (where the config goes) | the folder you ran it in, or the parent of the repo you're in | `~/work` |
-| *multi-repo:* which repos belong together | git repos in the workspace folder, grouped by GitHub owner | `api`, `web` |
-| *multi-repo:* repos from other folders | (you type paths) | `~/clients/billing, ../shared-lib` |
+| *multi-repo:* which repos nearby belong | git repos up to two folders down, grouped by GitHub owner | `frontend` |
+| *multi-repo:* repos in other places | (you type paths: absolute, `~/…`, or relative) | `~/Work/backend, /srv/database` |
+| *multi-repo:* where the config lives | the repos' shared parent folder, or `~/.spec-driven/<name>/` | `~/Projects` |
 | *monorepo:* package folders | the workspaces your `package.json`/`pnpm-workspace.yaml` declares, or `apps/*`, `packages/*` | `apps/web, packages/ui` |
 | Issue tracker | ticket keys in branch names and commits | Jira, key `STP` |
 | Base branch / PR target | default branch, `staging`/`develop` branches | `staging` |
@@ -125,6 +134,7 @@ can usually just press Enter):
 | Commit style | your recent commit messages | `conventional` (`feat: …`) or `ticket` (`STP-123: …`) |
 | Lint / typecheck / test / build / dev commands | `package.json` scripts and lockfile (per repo or package) | `pnpm run lint` |
 | Where specs go | (you choose) | `specs/` |
+| After you approve a spec | (you choose) | `stop` (wait at each stage) or `run-through` |
 
 **Where the file lives, by layout:**
 
@@ -132,17 +142,32 @@ can usually just press Enter):
 |---|---|---|---|
 | **single** | one repo, one app | the repo root (commit it, so the team shares it) | as described below |
 | **monorepo** | one repo, many apps/packages | the repo root (commit it) | tasks name their package, and checks run per package |
-| **multi-repo** | several repos that change together | their shared parent folder (personal to your machine) | investigation searches every listed repo, tasks stay inside one repo each, and `spec-ship` opens one PR per repo, each linking the others |
+| **multi-repo** | several repos that change together, in any folders | their shared parent folder, or `~/.spec-driven/<name>/` (personal to your machine) | investigation searches every listed repo, tasks stay inside one repo each, and `spec-ship` opens one PR per repo, each linking the others |
 
-Repos outside the workspace folder are saved with their full path. Paths that don't exist or
-aren't git repos are skipped with a message, and setup stops if a multi-repo workspace ends up with
-no repos. You can choose a different layout from the one detected: for example, choose
-`multi-repo` from inside one repo and it uses the parent folder as the workspace, with your current
-repo pre-selected.
+**Repos in different places.** A multi-repo workspace doesn't need its repos in one folder. For
+example, from inside `/Projects/frontend`:
+
+```
+Layout — single, monorepo, or multi-repo (detected: single) [single]: multi-repo
+Found 1 git repos under /Projects. Which ones belong to this workspace?
+  1. frontend
+Repos [1]:
+Other repo paths, comma-separated (empty for none): ~/Work/backend, /srv/database
+Where should this workspace's .spec-driven.yml live [~/.spec-driven/frontend-workspace]:
+```
+
+- **Where the config goes:** the repos' shared parent folder, or `~/.spec-driven/<name>/` when that
+  parent would be your home folder or `/`.
+- **How every repo finds it:** setup records the workspace in `~/.spec-driven/workspaces.json`, so
+  `/Work/backend` finds its config even though the config isn't above it. The skills, `doctor`,
+  and `status` all look there.
+- **Paths are checked:** ones that don't exist or aren't git repos are skipped with a message, and
+  setup stops if a workspace would end up with no repos.
 
 Every question also has a flag, for scripts and CI:
-`--layout=multi-repo --repos=api,web,~/clients/billing`, `--layout=monorepo --packages=apps/web,packages/ui`,
-`--tools=cursor,codex`, `--global`, `--yes` (accept everything detected).
+`--layout=multi-repo --repos=~/Projects/frontend,~/Work/backend --workspace=~/Projects`,
+`--layout=monorepo --packages=apps/web,packages/ui`, `--after-approval=run-through`,
+`--tools=cursor,codex`, `--global`, `--yes` (accept everything detected), and `--version`.
 
 To change the rules later, edit the file or run setup again, then run `spec-driven-dev doctor`
 to confirm the file still matches your repos. Setup never overwrites the file without
@@ -344,6 +369,18 @@ config sits outside any repo, so it stays on your machine.
 **Does it work with my stack?**
 Yes. No skill assumes a language or framework. Each one finds the repo's own commands.
 
+**Do I have to start every stage myself?**
+No. After you approve a spec, say "approved, run it through": implement, verify, and checkpoint then
+run one after another, stopping at the first failure. Two steps always wait for you: approving the
+spec, and pushing or opening the PR. You don't need slash commands either. Saying "investigate
+STP-123" or "ship it" picks the right skill.
+
+**Setup didn't ask me about repos.**
+It only asks about repos for a multi-repo or monorepo layout. If it detected `single`, type
+`multi-repo` at the layout question, then add your other repos by path. If it asked nothing at all,
+there was no terminal to type answers into (it prints a note saying so), so run it directly in a
+terminal. Check which version ran with `npx @benjaminthomas/spec-driven-dev@latest --version`.
+
 **Can I skip stages?**
 Yes. Every skill works on its own. `spec-verify` even works without a spec: it asks what to check.
 
@@ -487,15 +524,15 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 105 | 935 | 1 |
-| `spec-investigate` | 1 · understand | 323 | 2,708 | 1 |
-| `spec-create` | 2 · plan | 149 | 1,328 | 4 |
-| `spec-implement` | 3 · build | 236 | 1,790 | 3 |
-| `spec-verify` | 4 · prove | 153 | 1,459 | 1 |
-| `spec-checkpoint` | 5 · commit | 106 | 762 | 0 |
-| `spec-ship` | 6 · PR | 218 | 1,235 | 0 |
+| `spec-setup` | 0 · configure | 114 | 1,022 | 1 |
+| `spec-investigate` | 1 · understand | 325 | 2,741 | 1 |
+| `spec-create` | 2 · plan | 157 | 1,415 | 4 |
+| `spec-implement` | 3 · build | 273 | 2,109 | 3 |
+| `spec-verify` | 4 · prove | 155 | 1,492 | 1 |
+| `spec-checkpoint` | 5 · commit | 108 | 795 | 0 |
+| `spec-ship` | 6 · PR | 220 | 1,268 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **1,545** | **12,426** | **17** |
+| **Total** | | **1,607** | **13,051** | **17** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback

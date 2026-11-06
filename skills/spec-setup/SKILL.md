@@ -44,6 +44,11 @@ Read, don't guess. Collect a draft of every field in `references/config-template
      belong together. Never assume every folder in the parent belongs. Always also ask whether
      repos in **other folders** belong (e.g. `~/clients/billing`). Check each path is a git repo,
      and store paths inside the workspace as relative and paths outside it as absolute.
+   - The repos of one workspace can live in unrelated places (`/Projects/frontend`,
+     `~/Work/backend`, `/srv/database`). Put the config in their shared parent folder, or in
+     `~/.spec-driven/<name>/` when that parent would be the home folder or `/`. Then record it in
+     `~/.spec-driven/workspaces.json` (`{"<config path>": ["<repo path>", …]}`) so every repo can
+     find it.
    - The user can override the detected layout. If they choose `multi-repo` from inside one repo,
      the workspace folder defaults to that repo's parent, with the current repo pre-selected. If
      they choose `monorepo`, ask for the package folders. Never write a `multi-repo` config with
@@ -63,6 +68,10 @@ Read, don't guess. Collect a draft of every field in `references/config-template
    `Makefile`, `pyproject.toml`/`tox.ini`, `Cargo.toml`, `go.mod`, `composer.json`, CI workflow
    steps (CI is often the most truthful source). Dev URL from the dev script, `.env.example`, or
    framework defaults.
+
+6. **After approval.** Ask whether an approved spec should stop after each stage (`stop`), or
+   run implement → verify → checkpoint in one go (`run-through`), stopping at any failure and never
+   pushing. Store it as `pipeline.after_approval`.
 
 ## Step 2 — Confirm in one round
 

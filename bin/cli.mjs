@@ -7,7 +7,8 @@
 //   spec-driven-dev doctor          check .spec-driven.yml against the real repos (exit 1 on problems)
 //   spec-driven-dev status          list specs with unfinished tasks (used by the session-start hook)
 //   flags: --yes  --global  --tools=claude,cursor  --skills=spec-create,...  --no-setup  --dir=<path>
-//          --layout=single|monorepo|multi-repo  --repos=api,../web,/abs/path  --packages=apps/web,packages/ui
+//          --layout=single|monorepo|multi-repo  --repos=~/Projects/frontend,/srv/backend  --workspace=<config dir>
+//          --packages=apps/web,packages/ui  --after-approval=stop|run-through  --version
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -35,8 +36,15 @@ const command = args.find((a) => !a.startsWith("-")) || "install";
 const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status"].includes(command);
 const DIR = path.resolve(opt("dir") || process.cwd());
 
+if (flag("version") || flag("v")) {
+  console.log(JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version);
+  process.exit(0);
+}
+if (["install", "setup"].includes(command) && !process.stdin.isTTY && !flag("yes") && !flag("y"))
+  console.log("• No interactive terminal detected, so no questions will be asked: using the detected values.\n  Run it directly in a terminal to answer them, or pass flags (--layout, --repos, --tools …). Add --yes to hide this note.");
+
 if (flag("help") || flag("h")) {
-  console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 10).join("\n").replace(/^\/\/ ?/gm, ""));
+  console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 11).join("\n").replace(/^\/\/ ?/gm, ""));
   process.exit(0);
 }
 
@@ -103,6 +111,21 @@ const isRepo = (d) => run("git", ["rev-parse", "--is-inside-work-tree"], d) === 
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
 const subdirs = (d) => { try { return fs.readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith(".")).map((e) => e.name); } catch { return []; } };
 
+// Git repos up to two folders down (e.g. ~/work/client/api). A git worktree has a .git *file*;
+// it belongs to its main repo, so it is skipped. Repos aren't searched inside.
+function findRepos(dir, depth = 2, prefix = "") {
+  const out = [];
+  for (const n of subdirs(dir)) {
+    if (n === "node_modules") continue;
+    const full = path.join(dir, n);
+    let isGitDir = false;
+    try { isGitDir = fs.statSync(path.join(full, ".git")).isDirectory(); } catch {}
+    if (isGitDir) out.push(prefix + n);
+    else if (depth > 1) out.push(...findRepos(full, depth - 1, `${prefix}${n}/`));
+  }
+  return out;
+}
+
 function detectLayout(dir) {
   if (isRepo(dir)) {
     const top = run("git", ["rev-parse", "--show-toplevel"], dir);
@@ -121,8 +144,7 @@ function detectLayout(dir) {
     const mono = MARKERS.some((m) => fs.existsSync(path.join(top, m))) || pkg?.workspaces || cargo || packages.length > 1;
     return { layout: mono ? "monorepo" : "single", root: top, repos: mono ? packages : [] };
   }
-  // a git worktree has a .git *file*; it belongs to its main repo, so skip it
-  const repos = subdirs(dir).filter((n) => { try { return fs.statSync(path.join(dir, n, ".git")).isDirectory(); } catch { return false; } });
+  const repos = findRepos(dir);
   return repos.length ? { layout: "multi-repo", root: dir, repos } : { layout: "single", root: dir, repos: [] };
 }
 
@@ -182,13 +204,15 @@ function toYaml(c) {
   out += `tracker:\n  type: ${c.tracker.type}\n  key: ${y(c.tracker.key)}\n  url: ${y(c.tracker.url)}\n`;
   out += `git:\n${cmds(c.git, "  ")}\n`;
   out += `commands:\n${cmds(c.commands, "  ")}\n  dev_url: ${y(c.devUrl)}\n`;
+  out += `pipeline:\n  after_approval: ${c.afterApproval || "stop"}   # stop | run-through (implement → verify → checkpoint; ship always asks)\n`;
   return out + `specs_dir: ${y(c.specsDir)}\n`;
 }
 
 const LAYOUTS = ["single", "monorepo", "multi-repo"];
 const splitList = (v) => (v || "").split(",").map((x) => x.trim()).filter(Boolean);
 // Paths are stored relative to the config's folder when inside it, absolute otherwise.
-const relOrAbs = (root, p) => { const r = path.relative(root, p); return r.startsWith("..") || path.isAbsolute(r) ? p : r || "."; };
+const real = (p) => { try { return fs.realpathSync(p); } catch { return p; } }; // /var vs /private/var etc.
+const relOrAbs = (root, p) => { const r = path.relative(real(root), real(p)); return r.startsWith("..") || path.isAbsolute(r) ? real(p) : r || "."; };
 
 async function chooseLayout(detected) {
   const forced = opt("layout");
@@ -201,39 +225,72 @@ async function chooseLayout(detected) {
   }
 }
 
-// multi-repo: pick from repos found in the workspace folder, then add any others by path.
+const expandHome = (p) => p.replace(/^~(?=$|\/)/, HOME);
+
+function commonParent(paths) {
+  if (!paths.length) return "";
+  let parts = paths[0].split(path.sep);
+  for (const p of paths.slice(1)) { const q = p.split(path.sep); let i = 0; while (i < parts.length && parts[i] === q[i]) i++; parts = parts.slice(0, i); }
+  return parts.join(path.sep) || path.sep;
+}
+
+// multi-repo: the repos can live anywhere (/Projects/frontend, /Work/backend, …). Pick the ones found
+// nearby, add any others by path, then decide where the config lives.
 async function chooseRepos(d) {
-  // Inside one repo but multi-repo chosen → the workspace is the folder that holds this repo.
   const insideRepo = d.layout !== "multi-repo";
-  const defRoot = insideRepo ? path.dirname(d.root) : d.root;
-  const root = path.resolve(DIR, await ask("Workspace folder (where .spec-driven.yml goes)", defRoot));
-  const found = detectLayout(root).layout === "multi-repo" ? detectLayout(root).repos : [];
+  const scanRoot = insideRepo ? path.dirname(d.root) : d.root;
   let picked = [];
   const fromFlag = opt("repos");
   if (fromFlag) {
-    picked = splitList(fromFlag).map((p) => path.resolve(root, p));
+    picked = splitList(fromFlag).map((p) => path.resolve(DIR, expandHome(p)));
   } else {
+    const found = findRepos(scanRoot);
     if (found.length) {
       const owners = {};
-      for (const r of found) (owners[gitFacts(path.join(root, r))?.owner || "?"] ||= []).push(r);
+      for (const r of found) (owners[gitFacts(path.join(scanRoot, r))?.owner || "?"] ||= []).push(r);
       const biggest = Object.values(owners).sort((a, b) => b.length - a.length)[0] || [];
-      const here = insideRepo ? [path.relative(root, d.root)] : [];
-      console.log(`Found ${found.length} git repos in ${root}. Which ones change together as one workspace?`);
-      picked = (await pick("Repos", found.map((r) => ({ value: r, label: `${r}  (${Object.keys(owners).find((o) => owners[o].includes(r))})` })), [...new Set([...here, ...biggest])]))
-        .map((r) => path.join(root, r));
+      const here = insideRepo ? [path.relative(scanRoot, d.root)] : [];
+      console.log(`Found ${found.length} git repos under ${scanRoot}. Which ones belong to this workspace?`);
+      picked = (await pick("Repos", found.map((r) => ({ value: r, label: `${r}  (${Object.keys(owners).find((o) => owners[o].includes(r))})` })), [...new Set([...here, ...(insideRepo ? [] : biggest)])]))
+        .map((r) => path.join(scanRoot, r));
     } else if (insideRepo) picked = [d.root];
-    const extra = await ask("Add repos from other folders? Paths, comma-separated (absolute, ~/…, or relative to the workspace folder); empty for none", "");
-    picked.push(...splitList(extra).map((p) => path.resolve(root, p.replace(/^~(?=$|\/)/, HOME))));
+    console.log("Repos in other places can be part of the same workspace (e.g. ~/Work/backend, /srv/database).");
+    const extra = await ask("Other repo paths, comma-separated (empty for none)", "");
+    picked.push(...splitList(extra).map((p) => path.resolve(DIR, expandHome(p))));
   }
-  const repos = [];
+  const abs = [];
   for (const p of [...new Set(picked)]) {
     if (!fs.existsSync(p)) console.log(`  ✗ ${p}: folder not found — skipped`);
     else if (!isRepo(p)) console.log(`  ✗ ${p}: not a git repo — skipped`);
-    else repos.push(relOrAbs(root, p));
+    else abs.push(run("git", ["rev-parse", "--show-toplevel"], p) || p);
   }
-  if (!repos.length) throw new Error("A multi-repo workspace needs at least one git repo. Re-run setup and pick or add repos (or use --repos=a,b).");
+  if (!abs.length) throw new Error("A multi-repo workspace needs at least one git repo. Re-run setup and pick or add repos (or use --repos=a,b).");
+
+  // Config location: the repos' shared parent folder, unless that's too broad (home or /), in which
+  // case a named folder under ~/.spec-driven/. Repos outside it find the config via the registry.
+  const parent = commonParent([...new Set(abs.map(real))].map((p) => path.dirname(p)));
+  const tooBroad = !parent || parent === HOME || parent === path.parse(parent).root || HOME.startsWith(parent + path.sep);
+  // Ran in a workspace folder and every repo is under it → keep the config right there.
+  const allUnderScan = !insideRepo && abs.every((p) => real(p).startsWith(real(scanRoot) + path.sep));
+  const defRoot = opt("workspace") ? path.resolve(DIR, expandHome(opt("workspace")))
+    : allUnderScan ? scanRoot
+    : tooBroad ? path.join(HOME, ".spec-driven", path.basename(abs[0]) + "-workspace") : parent;
+  const root = path.resolve(DIR, expandHome(await ask("Where should this workspace's .spec-driven.yml live", defRoot)));
+  fs.mkdirSync(root, { recursive: true });
+  const repos = [...new Set(abs)].map((p) => relOrAbs(root, p));
   console.log(`  Workspace repos: ${repos.join(", ")}`);
   return { root, repos };
+}
+
+// ~/.spec-driven/workspaces.json maps each multi-repo config to its repos, so a repo outside the
+// config's folder (e.g. /Work/backend for a config in /Projects) can still find it.
+const REGISTRY = () => path.join(HOME, ".spec-driven", "workspaces.json");
+function readRegistry() { return readJson(REGISTRY()) || {}; }
+function register(file, repoPaths) {
+  const reg = readRegistry();
+  reg[file] = repoPaths;
+  fs.mkdirSync(path.dirname(REGISTRY()), { recursive: true });
+  fs.writeFileSync(REGISTRY(), JSON.stringify(reg, null, 2) + "\n");
 }
 
 // monorepo: confirm or edit the package folders (relative to the repo root).
@@ -250,8 +307,13 @@ async function choosePackages(d) {
 }
 
 async function setup() {
+  if (opt("after-approval") && !["stop", "run-through"].includes(opt("after-approval"))) throw new Error("--after-approval must be stop or run-through");
   console.log("\nProject setup — detecting how this project works…");
   const d = detectLayout(DIR);
+  console.log(d.layout === "multi-repo" ? `Detected: ${d.repos.length} git repos under ${d.root} (multi-repo).`
+    : d.layout === "monorepo" ? `Detected: monorepo at ${d.root} with ${d.repos.length} package(s)${d.repos.length ? `: ${d.repos.join(", ")}` : ""}.`
+    : isRepo(d.root) ? `Detected: single repo at ${d.root}. If it works together with other repos, choose multi-repo.`
+    : `Detected: no git repo in ${d.root}. Choose multi-repo to list your repos, wherever they are.`);
   const layout = await chooseLayout(d.layout);
   const { root, repos } = layout === "multi-repo" ? await chooseRepos(d) : layout === "monorepo" ? await choosePackages(d) : { root: d.layout === "multi-repo" ? DIR : d.root, repos: [] };
   if (layout === "single" && !isRepo(root)) console.log(`  • ${root} isn't a git repo — run setup inside the repo, or choose multi-repo.`);
@@ -274,9 +336,17 @@ async function setup() {
   const branchName = await ask("Branch name pattern ({ticket} {slug} {type})", g.branchName);
   const commitStyle = await ask("Commit style (conventional/ticket/freeform)", g.commitStyle);
   const specsDir = await ask("Where specs/<feature>/ folders go", "specs");
+  console.log("After you approve a spec, the workflow can stop and wait for you at each stage, or run");
+  console.log("implement → verify → checkpoint in one go (it stops at any failure, and never pushes without asking).");
+  let afterApproval = opt("after-approval");
+  if (!afterApproval) for (;;) {
+    afterApproval = await ask("After approval: stop or run-through", "stop");
+    if (["stop", "run-through"].includes(afterApproval)) break;
+    console.log("  Please type stop or run-through");
+  }
 
   const config = {
-    layout, tracker: { type: trackerType, key, url }, specsDir, devUrl: "",
+    layout, tracker: { type: trackerType, key, url }, specsDir, devUrl: "", afterApproval,
     git: { remote: "origin", base_branch: base, pr_target: pr, branch_name: branchName, commit_style: commitStyle },
     commands: layout === "single" ? commandsFor(repoDirs[0]) : commandsFor(root),
     repos: repos.map((r) => {
@@ -286,6 +356,7 @@ async function setup() {
     }),
   };
   fs.writeFileSync(file, toYaml(config));
+  if (layout === "multi-repo") register(real(file), repos.map((r) => real(path.resolve(root, r))));
   console.log(`✓ Wrote ${file}`);
   console.log(isRepo(root) ? "  Commit it so your team shares the same rules." : "  This folder isn't a git repo, so the config is personal to this machine.");
   console.log('  Fill in repo roles, dev_url, and non-Node commands by asking your AI tool to "run spec-setup".');
@@ -331,8 +402,13 @@ function findConfig(dir) {
   for (let d = dir; ; d = path.dirname(d)) {
     const f = path.join(d, ".spec-driven.yml");
     if (fs.existsSync(f)) return f;
-    if (d === path.dirname(d) || d === HOME) return null;
+    if (d === path.dirname(d) || d === HOME) break;
   }
+  // Not above us: a multi-repo workspace elsewhere may list this repo.
+  const here = real(dir);
+  for (const [file, repos] of Object.entries(readRegistry()))
+    if (fs.existsSync(file) && repos.some((r) => here === r || here.startsWith(r + path.sep))) return file;
+  return null;
 }
 
 function doctor() {
@@ -345,6 +421,7 @@ function doctor() {
   if (!["single", "monorepo", "multi-repo"].includes(c.layout)) problems.push(`layout "${c.layout}" must be single, monorepo, or multi-repo`);
   if (c.tracker && !["jira", "github", "linear", "none"].includes(c.tracker.type)) problems.push(`tracker.type "${c.tracker.type}" must be jira, github, linear, or none`);
   if (c.git?.commit_style && !["conventional", "ticket", "freeform"].includes(c.git.commit_style)) problems.push(`git.commit_style "${c.git.commit_style}" must be conventional, ticket, or freeform`);
+  if (c.pipeline?.after_approval && !["stop", "run-through"].includes(c.pipeline.after_approval)) problems.push(`pipeline.after_approval "${c.pipeline.after_approval}" must be stop or run-through`);
   if (c.git?.branch_name && !/\{(ticket|slug)\}/.test(c.git.branch_name)) problems.push(`git.branch_name "${c.git.branch_name}" needs {ticket} or {slug}`);
   const repos = c.layout === "single" ? [{ path: "." }] : Array.isArray(c.repos) ? c.repos : [];
   if (c.layout !== "single" && !repos.length) problems.push(`layout is ${c.layout} but repos: is empty`);

@@ -20,7 +20,9 @@ The key insight: implementation plans that live in a single file are either too 
 ## Project config (read first)
 
 Load `.spec-driven.yml`: walk up from the current directory to the home folder, and the first one
-found wins (a `multi-repo` config only applies inside the repos it lists). Its values beat anything
+found wins (a `multi-repo` config only applies inside the repos it lists). If none is found, check
+`~/.spec-driven/workspaces.json`, which maps each multi-repo config to its repo paths. Use the config
+whose repos contain the current directory, because a workspace's repos can live in unrelated folders. Its values beat anything
 you would detect or assume. This skill uses `layout`/`repos` and `specs_dir`.
 
 **Monorepo / multi-repo:** every task names its package or repo, and its file paths are relative to that. Keep each task inside one repo. Cross-repo work becomes separate tasks, with the contract (API shape, event, schema) written into both.
@@ -136,8 +138,14 @@ Batch breakdown:
 Next steps:
 1. Review action-required.md for tasks you need to complete manually
 2. Review the requirements and task files
-3. Use /spec-implement to start parallel implementation
+3. When you're happy with it, either:
+   - say "implement" to build it and stop for review, or
+   - say "approved, run it through" to build, verify and commit in one go (stops at any failure,
+     never pushes without asking)
 ```
+
+If `.spec-driven.yml` has `pipeline.after_approval: run-through`, say that this project runs through
+by default after approval. Never start implementing from this skill.
 
 ## Critical Rules
 

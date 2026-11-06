@@ -33,7 +33,9 @@ ready-to-use work branch; a human decides when to run `spec-create` next.
 ## Project config (read first)
 
 Load `.spec-driven.yml`: walk up from the current directory to the home folder, and the first one
-found wins (a `multi-repo` config only applies inside the repos it lists). Its values beat anything
+found wins (a `multi-repo` config only applies inside the repos it lists). If none is found, check
+`~/.spec-driven/workspaces.json`, which maps each multi-repo config to its repo paths. Use the config
+whose repos contain the current directory, because a workspace's repos can live in unrelated folders. Its values beat anything
 you would detect or assume. This skill uses `layout`/`repos` (where to look and what each repo does), `tracker`, `git.remote`, `git.base_branch`, `git.branch_name`, and `specs_dir`.
 
 **Monorepo:** name the package(s) involved. **Multi-repo:** search every listed repo whose role fits the ticket, and create the work branch, with the same name, only in the repos the investigation shows need changes.

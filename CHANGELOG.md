@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0 — 2026-11-06
+- **Run-through after approval.** Say "approved, run it through" (or set `pipeline.after_approval: run-through`) to implement → verify → checkpoint in one go. It stops at the first failure and never pushes without asking. Setup asks for your default.
+- **Multi-repo workspaces in different places.** Repos like `/Projects/frontend`, `~/Work/backend`, and `/srv/database` can form one workspace. The config goes in their shared parent, or `~/.spec-driven/<name>/`, and `~/.spec-driven/workspaces.json` lets every repo find it (skills, `doctor`, and `status`).
+- Setup prints what it detected before asking, finds repos up to two folders down, and says so when there's no terminal to answer in (instead of silently using defaults).
+- `--version`, `--workspace`, and `--after-approval` flags. `doctor` validates `pipeline.after_approval`.
+- README: first-time setup is `npx @benjaminthomas/spec-driven-dev@latest`, with an explanation of why `npm install -g` can't run setup.
+
 ## 1.4.1 — 2026-11-06
 - Setup asks for repos in other folders (multi-repo) and for package folders (monorepo). It checks
   each path, skips ones that don't exist or aren't git repos, and stores outside paths as absolute.

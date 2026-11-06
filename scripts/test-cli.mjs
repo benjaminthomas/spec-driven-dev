@@ -7,8 +7,8 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "bin", "cli.mjs");
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sdd-test-"));
-const home = path.join(tmp, "home");
+const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sdd-test-")));  // real path: macOS /var → /private/var
+const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sdd-home-")));  // outside tmp, like a real HOME
 fs.mkdirSync(path.join(home, ".cursor"), { recursive: true });
 const sh = (cwd, ...a) => execFileSync("git", a, { cwd, stdio: "ignore" });
 const cli = (...a) => { try { return execFileSync("node", [CLI, ...a], { env: { ...process.env, SPEC_DRIVEN_HOME: home }, stdio: "pipe" }).toString(); } catch (e) { e.message += `\n${e.stdout}${e.stderr}`; throw e; } };
@@ -83,18 +83,35 @@ fs.writeFileSync(path.join(single, "specs/b/investigation.md"), "x");
 const st = cli("status", `--dir=${single}`);
 assert.ok(st.includes("specs/a: 1/2 tasks done") && st.includes("specs/b: investigated"), st);
 
-// 8. multi-repo chosen from inside one repo: workspace = parent folder, extra repos added by path
+// 8. multi-repo from inside one repo, with repos in unrelated places (/Projects/frontend, /Work/backend …)
 const ws2 = path.join(tmp, "ws2"), elsewhere = path.join(tmp, "elsewhere", "billing");
 repo(path.join(ws2, "app"), { test: "jest" }, ["feat: a"]);
 repo(elsewhere, { build: "tsc" }, ["feat: b"], ["develop"]);
 fs.mkdirSync(path.join(tmp, "not-a-repo"));
-cli("setup", "--yes", `--dir=${path.join(ws2, "app")}`, "--layout=multi-repo", `--repos=app,${elsewhere},../not-a-repo,missing`);
+//  a) explicit --workspace keeps the config where you say; bad paths are skipped
+cli("setup", "--yes", `--dir=${path.join(ws2, "app")}`, "--layout=multi-repo", `--workspace=${ws2}`, `--repos=${path.join(ws2, "app")},${elsewhere},${path.join(tmp, "not-a-repo")},missing`);
 cfg = fs.readFileSync(path.join(ws2, ".spec-driven.yml"), "utf8");
-for (const want of ["layout: multi-repo", 'path: "app"', `path: ${JSON.stringify(elsewhere)}`, 'base_branch: "develop"'])
+for (const want of ["layout: multi-repo", 'path: "app"', `path: ${JSON.stringify(elsewhere)}`, 'base_branch: "develop"', "after_approval: stop"])
   assert.ok(cfg.includes(want), `multi-repo (paths) config missing ${want}\n${cfg}`);
 assert.ok(!cfg.includes("not-a-repo") && !cfg.includes("missing"), "invalid repo paths were saved");
 assert.equal(doctor(ws2).code, 0, doctor(ws2).out);  // absolute paths outside the workspace must resolve
+//  b) a repo outside the config's folder finds the config through ~/.spec-driven/workspaces.json
+const reg = JSON.parse(fs.readFileSync(path.join(home, ".spec-driven/workspaces.json"), "utf8"));
+assert.deepEqual(reg[path.join(ws2, ".spec-driven.yml")].sort(), [path.join(ws2, "app"), elsewhere].sort());
+assert.ok(doctor(path.join(elsewhere)).out.includes(path.join(ws2, ".spec-driven.yml")), "outside repo didn't find its workspace config");
+//  c) without --workspace, the config goes in the repos' shared parent folder
+cli("setup", "--yes", `--dir=${elsewhere}`, "--layout=multi-repo", `--repos=${path.join(ws2, "app")},${elsewhere}`, "--after-approval=run-through");
+cfg = fs.readFileSync(path.join(tmp, ".spec-driven.yml"), "utf8");
+assert.ok(cfg.includes('path: "ws2/app"') && cfg.includes('path: "elsewhere/billing"') && cfg.includes("after_approval: run-through"), cfg);
+fs.rmSync(path.join(tmp, ".spec-driven.yml"));
 assert.throws(() => cli("setup", "--yes", `--dir=${ws2}`, "--layout=multi-repo", "--repos=missing"), /at least one git repo/);
+assert.throws(() => cli("setup", "--yes", `--dir=${ws2}`, "--after-approval=maybe"), /must be stop or run-through/);
+
+//  d) repos two folders down are found (e.g. ~/work/client/api)
+const deep = path.join(tmp, "deep");
+repo(path.join(deep, "client", "api"), {}, ["x"]);
+cli("setup", "--yes", `--dir=${deep}`);
+assert.ok(fs.readFileSync(path.join(deep, ".spec-driven.yml"), "utf8").includes('path: "client/api"'), "nested repo not found");
 
 // 9. monorepo chosen for a repo setup saw as single: package folders given, missing ones skipped
 fs.rmSync(path.join(single, ".spec-driven.yml"));
@@ -104,8 +121,12 @@ cfg = fs.readFileSync(path.join(single, ".spec-driven.yml"), "utf8");
 assert.ok(cfg.includes("layout: monorepo") && cfg.includes('path: "apps/web"') && !cfg.includes("apps/nope"), cfg);
 assert.throws(() => cli("setup", "--yes", `--dir=${single}`, "--layout=mono"), /--layout must be/);
 
-// 10. bad input fails loudly
+// 10. --version
+assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
+
+// 11. bad input fails loudly
 assert.throws(() => cli("--yes", "--tools=nope", "--no-setup", `--dir=${single}`));
 
 fs.rmSync(tmp, { recursive: true, force: true });
+fs.rmSync(home, { recursive: true, force: true });
 console.log("✓ cli self-check passed");
