@@ -368,8 +368,8 @@ skills:
 | Tool | This project | All projects |
 |---|---|---|
 | Claude Code | `.claude/skills/<name>/` | `~/.claude/skills/<name>/` |
-| Codex CLI | `.agents/skills/<name>/` | `~/.codex/skills/<name>/` |
-| Cursor | `.cursor/skills/<name>/` (or `.agents/skills/<name>/`) | `~/.cursor/skills/<name>/` |
+| Codex CLI | `.agents/skills/<name>/` | `~/.agents/skills/<name>/` |
+| Cursor | `.cursor/skills/<name>/` (also reads `.agents/skills/`) | `~/.cursor/skills/<name>/` |
 | Antigravity | `.agents/skills/<name>/` | `~/.gemini/config/skills/<name>/` |
 
 Codex CLI and Antigravity share the project path, so installing for one covers both.

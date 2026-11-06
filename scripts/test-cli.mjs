@@ -47,11 +47,24 @@ assert.ok(!cfg.includes("api-STP-9"), "worktree listed as a repo");
 for (const want of ["layout: multi-repo", 'path: "api"', 'path: "web"', 'build: "npm run build"', 'commit_style: "conventional"'])
   assert.ok(cfg.includes(want), `multi-repo config missing ${want}\n${cfg}`);
 
-// 4. global install uses the tool's home folder; detection picks up ~/.cursor
-cli("--yes", "--global", "--no-setup", "--tools=cursor", `--dir=${single}`);
-assert.ok(fs.existsSync(path.join(home, ".cursor/skills/spec-ship/SKILL.md")));
+// 4. monorepo: declared workspace globs win over conventional folders
+const mono = path.join(tmp, "mono");
+repo(mono, { build: "turbo build" }, ["feat: init"]);
+fs.writeFileSync(path.join(mono, "package.json"), JSON.stringify({ workspaces: ["extensions/*", "tools/cli"] }));
+for (const d of ["extensions/pixel", "extensions/widget", "tools/cli"]) { fs.mkdirSync(path.join(mono, d), { recursive: true }); fs.writeFileSync(path.join(mono, d, "package.json"), "{}"); }
+fs.mkdirSync(path.join(mono, "extensions/no-manifest"));
+cli("setup", "--yes", `--dir=${mono}`);
+cfg = fs.readFileSync(path.join(mono, ".spec-driven.yml"), "utf8");
+for (const want of ["layout: monorepo", 'path: "extensions/pixel"', 'path: "extensions/widget"', 'path: "tools/cli"'])
+  assert.ok(cfg.includes(want), `monorepo config missing ${want}\n${cfg}`);
+assert.ok(!cfg.includes("no-manifest"), "folder without a manifest listed as a package");
 
-// 5. bad input fails loudly
+// 5. global install uses the tool's home folder; detection picks up ~/.cursor
+cli("--yes", "--global", "--no-setup", "--tools=cursor,codex,antigravity", `--dir=${single}`);
+for (const d of [".cursor/skills", ".agents/skills", ".gemini/config/skills"])
+  assert.ok(fs.existsSync(path.join(home, d, "spec-ship/SKILL.md")), `global install missing in ${d}`);
+
+// 6. bad input fails loudly
 assert.throws(() => cli("--yes", "--tools=nope", "--no-setup", `--dir=${single}`));
 
 fs.rmSync(tmp, { recursive: true, force: true });

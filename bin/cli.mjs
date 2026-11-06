@@ -20,7 +20,7 @@ const ALL_SKILLS = fs.readdirSync(SKILLS_DIR).filter((d) => fs.existsSync(path.j
 const TOOLS = {
   claude: { label: "Claude Code", home: ".claude", bin: "claude", project: ".claude/skills", global: ".claude/skills" },
   cursor: { label: "Cursor", home: ".cursor", bin: "cursor", project: ".cursor/skills", global: ".cursor/skills" },
-  codex: { label: "Codex CLI", home: ".codex", bin: "codex", project: ".agents/skills", global: ".codex/skills" },
+  codex: { label: "Codex CLI", home: ".codex", bin: "codex", project: ".agents/skills", global: ".agents/skills" }, // Codex reads $HOME/.agents/skills
   antigravity: { label: "Antigravity", home: ".gemini", bin: "antigravity", project: ".agents/skills", global: ".gemini/config/skills" },
 };
 
@@ -105,7 +105,16 @@ function detectLayout(dir) {
     const top = run("git", ["rev-parse", "--show-toplevel"], dir);
     const pkg = readJson(path.join(top, "package.json"));
     const cargo = fs.existsSync(path.join(top, "Cargo.toml")) && fs.readFileSync(path.join(top, "Cargo.toml"), "utf8").includes("[workspace]");
-    const packages = PKG_DIRS.flatMap((p) => subdirs(path.join(top, p)).filter((n) => MANIFESTS.some((m) => fs.existsSync(path.join(top, p, n, m)))).map((n) => `${p}/${n}`));
+    const hasManifest = (rel) => MANIFESTS.some((m) => fs.existsSync(path.join(top, rel, m)));
+    // Prefer the workspace list the repo declares; fall back to conventional folders.
+    // shortcut: only "dir/*", "dir/**" and exact paths are expanded — enough for typical workspace globs.
+    const pnpm = fs.existsSync(path.join(top, "pnpm-workspace.yaml")) ? [...fs.readFileSync(path.join(top, "pnpm-workspace.yaml"), "utf8").matchAll(/^\s*-\s*['"]?([^'"\n#]+?)['"]?\s*$/gm)].map((m) => m[1]) : [];
+    const declared = [...(Array.isArray(pkg?.workspaces) ? pkg.workspaces : pkg?.workspaces?.packages || []), ...pnpm].filter((g) => !g.startsWith("!"));
+    const globs = declared.length ? declared : PKG_DIRS.map((p) => `${p}/*`);
+    const packages = [...new Set(globs.flatMap((g) => {
+      const base = g.replace(/\/\*\*?$/, "");
+      return base === g ? [g.replace(/\/$/, "")] : subdirs(path.join(top, base)).map((n) => `${base}/${n}`);
+    }))].filter(hasManifest);
     const mono = MARKERS.some((m) => fs.existsSync(path.join(top, m))) || pkg?.workspaces || cargo || packages.length > 1;
     return { layout: mono ? "monorepo" : "single", root: top, repos: mono ? packages : [] };
   }
