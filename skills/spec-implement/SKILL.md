@@ -108,6 +108,25 @@ Read `references/coder-prompt-template.md` and construct each agent's prompt by 
 
 The coder agents should NOT commit their changes — the orchestrator handles commits after review.
 
+**Pick each coder's model from the task's tier.** Read the task's `## Complexity` tier (treat a
+missing tier as `standard`) and look up the model in `.spec-driven.yml` → `models.<tool>.<tier>`,
+where `<tool>` is the host you're running in (`claude`, `codex`, `cursor`, `antigravity`). Without a
+`models` section, use `models.claude` defaults: `light → haiku`, `standard → sonnet`,
+`deep → opus`.
+
+- **Host can set a model per agent** (e.g. Claude Code's Agent tool `model` parameter): dispatch
+  each coder with its tier's model.
+- **Host can't** (one model per session, as in Cursor or Codex): don't silently run deep tasks on a
+  light model. Before dispatching a batch, compare its highest tier with the model you're running
+  on. If the batch needs a stronger one, stop and say:
+  `Batch {N} has deep tasks ({task-nn: reason}). Switch to {models.<tool>.deep} for this batch, then
+  say "continue".` If the batch only has light tasks and you're on the deep model, mention that a
+  cheaper model would do, but carry on.
+- If the mapped value is `default`, use whatever model the session already runs, without
+  recommending a switch.
+
+Report the model used for each task in the batch summary.
+
 **Isolate parallel coders in git worktrees when the host allows it.** Coders sharing one working
 tree can clobber each other's edits and each other's lint/test runs. If your host can run an agent
 in its own worktree (e.g. Claude Code's `isolation: "worktree"`), use it for every coder in a
@@ -143,6 +162,9 @@ Read `references/review-prompt-template.md` and construct the review prompt by f
 - **{task_summaries}**: for each task in this batch, the task title and the coder agent's completion summary
 - **{verification_commands}**: `commands.lint`/`typecheck`/`test` from `.spec-driven.yml` for each repo or package touched, or the project's own commands if there's no config (e.g., `pnpm lint && pnpm typecheck && pnpm test`)
 
+Run the reviewer on the model for the **highest tier in the batch**, and never below `standard`: the
+review is where deep mistakes get caught.
+
 The review agent should:
 1. Run lint, typecheck, and tests
 2. Verify acceptance criteria and the tests named in each task file
@@ -160,6 +182,9 @@ If the review returns **FAIL**:
    - **{issues}**: the specific issues for this task group
    - **{task_content}**: the original task file for context
 4. After fix agents complete, re-run the review (Step 6)
+5. **Escalate on repeat failure.** If a task's issues survive a fix cycle, run its next fix one tier
+   higher (`light → standard → deep`). Note the escalation in the batch report. When a task needed
+   escalating, its tier was probably wrong, which is useful feedback for future specs.
 
 **Cap at 3 review cycles per batch.** If the third review still fails, stop and report to the user:
 

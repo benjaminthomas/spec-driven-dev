@@ -15,6 +15,11 @@ pending
 
 {N}
 
+## Complexity
+
+**Tier:** {light | standard | deep}
+**Signals:** {which rubric signals applied, with the evidence — or "none"}
+
 ## Description
 
 {2-5 sentences describing what this task accomplishes and why it matters in the context of the overall feature. Include enough context that an agent unfamiliar with the planning conversation understands the purpose.}
@@ -82,5 +87,6 @@ pending
 - The **Dependencies** section includes prose context (not just filenames) so the agent understands its inputs without reading other files. This is the most important part of making task files self-contained.
 - **Files to Create** and **Files to Modify** make the task's scope explicit. Tasks in the same batch should not overlap on these lists.
 - **Technical Details** captures everything from the planning conversation — CLI commands, schemas, code snippets, file paths, env vars, API endpoints. If it was discussed during planning and is relevant to this task, it belongs here.
+- **Complexity** comes from `complexity-rubric.md`. `spec-implement` picks the coder's model from this tier, so rate honestly: under-rating a risky task is the expensive mistake.
 - **Tests** names the tests the coder writes alongside the code. A behavioural acceptance criterion without a matching test is a gap — add the test or explain why it can only be checked by `spec-verify`.
 - **Acceptance Criteria** should be specific enough that completion can be verified objectively (by a code review agent or a human).

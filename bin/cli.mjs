@@ -235,11 +235,22 @@ function toYaml(c) {
   out += `tracker:\n  type: ${c.tracker.type}\n  key: ${y(c.tracker.key)}\n  url: ${y(c.tracker.url)}\n`;
   out += `git:\n${cmds(c.git, "  ")}\n`;
   out += `commands:\n${cmds(c.commands, "  ")}\n  dev_url: ${y(c.devUrl)}\n`;
+  out += "models:   # model per task tier (light / standard / deep); \"default\" = the session's model\n" + Object.entries(MODEL_DEFAULTS)
+    .map(([tool, m]) => `  ${tool}:\n` + TIERS.map((t) => `    ${t}: ${m[t]}\n`).join("")).join("");
   out += `pipeline:\n  after_approval: ${c.afterApproval || "stop"}   # stop | run-through (implement → verify → checkpoint; ship always asks)\n`;
   return out + `specs_dir: ${y(c.specsDir)}\n`;
 }
 
 const LAYOUTS = ["single", "monorepo", "multi-repo"];
+const TIERS = ["light", "standard", "deep"];
+// Aliases, not dated model IDs, so they keep pointing at the current models. Other tools default to
+// the session's own model; spec-implement then tells you when to switch.
+const MODEL_DEFAULTS = {
+  claude: { light: "haiku", standard: "sonnet", deep: "opus" },
+  cursor: { light: "default", standard: "default", deep: "default" },
+  codex: { light: "default", standard: "default", deep: "default" },
+  antigravity: { light: "default", standard: "default", deep: "default" },
+};
 const splitList = (v) => (v || "").split(",").map((x) => x.trim()).filter(Boolean);
 // Paths are stored relative to the config's folder when inside it, absolute otherwise.
 const real = (p) => { try { return fs.realpathSync(p); } catch { return p; } }; // /var vs /private/var etc.
@@ -466,7 +477,8 @@ function parseYaml(text) {
     }
     const m = line.match(/^([\w-]+):\s*(.*)$/);
     if (!m) continue;
-    const [, key, val] = m;
+    const [, key, rawVal] = m;
+    const val = rawVal.replace(/(^|\s+)#.*$/, "").trim();  // `key:   # comment` opens a block
     if (val === "") {
       const next = text.split("\n").slice(text.split("\n").indexOf(raw) + 1).find((l) => l.trim() && !l.trim().startsWith("#"));
       parent[key] = next && next.trim().startsWith("- ") ? [] : {};
@@ -499,6 +511,11 @@ function doctor() {
   if (!["single", "monorepo", "multi-repo"].includes(c.layout)) problems.push(`layout "${c.layout}" must be single, monorepo, or multi-repo`);
   if (c.tracker && !["jira", "github", "linear", "none"].includes(c.tracker.type)) problems.push(`tracker.type "${c.tracker.type}" must be jira, github, linear, or none`);
   if (c.git?.commit_style && !["conventional", "ticket", "freeform"].includes(c.git.commit_style)) problems.push(`git.commit_style "${c.git.commit_style}" must be conventional, ticket, or freeform`);
+  for (const [tool, m] of Object.entries(c.models || {})) {
+    if (typeof m !== "object") { problems.push(`models.${tool} must list light / standard / deep`); continue; }
+    for (const t of TIERS) if (!m[t]) problems.push(`models.${tool}.${t} is missing (use "default" for the session's model)`);
+    for (const k of Object.keys(m)) if (!TIERS.includes(k)) problems.push(`models.${tool}.${k}: unknown tier (use light, standard, deep)`);
+  }
   if (c.pipeline?.after_approval && !["stop", "run-through"].includes(c.pipeline.after_approval)) problems.push(`pipeline.after_approval "${c.pipeline.after_approval}" must be stop or run-through`);
   if (c.git?.branch_name && !/\{(ticket|slug)\}/.test(c.git.branch_name)) problems.push(`git.branch_name "${c.git.branch_name}" needs {ticket} or {slug}`);
   const repos = c.layout === "single" ? [{ path: "." }] : Array.isArray(c.repos) ? c.repos : [];

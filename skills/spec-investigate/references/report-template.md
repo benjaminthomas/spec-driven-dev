@@ -48,6 +48,11 @@ Copy this structure into `specs/{feature-slug}/investigation.md`.
 ### Proposed Solutions Discussed
 ### Open Questions
 ### Conflicts / Discrepancies
+## Complexity Estimate
+- Overall tier: (light / standard / deep): the tier of the hardest part of the work
+- Signals: (which of spread, new design, data, concurrency, security, public contract, ambiguity, hard to verify apply, each with its evidence)
+- Suggested model for planning this: (the `deep` model if the tier is deep; otherwise the session's model is fine)
+
 ## Recommended Implementation Direction
 ## References
 ```

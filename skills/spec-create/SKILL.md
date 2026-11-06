@@ -68,6 +68,11 @@ Think carefully about granularity. Too coarse and agents can't work in parallel.
 
 Tests ship with the code they cover: fill in each task's **Tests** section (see the task template) instead of creating separate "write tests" tasks. Only add a standalone testing task for cross-cutting suites (e.g. a new E2E harness) or when the user asks for one.
 
+**Rate each task's complexity.** Read `references/complexity-rubric.md` and give every task a tier
+(`light`, `standard`, or `deep`) with the signals that justify it. `spec-implement` uses the tier to
+pick the model for that task, so a risky task under-rated as `light` is the costly mistake. Round up
+when unsure. If one task scores `deep` mainly because it's doing too much, split it first.
+
 ### Step 4: Build the Dependency Graph
 
 For each task, identify:
@@ -129,6 +134,10 @@ Files created:
 - requirements.md
 - action-required.md
 - tasks/ ({T} task files)
+
+Model plan: {n} light · {n} standard · {n} deep
+  (models from .spec-driven.yml → light: {model}, standard: {model}, deep: {model})
+  Deep tasks: {task-nn — main reason}
 
 Batch breakdown:
 - Batch 1: {count} tasks (parallel) — {brief description}

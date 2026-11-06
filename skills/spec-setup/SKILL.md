@@ -69,7 +69,10 @@ Read, don't guess. Collect a draft of every field in `references/config-template
    steps (CI is often the most truthful source). Dev URL from the dev script, `.env.example`, or
    framework defaults.
 
-6. **After approval.** Ask whether an approved spec should stop after each stage (`stop`), or
+6. **Models per tier.** Write the `models:` block from the template. Ask which models the user
+   has for each tool they installed, only if they want to tune it: the Claude defaults (haiku /
+   sonnet / opus) work as-is, and `default` is safe for the rest.
+7. **After approval.** Ask whether an approved spec should stop after each stage (`stop`), or
    run implement → verify → checkpoint in one go (`run-through`), stopping at any failure and never
    pushing. Store it as `pipeline.after_approval`.
 

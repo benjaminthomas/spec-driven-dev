@@ -29,10 +29,12 @@ graph TD
 
 ## Batches
 
-| Batch | Tasks | Description |
-|------|-------|-------------|
-| 1 | task-01, task-02 | {Brief description of what this batch accomplishes} |
-| 2 | task-03 | {Brief description} |
+| Batch | Tasks | Tiers | Description |
+|------|-------|-------|-------------|
+| 1 | task-01, task-02 | light, standard | {Brief description of what this batch accomplishes} |
+| 2 | task-03 | deep | {Brief description} |
+
+**Model plan:** {n} light · {n} standard · {n} deep. Deep tasks: {task-03 — reason}.
 
 ## Task Status
 

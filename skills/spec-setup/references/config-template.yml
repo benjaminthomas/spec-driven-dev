@@ -42,6 +42,28 @@ commands:
   dev: ""                       # how spec-verify starts the app
   dev_url: ""                   # where it answers, e.g. http://localhost:3000
 
+# Which model runs each task tier (spec-create rates every task light / standard / deep).
+# Values are whatever your tool accepts; "default" means "whatever model the session is using".
+# Hosts that can pick a model per agent (Claude Code) switch automatically; others (Cursor, Codex)
+# tell you which model to switch to before a heavier batch.
+models:
+  claude:
+    light: haiku
+    standard: sonnet
+    deep: opus
+  cursor:
+    light: default
+    standard: default
+    deep: default
+  codex:
+    light: default
+    standard: default
+    deep: default
+  antigravity:
+    light: default
+    standard: default
+    deep: default
+
 pipeline:
   # stop        — every stage waits for you (default)
   # run-through — after you approve a spec: implement → verify → checkpoint in one go,

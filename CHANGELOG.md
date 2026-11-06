@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.0 — 2026-11-06
+- **Model routing by task complexity.** `spec-create` rates every task `light`, `standard`, or `deep` using a shared rubric (`references/complexity-rubric.md`): spread, new design, data, concurrency, security, public contract, ambiguity, and hard to verify. `spec-implement` runs each coder on that tier's model from `.spec-driven.yml` → `models:` (Claude Code defaults `haiku`/`sonnet`/`opus`). Reviews run on at least `standard`, and repeat failures escalate one tier. Tools that can't pick a model per agent pause and say which model to switch to.
+- `spec-investigate` adds a complexity estimate and the model worth planning on.
+- Spec README shows the model plan (`n light · n standard · n deep`).
+- Fix: config lines like `key:   # comment` are now read as the start of a section.
+
 ## 1.6.0 — 2026-11-06
 - **Setup uses menus.** Arrow keys and Enter to choose, Space to tick, instead of typing words and comma-separated numbers. Detected values are pre-selected and marked *(detected)*. Branch-naming and commit-style questions show real examples (`STP-123`, `feat: add login`) instead of patterns. Ctrl+C cancels cleanly.
 - **Repo paths are added one at a time and checked as you go.** A wrong path shows an error and lets you fix it, instead of being skipped after the fact. Pasted paths can have quotes, `~`, or Windows form (`"C:\personal\society-app"` now works).

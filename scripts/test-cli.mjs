@@ -127,6 +127,14 @@ repo(quiet, {}, ["x"]);
 assert.throws(() => cli("setup", `--dir=${quiet}`), /No interactive terminal/);
 assert.ok(!fs.existsSync(path.join(quiet, ".spec-driven.yml")), "wrote a config without a terminal or flags");
 
+// 10b. models block: written by setup, parsed and validated by doctor
+cfg = fs.readFileSync(path.join(quiet, "..", "ws", ".spec-driven.yml"), "utf8");
+assert.ok(/models:[\s\S]*claude:\n    light: haiku\n    standard: sonnet\n    deep: opus/.test(cfg), cfg);
+fs.writeFileSync(path.join(quiet, ".spec-driven.yml"), "layout: single\nmodels:\n  claude:\n    light: haiku\n    huge: x\n");
+d = doctor(quiet);
+assert.ok(d.code === 1 && d.out.includes("models.claude.standard is missing") && d.out.includes("models.claude.huge: unknown tier"), d.out);
+fs.rmSync(path.join(quiet, ".spec-driven.yml"));
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 

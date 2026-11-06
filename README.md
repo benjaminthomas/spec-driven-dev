@@ -93,6 +93,23 @@ words in quotes.
 /spec-ship                         "ship it"
 ```
 
+**The right model for each task.** `spec-create` rates every task **light**, **standard**, or
+**deep**, based on how much it touches and how risky it is (data, security, concurrency, public
+contracts, unclear requirements). `spec-implement` then runs each task on the model for its tier:
+
+| Tier | Typical task | Claude Code default |
+|---|---|---|
+| light | copy change, config value, small UI tweak following an existing pattern | `haiku` |
+| standard | a normal feature slice: route + service + tests | `sonnet` |
+| deep | migrations with backfills, auth/permissions, concurrency, cross-repo contracts | `opus` |
+
+- **Reviews:** each batch's review runs on at least `standard`, and on the batch's highest tier.
+- **Escalation:** a task that still fails after a fix round is retried one tier up.
+- **Tools that run one model per session** (Cursor, Codex) don't switch silently. Before a heavier
+  batch, they pause and tell you which model to switch to.
+- **Changing the models:** edit the `models:` section of `.spec-driven.yml`, for example to use a
+  newer model for `deep`.
+
 **Fewer stops:** after reviewing the spec, say **"approved, run it through"**. The workflow then
 implements, verifies, and commits in one go. It stops at the first failure, and it always asks
 before pushing or opening a PR. To make this the default after approval, choose `run-through` during
@@ -139,6 +156,7 @@ straight away, so you can fix it before moving on. Press Enter on an empty line 
 | Lint / typecheck / test / build / dev commands | `package.json` scripts and lockfile (per repo or package) | `pnpm run lint` |
 | Where specs go | (you choose) | `specs/` |
 | After you approve a spec | (you choose) | `stop` (wait at each stage) or `run-through` |
+| Model per task tier | written with defaults: Claude Code `haiku`/`sonnet`/`opus`, others `default` | edit `models:` later |
 
 **Where the file lives, by layout:**
 
@@ -542,15 +560,15 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 114 | 1,022 | 1 |
-| `spec-investigate` | 1 · understand | 325 | 2,741 | 1 |
-| `spec-create` | 2 · plan | 157 | 1,415 | 4 |
-| `spec-implement` | 3 · build | 273 | 2,109 | 3 |
+| `spec-setup` | 0 · configure | 117 | 1,068 | 1 |
+| `spec-investigate` | 1 · understand | 330 | 2,794 | 1 |
+| `spec-create` | 2 · plan | 166 | 1,503 | 5 |
+| `spec-implement` | 3 · build | 298 | 2,375 | 3 |
 | `spec-verify` | 4 · prove | 155 | 1,492 | 1 |
 | `spec-checkpoint` | 5 · commit | 108 | 795 | 0 |
 | `spec-ship` | 6 · PR | 220 | 1,268 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **1,607** | **13,051** | **17** |
+| **Total** | | **1,649** | **13,504** | **18** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback

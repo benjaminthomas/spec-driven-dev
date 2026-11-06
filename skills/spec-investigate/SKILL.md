@@ -288,6 +288,11 @@ gitignores `specs/`, matching whatever this repo already does there). Use the st
 Every section should be specific and evidence-backed, or explicitly say "None found" /
 "Not applicable to this ticket" rather than being left looking like an oversight.
 
+**Complexity Estimate** uses the same signals and tiers `spec-create` will apply per task: spread,
+new design, data, concurrency, security, public contract, ambiguity, hard to verify. Security plus
+data, or security plus concurrency, means `deep`. Say which model is worth planning this on, since a
+deep ticket deserves the strongest model for `spec-create` too.
+
 **Recommended Implementation Direction** describes the technically-supported direction the
 evidence points to — reusing existing patterns the investigation actually found, not a novel
 architecture invented on the spot. It is not permission to start building; flag any business
