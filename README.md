@@ -12,7 +12,8 @@ the PR.
 It's a set of eight [Agent Skills](https://agentskills.io), plain Markdown instruction files that
 AI coding tools load on demand. It works with Claude Code, Codex CLI, Cursor, and Google Antigravity,
 in any language or framework, and in a single repo, a monorepo, or several repos that change
-together. One command installs it: `npx @benjaminthomas/spec-driven-dev`.
+together. Install it from npm with `npm install -g @benjaminthomas/spec-driven-dev`, then run
+`spec-driven-dev` in your project.
 
 ---
 
@@ -53,20 +54,26 @@ start a new session and continue where you left off.
 
 ## Quick start (5 minutes)
 
-**1. Install.** In your project folder (or, for several repos, their shared parent folder), run:
+**1. Install the CLI from npm** (once per machine):
 
 ```bash
-npx @benjaminthomas/spec-driven-dev
+npm install -g @benjaminthomas/spec-driven-dev
 ```
 
-The installer:
+**2. Run it in your project folder** (or, for several repos, in their shared parent folder):
+
+```bash
+spec-driven-dev
+```
+
+It:
 1. **Finds your AI tools** (Claude Code, Cursor, Codex CLI, Antigravity) and installs the skills
    into each one you choose, for this project or for all projects.
 2. **Sets up your project** by detecting its layout, issue tracker, branch conventions, and
    commands, then asking you to confirm. The answers go into `.spec-driven.yml`
    ([details below](#project-setup-your-teams-rules)).
 
-**2. In your project, run each stage in order.** You can type the slash command or just say the
+**3. In your AI tool, run each stage in order.** You can type the slash command or just say the
 words in quotes.
 
 ```
@@ -94,7 +101,7 @@ others `fix/STP-123-short-name`. Some have one repo, others have six. None of th
 skills. Each project describes its own rules in **`.spec-driven.yml`**, and every skill reads that
 file before doing anything.
 
-**How the file gets created:** `npx @benjaminthomas/spec-driven-dev` (or `npx @benjaminthomas/spec-driven-dev setup` to run only this
+**How the file gets created:** `spec-driven-dev` (or `spec-driven-dev setup` to run only this
 step) detects the answers from your repos and asks you to confirm them. In your AI tool you can also
 say **"run spec-setup"**: that does a deeper version that also reads `CLAUDE.md`/`AGENTS.md`, CI
 config, and recent PRs, and fills in what the installer can't (such as each repo's role, or commands
@@ -121,7 +128,7 @@ for stacks other than Node). If a skill finds no config, it runs this setup firs
 | **monorepo** | one repo, many apps/packages | the repo root (commit it) | tasks name their package, and checks run per package |
 | **multi-repo** | several repos that change together | their shared parent folder (personal to your machine) | investigation searches every listed repo, tasks stay inside one repo each, and `spec-ship` opens one PR per repo, each linking the others |
 
-To change the rules later, edit the file or run setup again, then run `npx @benjaminthomas/spec-driven-dev doctor`
+To change the rules later, edit the file or run setup again, then run `spec-driven-dev doctor`
 to confirm the file still matches your repos. Setup never overwrites the file without
 asking. See [`config-template.yml`](skills/spec-setup/references/config-template.yml) for every field.
 
@@ -332,7 +339,8 @@ Yes. Progress is saved in the spec's `README.md` checkboxes and the commit for e
 `spec-implement` again to continue.
 
 **How do I update?**
-Run `npx @benjaminthomas/spec-driven-dev@latest`. Claude Code plugin users run
+Run `npm install -g @benjaminthomas/spec-driven-dev@latest`, then `spec-driven-dev` in your project.
+Claude Code plugin users run
 `/plugin marketplace update spec-driven-dev` and then update the plugin. Your config is never
 touched by an update.
 
@@ -343,7 +351,7 @@ a provenance badge linking it to the exact commit and workflow run that built it
 no dependencies, and it contains only `bin/cli.mjs` and the `skills/` folder.
 
 **Something isn't working. Where do I start?**
-Run `npx @benjaminthomas/spec-driven-dev doctor` in your project. It checks the config against your
+Run `spec-driven-dev doctor` in your project. It checks the config against your
 repos and names anything that doesn't match. If that passes, open an
 [issue](https://github.com/benjaminthomas/spec-driven-dev/issues) with the doctor output and the
 skill you were running.
@@ -360,23 +368,35 @@ everywhere.
 ### Any tool: npm (recommended)
 
 ```bash
-npx @benjaminthomas/spec-driven-dev                                   # detect tools, install, set up the project
-npx @benjaminthomas/spec-driven-dev setup                             # only (re)run project setup
-npx @benjaminthomas/spec-driven-dev --global                          # install for all projects, not just this one
-npx @benjaminthomas/spec-driven-dev --tools=cursor,codex              # pick tools without being asked
-npx @benjaminthomas/spec-driven-dev --skills=spec-create,spec-ship    # install only some skills
-npx @benjaminthomas/spec-driven-dev --yes                             # accept every detected default (CI-friendly)
-npx @benjaminthomas/spec-driven-dev doctor                            # check .spec-driven.yml against the real repos
-npx @benjaminthomas/spec-driven-dev status                            # list specs with unfinished work
+npm install -g @benjaminthomas/spec-driven-dev    # once per machine; adds the `spec-driven-dev` command
 ```
+
+Then, in a project:
+
+```bash
+spec-driven-dev                                   # detect tools, install skills, set up the project
+spec-driven-dev setup                             # only (re)run project setup
+spec-driven-dev --global                          # install skills for all projects, not just this one
+spec-driven-dev --tools=cursor,codex              # pick tools without being asked
+spec-driven-dev --skills=spec-create,spec-ship    # install only some skills
+spec-driven-dev --yes                             # accept every detected default (CI-friendly)
+spec-driven-dev doctor                            # check .spec-driven.yml against the real repos
+spec-driven-dev status                            # list specs with unfinished work
+spec-driven-dev --help                            # show all of the above
+```
+
+**Without installing:** replace `spec-driven-dev` with `npx @benjaminthomas/spec-driven-dev`, for
+example `spec-driven-dev setup`. That downloads and runs the latest version once,
+which is handy in CI or on a machine you won't use again.
 
 `doctor` checks that every branch, folder, and `npm run` script named in the config exists, and
 that each value is one the skills understand. It exits 1 if anything is wrong, so you can run it in
 CI. `status` prints nothing when all specs are finished.
 
-**Updating:** run `npx @benjaminthomas/spec-driven-dev@latest`. The `@latest` matters because
-`npx` can otherwise reuse an older copy it cached. The installer replaces the installed skill
-folders and leaves your `.spec-driven.yml` alone. What changed in each version is in
+**Updating:** run `npm install -g @benjaminthomas/spec-driven-dev@latest` to get the newest CLI,
+then `spec-driven-dev` in each project to refresh its skills. This replaces the installed skill
+folders and leaves your `.spec-driven.yml` alone. If you use `npx`, add `@latest`, because `npx`
+can otherwise reuse an older copy it cached. What changed in each version is in
 [CHANGELOG.md](CHANGELOG.md).
 
 `npx github:benjaminthomas/spec-driven-dev` installs straight from GitHub instead, for example to
@@ -397,8 +417,8 @@ The plugin also adds a **session-start reminder**. When you open Claude Code in 
 unfinished specs, Claude is told which ones and what the next step is (for example,
 `specs/stp-123: 3/5 tasks done → next: spec-implement`). It prints nothing when everything is
 finished. If
-you use the plugin, `npx @benjaminthomas/spec-driven-dev` skips Claude Code so you don't get every skill twice. Run
-`npx @benjaminthomas/spec-driven-dev setup` for the project config.
+you use the plugin, `spec-driven-dev` skips Claude Code so you don't get every skill twice. Run
+`spec-driven-dev setup` for the project config.
 
 ### By hand
 
@@ -464,7 +484,7 @@ skips that step rather than failing.
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback
 - **3** layouts: single repo, monorepo, multi-repo
-- **1** install command, `npx @benjaminthomas/spec-driven-dev`, plus the Claude Code plugin and an MCP fallback
+- **1** npm package, `@benjaminthomas/spec-driven-dev`, plus the Claude Code plugin and an MCP fallback
 - **0** stack assumptions: lint, typecheck, test, build, and dev commands come from your repo
 
 _The table is generated by `python3 scripts/check.py --fix`; CI fails if it goes out of date._
@@ -478,7 +498,7 @@ skills/<name>/SKILL.md        the skill itself (frontmatter: name, description, 
 skills/<name>/references/     templates and prompts the skill loads when needed
 .claude-plugin/               Claude Code plugin + marketplace manifests
 .agents/skills/               symlinks so Codex/Antigravity pick the skills up inside this repo
-bin/cli.mjs                   the npx installer + project setup (no dependencies)
+bin/cli.mjs                   the `spec-driven-dev` CLI: installer, setup, doctor, status (no dependencies)
 package.json                  npm package (ships bin/ and skills/)
 mcp-server/                   MCP fallback server
 hooks/hooks.json              Claude Code session-start hook (runs `cli.mjs status`)

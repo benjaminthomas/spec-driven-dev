@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// spec-driven-dev installer: detects your AI coding tools, copies the skills into each one, and
+// spec-driven-dev installer (npm i -g @benjaminthomas/spec-driven-dev): detects your AI coding tools, copies the skills into each one, and
 // runs project discovery (layout, tracker, branches, commands) to write .spec-driven.yml.
 //
-//   npx @benjaminthomas/spec-driven-dev                 install + project setup (interactive)
-//   npx @benjaminthomas/spec-driven-dev setup           project setup only
-//   npx @benjaminthomas/spec-driven-dev doctor          check .spec-driven.yml against the real repos (exit 1 on problems)
-//   npx @benjaminthomas/spec-driven-dev status          list specs with unfinished tasks (used by the session-start hook)
+//   spec-driven-dev                 install + project setup (interactive)
+//   spec-driven-dev setup           project setup only
+//   spec-driven-dev doctor          check .spec-driven.yml against the real repos (exit 1 on problems)
+//   spec-driven-dev status          list specs with unfinished tasks (used by the session-start hook)
 //   flags: --yes  --global  --tools=claude,cursor  --skills=spec-create,...  --no-setup  --dir=<path>
 import fs from "node:fs";
 import os from "node:os";
@@ -279,7 +279,7 @@ function findConfig(dir) {
 
 function doctor() {
   const file = findConfig(DIR);
-  if (!file) throw new Error(`No .spec-driven.yml in ${DIR} or above. Run: npx @benjaminthomas/spec-driven-dev setup`);
+  if (!file) throw new Error(`No .spec-driven.yml in ${DIR} or above. Run: spec-driven-dev setup  (or npx @benjaminthomas/spec-driven-dev setup)`);
   const root = path.dirname(file);
   let c;
   try { c = parseYaml(fs.readFileSync(file, "utf8")); } catch (e) { throw new Error(`${file} could not be read: ${e.message}`); }
