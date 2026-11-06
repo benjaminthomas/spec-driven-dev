@@ -386,7 +386,7 @@ spec-driven-dev --help                            # show all of the above
 ```
 
 **Without installing:** replace `spec-driven-dev` with `npx @benjaminthomas/spec-driven-dev`, for
-example `spec-driven-dev setup`. That downloads and runs the latest version once,
+example `npx @benjaminthomas/spec-driven-dev setup`. That downloads and runs the latest version once,
 which is handy in CI or on a machine you won't use again.
 
 `doctor` checks that every branch, folder, and `npm run` script named in the config exists, and
