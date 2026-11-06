@@ -10,6 +10,7 @@ description: >
   to the existing spec-create skill and does not replace, duplicate, or invoke spec-create,
   spec-implement, spec-verify, or spec-ship itself. Ticket-agnostic: works for bugs, features,
   refactors, security, performance, infra, or cross-repository tickets in any repo.
+license: MIT
 ---
 
 # spec-investigate

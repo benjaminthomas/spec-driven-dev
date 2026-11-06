@@ -49,6 +49,24 @@ interview, then remembers the answers for every later run. See
 `skills/generative-seo/SKILL.md` for the seven modes
 (`audit`/`content`/`optimize`/`competitors`/`citations`/`report`/`social`).
 
+## By the numbers
+
+| Skill | Stage | SKILL.md lines | Words | Supporting files |
+|---|---|---:|---:|---:|
+| `spec-investigate` | 1 · understand | 323 | 2,278 | 0 |
+| `spec-create` | 2 · plan | 136 | 1,157 | 4 |
+| `spec-implement` | 3 · build | 210 | 1,461 | 3 |
+| `spec-verify` | 4 · prove | 140 | 1,336 | 1 |
+| `spec-checkpoint` | 5 · commit | 94 | 599 | 0 |
+| `spec-ship` | 6 · PR | 201 | 1,051 | 0 |
+| `generative-seo` | standalone | 255 | 2,209 | 7 |
+| **Total** | | **1,359** | **10,091** | **15** |
+
+- **7** skills — **6** pipeline stages + **1** standalone
+- **4** hosts supported natively (Claude Code, Codex CLI, Cursor, Antigravity) + an MCP fallback for any MCP host
+- **3** install paths: Claude Code plugin, `install.sh`, MCP server (121 lines, 1 dependency)
+- **0** stack-specific assumptions — lint/typecheck/build/dev commands are read from the target repo
+
 ## Compatibility
 
 Every skill here is a plain `SKILL.md` + `references/` folder conforming to the open

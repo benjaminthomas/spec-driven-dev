@@ -27,6 +27,8 @@ The key insight: implementation plans that live in a single file are either too 
 
 ### Step 1: Gather Requirements
 
+If a `specs/*/investigation.md` from `spec-investigate` exists for this work, read it first and treat it as the evidence base: carry its VERIFIED facts, affected files, risks, and acceptance criteria into the spec, reuse its folder (`specs/{feature-slug}/`) instead of naming a new one in Step 2, and turn its open questions/UNKNOWNs into items for the user or `action-required.md` rather than guessing.
+
 If the conversation already contains planning context (requirements discussed, technical decisions made, architecture outlined), extract all of it. Review the entire conversation to ensure nothing is lost — the spec is the single source of truth, and anything not captured here disappears.
 
 If no planning conversation exists, interview the user:
