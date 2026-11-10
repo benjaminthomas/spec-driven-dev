@@ -26,7 +26,7 @@ spec-investigate → spec-create → human approval → spec-implement → spec-
 ```
 
 `spec-create`, `spec-implement`, `spec-verify`, and `spec-ship` already exist elsewhere (e.g. the
-`spec-driven-dev` plugin, or whatever equivalent this host provides). **Never create, redesign,
+`ticket-to-pr` plugin, or whatever equivalent this host provides). **Never create, redesign,
 duplicate, or invoke those skills from here.** Your only output is an investigation report plus a
 ready-to-use work branch; a human decides when to run `spec-create` next.
 
