@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.10.0 — 2026-11-10
+- **Project memory, so context survives new sessions, compaction and new features.**
+  - Setup asks whether the project is new or existing (`--project=new|existing`), detected from commit and file counts and saved as `context.project`.
+  - `spec-setup` audits an existing repo with cheap commands plus one round of questions, or records the intended stack for a new one, and writes `specs/CONTEXT.md` (index, ≤60 lines) and `specs/context/<area>.md` (≤150 lines each). With your consent, it adds a one-line pointer to `CLAUDE.md`/`AGENTS.md`.
+  - Every spec folder gets a **Resume here** block in its README and an append-only `log.md`. Skills read Resume here first and update it before stopping.
+  - Context is passed on as digests: investigation → Relevant Context → each task's Project Context. Coders never load the context files.
+  - `spec-checkpoint` distils a finished feature's log into the right area file.
+  - Requirements are numbered R1… and traced through tasks (`Covers`) to verification.
+- New `spec-driven-dev context [--areas=a,b]` prints the memory without a model. `status` shows each spec's Resume-here next step. `doctor` checks the size limits and flags context lines pointing at files that no longer exist.
+- **New `spec-review` skill** between verify and checkpoint. It reviews the whole branch against the spec's requirements, the project's conventions, and the code (correctness, security, tests), writes a ranked `review.md`, and blocks `spec-ship` and run-through on open blockers. Fixes go through `spec-implement`'s fix loop after your yes. It also reviews any branch or PR, and posts comments only with your approval. `status` shows "verified, not reviewed" and "open blockers".
+- `spec-implement`'s orchestrator and `spec-checkpoint` now follow commit rules recorded in CONTEXT.md (found in a live test: batch commits had ignored a "no AI co-author trailers" rule).
+- Every doc and skill now describes the full flow: investigate → create → approve → implement → verify → review → checkpoint → ship.
+- Optional [graphify](https://github.com/Graphify-Labs/graphify) support (`context.graph: auto|off`): used when installed, never installed for you.
+
 ## 1.9.0 — 2026-11-10
 - **The Claude Code plugin is now `ticket-to-pr`** (was `spec-driven-dev`, a name another directory listing already uses). Reinstall with `/plugin install ticket-to-pr@spec-driven-dev`; the marketplace id, npm package and CLI are unchanged.
 - The plugin moved to `plugin/` and contains only its manifest, icon and skills, so it passes Anthropic's plugin directory checks.

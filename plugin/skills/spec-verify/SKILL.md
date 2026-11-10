@@ -5,7 +5,7 @@ description: >
   — and checking off every acceptance criterion from its specs/{feature}/ folder one by one. Use
   this after /spec-implement finishes a spec, when the user says "test this end to end",
   "verify this feature actually works", "did we actually build this right", or "/spec-verify",
-  and before /spec-ship or opening a PR. This is the spec-aware sibling of the generic /verify and
+  and before /spec-review, /spec-ship, or opening a PR. This is the spec-aware sibling of the generic /verify and
   /run skills — /verify checks an arbitrary diff's runtime behavior and /run just launches the
   app, but this skill specifically reads a spec's requirements.md and task files, builds a master
   checklist of acceptance criteria, and reports pass/fail per criterion with real evidence
@@ -37,6 +37,14 @@ you would detect or assume. This skill uses `commands.dev`, `commands.dev_url`, 
 isn't, detect what this skill needs from the repo, ask about anything ambiguous, and offer to save
 the answers to `.spec-driven.yml` (keys: `layout`, `repos`, `tracker`, `git`, `commands`,
 `specs_dir`).
+
+## Project context and memory
+
+- Read the README's **Resume here** block first.
+- Where requirements.md numbers its criteria (R1…), group the checklist by requirement and report
+  pass/fail per requirement number.
+- Append each failure and how you confirmed it to `log.md`. When you finish, overwrite
+  **Resume here** (`Verified X/Y`, `Next: spec-checkpoint`, or what to fix first).
 
 ## When there's no spec folder
 
@@ -144,7 +152,7 @@ Then tell the user directly:
 ```
 Verified {feature}: {X}/{Y} criteria passed.
 
-{If all pass:} Ready to ship.
+{If all pass:} Next: spec-review (reviews the whole change before checkpoint and ship).
 {If failures:} {N} failing — see specs/{feature}/verification-report.md for exact repro steps.
 Options: loop back to /spec-implement to fix, or fix manually.
 ```

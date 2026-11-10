@@ -5,10 +5,11 @@
 //   spec-driven-dev                 install + project setup (interactive)
 //   spec-driven-dev setup           project setup only
 //   spec-driven-dev doctor          check .spec-driven.yml against the real repos (exit 1 on problems)
-//   spec-driven-dev status          list specs with unfinished tasks (used by the session-start hook)
+//   spec-driven-dev status          list specs with unfinished work and each one's "Resume here" next step
+//   spec-driven-dev context         print specs/CONTEXT.md; --areas=billing,api prints only those area files
 //   flags: --yes  --global  --tools=claude,cursor  --skills=spec-create,...  --no-setup  --dir=<path>
 //          --layout=single|monorepo|multi-repo  --repos=~/Projects/frontend,/srv/backend  --workspace=<config dir>
-//          --packages=apps/web,packages/ui  --after-approval=stop|run-through  --version
+//          --packages=apps/web,packages/ui  --after-approval=stop|run-through  --project=new|existing  --version
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -33,7 +34,7 @@ const args = process.argv.slice(2);
 const flag = (n) => args.includes(`--${n}`);
 const opt = (n) => args.find((a) => a.startsWith(`--${n}=`))?.split("=")[1];
 const command = args.find((a) => !a.startsWith("-")) || "install";
-const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status"].includes(command);
+const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status", "context"].includes(command);
 const DIR = path.resolve(opt("dir") || process.cwd());
 
 if (flag("version") || flag("v")) {
@@ -42,7 +43,7 @@ if (flag("version") || flag("v")) {
 }
 // No terminal to answer in (e.g. `!` in Claude Code, an IDE task, a pipe) and nothing passed explicitly:
 // stop rather than write a config from guesses.
-const ANSWER_FLAGS = ["yes", "y", "layout", "repos", "packages", "tools", "workspace", "after-approval", "skills", "global", "no-setup"];
+const ANSWER_FLAGS = ["yes", "y", "layout", "repos", "packages", "tools", "workspace", "after-approval", "skills", "global", "no-setup", "project"];
 if (["install", "setup"].includes(command) && !process.stdin.isTTY && !args.some((a) => ANSWER_FLAGS.some((f) => a === `--${f}` || a.startsWith(`--${f}=`)))) {
   console.log(`✗ No interactive terminal, so setup can't ask its questions. Nothing was changed.
 
@@ -239,7 +240,8 @@ function toYaml(c) {
     .map(([tool, m]) => `  ${tool}:\n` + MODEL_KEYS.map((t) => `    ${t}: ${m[t]}\n`).join("")).join("");
   out += "effort:   # effort / reasoning level per tier (Claude Code, Codex): low | medium | high | xhigh | max | default\n"
     + MODEL_KEYS.map((t) => `  ${t}: ${EFFORT_DEFAULTS[t]}\n`).join("");
-  out += `pipeline:\n  after_approval: ${c.afterApproval || "stop"}   # stop | run-through (implement → verify → checkpoint; ship always asks)\n`;
+  out += `context:   # project memory: {specs_dir}/CONTEXT.md (index) + context/<area>.md\n  project: ${c.project || "existing"}   # existing | new\n  graph: auto   # auto = use graphify if installed | off\n`;
+  out += `pipeline:\n  after_approval: ${c.afterApproval || "stop"}   # stop | run-through (implement → verify → review → checkpoint; ship always asks)\n`;
   return out + `specs_dir: ${y(c.specsDir)}\n`;
 }
 
@@ -381,7 +383,16 @@ async function choosePackages(d) {
   return { root, repos: pkgs };
 }
 
+// shortcut: counts only (no model here), so a big template repo with 1 commit reads as existing; the spec-setup skill confirms.
+function detectProject(dirs) {
+  const n = (d, a) => Number(run("git", a, d).split("\n").filter(Boolean).length);
+  const commits = dirs.reduce((t, d) => t + (Number(run("git", ["rev-list", "--count", "HEAD"], d)) || 0), 0);
+  const files = dirs.reduce((t, d) => t + n(d, ["ls-files"]), 0);
+  return { commits, files, kind: commits >= 20 || files >= 50 ? "existing" : "new" };
+}
+
 async function setup() {
+  if (opt("project") && !["new", "existing"].includes(opt("project"))) throw new Error("--project must be new or existing");
   if (opt("after-approval") && !["stop", "run-through"].includes(opt("after-approval"))) throw new Error("--after-approval must be stop or run-through");
   console.log("\nProject setup — detecting how this project works…");
   const d = detectLayout(DIR);
@@ -439,11 +450,17 @@ async function setup() {
   const specsDir = await askText("Folder for specs (one sub-folder per feature)", "specs");
   const afterApproval = opt("after-approval") || await askSelect("After you approve a spec…", [
     { title: "Stop after each stage", value: "stop", description: "you start implement, verify and checkpoint yourself" },
-    { title: "Run straight through", value: "run-through", description: "implement → verify → commit in one go; stops at any failure, never pushes without asking" },
+    { title: "Run straight through", value: "run-through", description: "implement → verify → review → commit in one go; stops at any failure or review blocker, never pushes without asking" },
   ], "stop");
 
+  const pd = detectProject(repoDirs.filter(isRepo));
+  const project = opt("project") || await askSelect("Is this a new project or an existing one?", [
+    { title: `Existing project${pd.kind === "existing" ? "  (detected)" : ""}`, value: "existing", description: `${pd.commits} commits, ${pd.files} files — your AI tool audits it once and saves what it learns` },
+    { title: `New project${pd.kind === "new" ? "  (detected)" : ""}`, value: "new", description: "nothing to audit — your AI tool asks about the stack and conventions you want" },
+  ], pd.kind);
+
   const config = {
-    layout, tracker: { type: trackerType, key, url }, specsDir, devUrl: "", afterApproval,
+    project, layout, tracker: { type: trackerType, key, url }, specsDir, devUrl: "", afterApproval,
     git: { remote: "origin", base_branch: base, pr_target: pr, branch_name: branchName, commit_style: commitStyle },
     commands: layout === "single" ? commandsFor(repoDirs[0]) : commandsFor(root),
     repos: repos.map((r) => {
@@ -456,7 +473,9 @@ async function setup() {
   if (layout === "multi-repo") register(real(file), repos.map((r) => real(path.resolve(root, r))));
   console.log(`✓ Wrote ${file}`);
   console.log(isRepo(root) ? "  Commit it so your team shares the same rules." : "  This folder isn't a git repo, so the config is personal to this machine.");
-  console.log('  Fill in repo roles, dev_url, and non-Node commands by asking your AI tool to "run spec-setup".');
+  console.log(project === "existing"
+    ? `  Next: ask your AI tool to "run spec-setup". It audits the ${layout === "multi-repo" ? "repos" : "repo"}, asks a few questions, and saves ${specsDir}/CONTEXT.md.`
+    : `  Next: ask your AI tool to "run spec-setup". It asks about your stack and conventions and saves ${specsDir}/CONTEXT.md.`);
 }
 
 // ---------- reading the config ----------
@@ -554,6 +573,10 @@ function doctor() {
   }
   const specs = path.join(root, c.specs_dir || "specs");
   if (!fs.existsSync(specs)) notes.push(`${c.specs_dir || "specs"}/ doesn't exist yet — created on first spec`);
+  if (c.context?.project && !["new", "existing"].includes(c.context.project)) problems.push(`context.project "${c.context.project}" must be new or existing`);
+  if (c.context?.graph && !["auto", "off"].includes(c.context.graph)) problems.push(`context.graph "${c.context.graph}" must be auto or off`);
+  const repoRoots = c.layout === "multi-repo" ? (c.repos || []).map((r) => path.resolve(root, expandHome(r.path))) : [root];
+  checkContext(specs, c.specs_dir || "specs", repoRoots, problems, notes);
   console.log(`Checked ${file}`);
   for (const n of notes) console.log(`  • ${n}`);
   for (const p of problems) console.log(`  ✗ ${p}`);
@@ -561,7 +584,43 @@ function doctor() {
   else console.log("✓ Config matches the repos.");
 }
 
-// Silent unless something is unfinished, so it costs no context in a session start hook.
+const LIMITS = { "CONTEXT.md": 60, area: 150 };
+// Context lines point at code as `path` or `path:line`; flag the ones that no longer exist anywhere in the repos.
+function checkContext(specs, specsName, repoRoots, problems, notes) {
+  const index = path.join(specs, "CONTEXT.md");
+  if (!fs.existsSync(index)) { notes.push(`no ${specsName}/CONTEXT.md yet — ask your AI tool to "run spec-setup" to audit the project`); return; }
+  const areaDir = path.join(specs, "context");
+  const files = [index, ...(fs.existsSync(areaDir) ? fs.readdirSync(areaDir).filter((f) => f.endsWith(".md") && f !== "archive.md").map((f) => path.join(areaDir, f)) : [])];
+  for (const f of files) {
+    const text = fs.readFileSync(f, "utf8");
+    const rel = path.relative(specs, f), max = f === index ? LIMITS["CONTEXT.md"] : LIMITS.area, lines = text.split("\n").length;
+    if (lines > max) problems.push(`${specsName}/${rel} is ${lines} lines (limit ${max}) — merge duplicates or move old entries to context/archive.md`);
+    for (const [, p] of text.matchAll(/`([\w.@-]+(?:\/[\w.@-]+)+\/?)(?::\d+)?`/g)) {
+      if (p.startsWith("context/") || /^(?:https?|www|@)/.test(p)) continue; // @scope/pkg is a package name, not a path
+      if (!repoRoots.some((r) => fs.existsSync(path.join(r, p)))) notes.push(`${specsName}/${rel} mentions \`${p}\`, which no longer exists — stale context?`);
+    }
+  }
+}
+
+function context() {
+  const file = findConfig(DIR);
+  const root = file ? path.dirname(file) : DIR;
+  const specsName = (file && parseYaml(fs.readFileSync(file, "utf8")).specs_dir) || "specs";
+  const index = path.join(root, specsName, "CONTEXT.md");
+  const areas = splitList(opt("areas"));
+  if (!areas.length) {
+    if (!fs.existsSync(index)) { console.log(`No ${specsName}/CONTEXT.md yet. Ask your AI tool to "run spec-setup" to create it.`); return; }
+    process.stdout.write(fs.readFileSync(index, "utf8"));
+    return;
+  }
+  for (const a of areas) {
+    const f = path.join(root, specsName, "context", `${a.replace(/[^\w-]/g, "")}.md`);
+    if (fs.existsSync(f)) process.stdout.write(fs.readFileSync(f, "utf8").replace(/\n*$/, "\n\n"));
+    else console.log(`(no ${specsName}/context/${a}.md — nothing recorded for this area yet)\n`);
+  }
+}
+
+// Silent unless something is unfinished, so it's cheap to run at the start of a session.
 function status() {
   const file = findConfig(DIR);
   const root = file ? path.dirname(file) : DIR;
@@ -575,9 +634,12 @@ function status() {
       continue;
     }
     const t = fs.readFileSync(readme, "utf8");
+    const next = t.match(/^## Resume here[\s\S]*?^- \*\*Next:\*\*\s*(.+)$/m)?.[1]?.trim();
     const done = (t.match(/^\s*- \[x\]/gim) || []).length, todo = (t.match(/^\s*- \[ \]/gm) || []).length;
-    if (todo) lines.push(`- ${specsName}/${name}: ${done}/${done + todo} tasks done → next: spec-implement`);
+    if (todo) lines.push(`- ${specsName}/${name}: ${done}/${done + todo} tasks done → next: ${next || "spec-implement"}`);
     else if (done && !fs.existsSync(path.join(specs, name, "verification-report.md"))) lines.push(`- ${specsName}/${name}: all tasks done, not verified → next: spec-verify`);
+    else if (done && !fs.existsSync(path.join(specs, name, "review.md"))) lines.push(`- ${specsName}/${name}: verified, not reviewed → next: spec-review`);
+    else if (done && /\[blocker\][^\n]*\n(?:(?!###)[^\n]*\n)*?- \*\*Status:\*\* open/.test(fs.readFileSync(path.join(specs, name, "review.md"), "utf8"))) lines.push(`- ${specsName}/${name}: review has open blockers → next: fix them (spec-review)`);
   }
   if (lines.length) console.log(`spec-driven-dev: unfinished work in ${root}\n${lines.join("\n")}`);
 }
@@ -585,11 +647,12 @@ function status() {
 try {
   if (command === "doctor") doctor();
   else if (command === "status") status();
+  else if (command === "context") context();
   else if (command === "install") {
     await install();
     if (!flag("no-setup") && (await askConfirm("Set up this project now?", true))) await setup();
   } else if (command === "setup") await setup();
-  else throw new Error(`Unknown command "${command}" — use install (default), setup, doctor, or status`);
+  else throw new Error(`Unknown command "${command}" — use install (default), setup, doctor, status, or context`);
   if (["install", "setup"].includes(command)) console.log('\nNext: in your AI tool, say "investigate <ticket>" or "create a spec".');
 } catch (e) {
   console.error(`✗ ${e.message}`);

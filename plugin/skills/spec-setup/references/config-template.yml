@@ -77,8 +77,13 @@ effort:
 
 pipeline:
   # stop        — every stage waits for you (default)
-  # run-through — after you approve a spec: implement → verify → checkpoint in one go,
-  #               stopping at any failure. Pushing / opening the PR (spec-ship) always asks first.
+  # run-through — after you approve a spec: implement → verify → review → checkpoint in one go,
+  #               stopping at any failure or review blocker. Pushing / opening the PR (spec-ship) always asks first.
   after_approval: stop
+
+# Project memory: {specs_dir}/CONTEXT.md (index, ≤60 lines) + {specs_dir}/context/<area>.md (≤150 each).
+context:
+  project: existing             # existing (audited) | new (intent recorded) — set by setup
+  graph: auto                   # auto = use graphify if installed or graphify-out/ exists | off
 
 specs_dir: specs                # where specs/<feature>/ folders go (relative to this file)

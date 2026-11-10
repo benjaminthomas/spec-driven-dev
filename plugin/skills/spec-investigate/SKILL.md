@@ -8,9 +8,9 @@ description: >
   plan it", or hands over any of those inputs and wants the
   system understood (current behaviour, root cause, affected repos/files, risks, open
   questions) rather than fixed or built yet. This is the first stage of the
-  investigate → create → (human approval) → implement → verify → ship pipeline — it hands off
+  investigate → create → (human approval) → implement → verify → review → ship pipeline — it hands off
   to the existing spec-create skill and does not replace, duplicate, or invoke spec-create,
-  spec-implement, spec-verify, or spec-ship itself. Ticket-agnostic: works for bugs, features,
+  spec-implement, spec-verify, spec-review, or spec-ship itself. Ticket-agnostic: works for bugs, features,
   refactors, security, performance, infra, or cross-repository tickets in any repo.
 license: MIT
 ---
@@ -22,10 +22,10 @@ Discover and record the facts. Do not design the fix and do not write any code.
 This skill is stage 1 of:
 
 ```
-spec-investigate → spec-create → human approval → spec-implement → spec-verify → spec-ship
+spec-investigate → spec-create → human approval → spec-implement → spec-verify → spec-review → spec-checkpoint → spec-ship
 ```
 
-`spec-create`, `spec-implement`, `spec-verify`, and `spec-ship` already exist elsewhere (e.g. the
+`spec-create`, `spec-implement`, `spec-verify`, `spec-review`, and `spec-ship` already exist elsewhere (e.g. the
 `ticket-to-pr` plugin, or whatever equivalent this host provides). **Never create, redesign,
 duplicate, or invoke those skills from here.** Your only output is an investigation report plus a
 ready-to-use work branch; a human decides when to run `spec-create` next.
@@ -44,6 +44,26 @@ you would detect or assume. This skill uses `layout`/`repos` (where to look and 
 isn't, detect what this skill needs from the repo, ask about anything ambiguous, and offer to save
 the answers to `.spec-driven.yml` (keys: `layout`, `repos`, `tracker`, `git`, `commands`,
 `specs_dir`).
+
+## Project context (read before investigating)
+
+Cheap sources first, code second:
+
+1. Read `{specs_dir}/CONTEXT.md`, the index of 60 lines or fewer, or run
+   `spec-driven-dev context`. Pick the areas this work touches and read only those
+   `context/<area>.md` files (`spec-driven-dev context --areas=billing,api`). Never load
+   `context/archive.md`.
+2. **Optional graph.** If `context.graph` isn't `off` and graphify is available
+   (`graphify-out/graph.json` exists or `graphify` is on the PATH), map the system with
+   `graphify query "<topic>" --budget 1500` and `graphify path "<A>" "<B>"` before grepping. Treat
+   INFERRED or AMBIGUOUS edges as hints. Never install it.
+3. **Context is a lead, not evidence.** Verify it against the code like any other source. Where the
+   code contradicts it, record that under **Relevant Context → Context corrections**. Don't edit
+   CONTEXT.md from here.
+4. Copy the 10–20 lines that apply into the report's **Relevant Context** section. That digest is
+   what later stages use, so they don't reload the context files.
+
+No CONTEXT.md? Investigate as usual, and suggest running `spec-setup` afterwards to create one.
 
 ## Invocation
 
@@ -284,6 +304,10 @@ Write it to `{specs_dir}/{feature-slug}/investigation.md` (`specs_dir` from conf
 needed — this mirrors where `spec-create` already keeps its own output, so the handoff reads
 naturally from the same place; don't commit this folder if the repo's convention already
 gitignores `specs/`, matching whatever this repo already does there). Use the structure in `references/report-template.md`.
+
+Number the **Potential Requirements** R1, R2… so `spec-create` and `spec-verify` can trace
+each one. Start `{specs_dir}/{feature-slug}/log.md` (append-only; template: references/log-template.md inside the installed
+`spec-create` skill folder, next to its SKILL.md, not in this repo) with one entry: the date, `spec-investigate`, and the headline finding.
 
 Every section should be specific and evidence-backed, or explicitly say "None found" /
 "Not applicable to this ticket" rather than being left looking like an oversight.

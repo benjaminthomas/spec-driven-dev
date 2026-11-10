@@ -1,7 +1,7 @@
 {
   "name": "@benjaminthomas/spec-driven-dev",
-  "version": "1.9.0",
-  "description": "Spec-driven AI development workflow (investigate → spec → implement → verify → ship) as Agent Skills for Claude Code, Cursor, Codex CLI and Antigravity.",
+  "version": "1.10.0",
+  "description": "Spec-driven AI development workflow (investigate → spec → implement → verify → review → ship) as Agent Skills for Claude Code, Cursor, Codex CLI and Antigravity.",
   "type": "module",
   "bin": {
     "spec-driven-dev": "bin/spec-driven-dev.cjs"

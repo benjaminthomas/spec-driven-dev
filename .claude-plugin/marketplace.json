@@ -1,14 +1,14 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "spec-driven-dev",
-  "description": "Investigate tickets, turn planning conversations into parallel-executable specs, implement them batch-by-batch with review gates, verify against the real running app, and ship a PR \u2014 plus a portable SEO/GEO operations skill.",
+  "description": "Investigate tickets, turn planning conversations into parallel-executable specs, implement them batch-by-batch with review gates, verify against the real running app, review the whole change (spec-review), and ship a PR \u2014 plus a portable SEO/GEO operations skill.",
   "owner": {
     "name": "Benjamin Thomas"
   },
   "plugins": [
     {
       "name": "ticket-to-pr",
-      "description": "Spec-driven feature pipeline (spec-setup / spec-investigate / spec-create / spec-implement / spec-verify / spec-checkpoint / spec-ship) + generative-seo, a portable SEO/GEO skill for any project.",
+      "description": "Spec-driven feature pipeline (spec-setup / spec-investigate / spec-create / spec-implement / spec-verify / spec-review / spec-checkpoint / spec-ship) + generative-seo, a portable SEO/GEO skill for any project.",
       "source": "./plugin",
       "category": "productivity"
     }

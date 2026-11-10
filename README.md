@@ -9,7 +9,7 @@ without guessing.** It first investigates the problem, then writes a plan you ap
 in parallel with tests and review, then checks the real running app, and finally commits and opens
 the PR.
 
-It's a set of eight [Agent Skills](https://agentskills.io), plain Markdown instruction files that
+It's a set of nine [Agent Skills](https://agentskills.io), plain Markdown instruction files that
 AI coding tools load on demand. It works with Claude Code, Codex CLI, Cursor, and Google Antigravity,
 in any language or framework, and in a single repo, a monorepo, or several repos that change
 together, even when those repos live in different folders. To set it up, run
@@ -45,6 +45,8 @@ Asking an AI agent to "just build it" tends to fail in predictable ways:
 | A big plan won't fit in the agent's context, or is too vague to act on | **`spec-create`** splits the work into small, self-contained task files, so each agent reads only its own |
 | One agent working alone is slow | **`spec-implement`** runs several coder agents in parallel, each in its own copy of the repo |
 | "It compiles" gets treated as "it works" | **`spec-verify`** drives the real running app and checks every acceptance criterion, with evidence |
+| Problems slip through because nobody reviews the whole change | **`spec-review`** checks the finished branch against the spec, your conventions, and the code, and blocks shipping on real problems |
+| A new session forgets what was decided last time | **Project memory**: a small `specs/CONTEXT.md`, plus a "Resume here" block and a log in every spec, kept short so reloading them is cheap |
 | Broken code gets committed, or a PR is pushed by accident | **`spec-checkpoint`** commits only once lint, types, tests, and build all pass. **`spec-ship`** asks before it pushes |
 
 Each stage writes its result to a file, so you can stop at any point, hand over to a teammate, or
@@ -89,6 +91,7 @@ words in quotes.
 
 /spec-implement                    "implement the spec"
 /spec-verify                       "does it actually work?"
+/spec-review                       "review this"
 /spec-checkpoint                   "checkpoint"
 /spec-ship                         "ship it"
 ```
@@ -123,9 +126,9 @@ contracts, unclear requirements). `spec-implement` then runs each task on the mo
   newer model for `deep`.
 
 **Fewer stops:** after reviewing the spec, say **"approved, run it through"**. The workflow then
-implements, verifies, and commits in one go. It stops at the first failure, and it always asks
-before pushing or opening a PR. To make this the default after approval, choose `run-through` during
-setup (`pipeline.after_approval` in `.spec-driven.yml`).
+implements, verifies, reviews, and commits in one go. It stops at the first failure or review
+blocker, and always asks before pushing or opening a PR. To make this the default after approval,
+choose `run-through` during setup (`pipeline.after_approval` in `.spec-driven.yml`).
 
 That's the whole workflow. Every stage can be used on its own as well: use `/spec-create` straight
 from a planning chat, or `/spec-checkpoint` on any work in progress.
@@ -205,28 +208,63 @@ example, from inside `/Projects/frontend`:
 Every question also has a flag, for scripts and CI:
 `--layout=multi-repo --repos=~/Projects/frontend,~/Work/backend --workspace=~/Projects`,
 `--layout=monorepo --packages=apps/web,packages/ui`, `--after-approval=run-through`,
-`--tools=cursor,codex`, `--global`, `--yes` (accept everything detected), and `--version`.
+`--project=new|existing`, `--tools=cursor,codex`, `--global`, `--yes` (accept everything detected), and `--version`.
 
 To change the rules later, edit the file or run setup again, then run `spec-driven-dev doctor`
 to confirm the file still matches your repos. Setup never overwrites the file without
 asking. See [`config-template.yml`](plugin/skills/spec-setup/references/config-template.yml) for every field.
 
+### Project memory: so context isn't lost between sessions and features
+
+Setup asks whether this is a **new or existing project** and detects the likely answer from the
+commit and file counts. Then "run spec-setup" in your AI tool builds the project's memory:
+
+- **Existing project:** a shallow audit using cheap commands (folder sizes, manifests, CI, busy areas
+  from git log, your README/CLAUDE.md/ADRs), then one round of questions the code can't answer
+  (what the product does, off-limits areas, fragile spots, where it's heading, unwritten rules).
+- **New project:** it asks about the stack and conventions you want and saves them as the first
+  decisions.
+
+Everything is kept small on purpose, because loading context costs tokens:
+
+| File | Size limit | Loaded when |
+|---|---|---|
+| `specs/CONTEXT.md`, the index: product, area map, top conventions, decisions | 60 lines | once per stage, only during spec work |
+| `specs/context/<area>.md`, details for one area | 150 lines | only when a task touches that area |
+| `specs/context/archive.md`, superseded entries | none | never by default |
+| `specs/<feature>/README.md`, its **Resume here** block | ~10 lines | first thing in a new or compacted session |
+| `specs/<feature>/log.md`, decisions, deviations, review findings | append-only | rarely; read in full only once, at checkpoint |
+
+Each stage passes on a digest instead of the files: the investigation keeps 10–20 relevant lines,
+and each task file gets only the 3–5 conventions it needs, so parallel coders never load the
+context. When a feature is finished, `spec-checkpoint` adds its lasting lessons to the right area
+file. Requirements are numbered (R1, R2…) and traced from investigation to tasks to verification.
+
+`spec-driven-dev context` prints the index, and `spec-driven-dev context --areas=billing,api`
+prints just those areas, with no model involved. `doctor` checks the size limits and flags context
+lines that point to files that no longer exist. If you install
+[graphify](https://github.com/Graphify-Labs/graphify), the skills use it for cheaper code
+navigation. It's optional (`context.graph: off` turns it off), and nothing is installed for you.
+
 ## How the workflow fits together
 
 ```
- ┌──────────────────┐   ┌─────────────┐   ┌──────────┐   ┌────────────────┐   ┌─────────────┐   ┌─────────────────┐   ┌───────────┐
- │ spec-investigate │ → │ spec-create │ → │ YOU      │ → │ spec-implement │ → │ spec-verify │ → │ spec-checkpoint │ → │ spec-ship │
- │ understand       │   │ plan        │   │ approve  │   │ build + test   │   │ prove       │   │ commit          │   │ open PR   │
- └──────────────────┘   └─────────────┘   └──────────┘   └────────────────┘   └─────────────┘   └─────────────────┘   └───────────┘
-   investigation.md       specs/<feature>/                   code + tests,       verification-      local commit         pushed branch
-   + work branch          task files                         one commit/batch    report.md                               + GitHub PR
+ ┌──────────────────┐   ┌─────────────┐   ┌──────────┐   ┌────────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────────┐   ┌───────────┐
+ │ spec-investigate │ → │ spec-create │ → │ YOU      │ → │ spec-implement │ → │ spec-verify │ → │ spec-review │ → │ spec-checkpoint │ → │ spec-ship │
+ │ understand       │   │ plan        │   │ approve  │   │ build + test   │   │ prove       │   │ review      │   │ commit          │   │ open PR   │
+ └──────────────────┘   └─────────────┘   └──────────┘   └────────────────┘   └─────────────┘   └─────────────┘   └─────────────────┘   └───────────┘
+   investigation.md       specs/<feature>/                   code + tests,       verification-     review.md         local commit         pushed branch
+   + work branch          task files                         one commit/batch    report.md         (blockers stop)                        + GitHub PR
 ```
 
 - **The approval step is yours.** Nothing builds until you've read the spec and run `spec-implement`
   yourself. `spec-investigate` never moves on to the next stage by itself.
 - **Each stage reads the previous stage's files.** `spec-create` uses `investigation.md` as its
-  evidence, `spec-implement` works through the task files, and `spec-verify` checks against their
-  acceptance criteria.
+  evidence, `spec-implement` works through the task files, `spec-verify` checks against their
+  acceptance criteria, and `spec-review` checks the whole diff against the requirements before
+  anything is committed for shipping.
+- **Every stage leaves a way back in.** Each one updates the spec's **Resume here** block and adds
+  to its `log.md`, so a new or compacted session continues from about 10 lines, not the chat history.
 - **Stages can be skipped.** For new projects with nothing to investigate, start at `spec-create`.
   For a quick fix, use only `spec-checkpoint` and `spec-ship`.
 
@@ -236,10 +274,13 @@ asking. See [`config-template.yml`](plugin/skills/spec-setup/references/config-t
 
 ### 0. `spec-setup`: learn the project's rules
 
-**Say:** "run spec-setup", "configure the pipeline", "change our branch rules"
+**Say:** "run spec-setup", "configure the pipeline", "audit this repo", "refresh the project context"
 
-**What it does:** see [Project setup](#project-setup-your-teams-rules). It writes `.spec-driven.yml` and
-nothing else: no branches, commits, or code.
+**What it does:** see [Project setup](#project-setup-your-teams-rules). It writes `.spec-driven.yml`, then
+builds the [project memory](#project-memory-so-context-isnt-lost-between-sessions-and-features): a
+shallow audit and one round of questions for an existing repo, or your intended stack and conventions
+for a new one, saved to `specs/CONTEXT.md`. It adds a one-line pointer to `CLAUDE.md`/`AGENTS.md`
+only if you say yes. No branches, commits, or code.
 
 ### 1. `spec-investigate`: understand before planning
 
@@ -269,8 +310,13 @@ You can add `--context ./notes.md` to supply extra background, such as meeting n
 4. Sorts the work into **required / supporting / optional / out of scope**, and lists risks, security
    and performance concerns, and existing tests.
 
+It starts from the project memory (`specs/CONTEXT.md` and only the area files the ticket touches),
+treats it as a lead rather than evidence, and notes where the code contradicts it. If graphify is
+installed, it uses it to map the code more cheaply.
+
 **You get:** `specs/<feature>/investigation.md`, with every finding labelled **VERIFIED**,
-**INFERRED**, **ASSUMPTION**, or **UNKNOWN**.
+**INFERRED**, **ASSUMPTION**, or **UNKNOWN**, a short **Relevant Context** digest for the next
+stages, and requirements numbered R1, R2… so they can be traced through to verification and review.
 
 **It won't:** write code, write tests, or start `spec-create` without being asked.
 
@@ -285,7 +331,9 @@ each other and don't touch the same files, so they can be built at the same time
 
 **You get:** a `specs/<feature>/` folder (see [What ends up in your repo](#what-ends-up-in-your-repo)).
 Each task file is complete on its own: description, files to change, implementation steps, **tests
-to write**, and acceptance criteria.
+to write**, acceptance criteria, the requirements it **covers**, and the few **project conventions**
+that apply to it. Every requirement must map to a task, and the spec isn't finished until it does.
+It also starts the spec's `log.md` and **Resume here** block.
 
 **Then:** read it, edit anything you disagree with, and only then run `spec-implement`.
 
@@ -302,10 +350,14 @@ to write**, and acceptance criteria.
 4. A **separate reviewer agent** runs lint, typecheck, and tests and checks every acceptance
    criterion. If anything fails, fix agents are sent in, for up to 3 rounds before it stops and
    asks you.
-5. Commits the batch and ticks it off in the spec's README.
+5. Logs decisions and deviations to `log.md`, updates **Resume here**, then commits the batch and
+   ticks it off in the spec's README.
 
-**It can resume:** if you stop halfway, run it again and it carries on from the first unfinished
-batch. If your tool can't run agents in parallel, it does the tasks one at a time instead.
+Each coder gets only its task file, which already carries the 3–5 project conventions that task
+needs, so parallel coders don't each load the project memory.
+
+**It can resume:** if you stop halfway, or the conversation gets compacted, run it again. It reads
+the spec's **Resume here** block and carries on from the first unfinished batch. If your tool can't run agents in parallel, it does the tasks one at a time instead.
 
 ### 4. `spec-verify`: prove it works
 
@@ -316,10 +368,24 @@ each one the way a user would: clicking through the UI, calling real API routes,
 database only to confirm the result.
 
 **You get:** `specs/<feature>/verification-report.md`, with pass or fail for each criterion and the
-evidence (screenshots, responses, data). If there's no spec, it asks you what "working" means and
+evidence (screenshots, responses, data), grouped by requirement number (R1…) where the spec has them. If there's no spec, it asks you what "working" means and
 checks that instead.
 
-### 5. `spec-checkpoint`: commit safely
+### 5. `spec-review`: review the whole change
+
+**Say:** "review this", "code review", "review PR #42", "is this ready to merge?"
+
+**What it does:** It reviews the finished branch against the spec (every requirement R1… delivered,
+nothing out of scope), the project's recorded conventions, and the code itself: correctness,
+security, error handling, tests, and hot-path performance. It checks each finding against the code
+before reporting it, and reads the diff rather than the whole repo.
+
+**You get:** `specs/<feature>/review.md`, with findings ranked blocker, should-fix, nit, or question,
+each with `file:line` and a suggested fix. Blockers stop `spec-ship` and run-through. It then asks
+whether to fix them, and fixes go through `spec-implement`'s fix loop only after you say yes. It also
+reviews any branch or a teammate's PR, and posts PR comments only after you approve the text.
+
+### 6. `spec-checkpoint`: commit safely
 
 **Say:** "checkpoint", "commit everything", "save my progress"
 
@@ -328,9 +394,13 @@ finds them in `package.json`, `Makefile`, `pyproject.toml`, CI config, and so on
 Then it stages everything and commits in your configured style (`feat: …` or `STP-123: …`). In a
 multi-repo setup, it makes one commit in each repo that changed.
 
+When a spec is finished, it also adds the feature's lasting lessons (decisions and why, conventions
+found, pitfalls) to the right `specs/context/<area>.md`, and shows you those changes so you can
+correct them. It follows any commit rules recorded in the project memory.
+
 **It won't:** push. Committing is a local step.
 
-### 6. `spec-ship`: open the PR
+### 7. `spec-ship`: open the PR
 
 **Say:** "ship it", "push this", "open a PR"
 
@@ -339,6 +409,9 @@ multi-repo setup, it makes one commit in each repo that changed.
 against your configured PR target, with a written description. In a multi-repo setup, it opens one
 PR per repo, each linking the others. If a PR already exists for the branch, it pushes the new commits to that PR
 instead of opening another one.
+
+It won't open a PR while `review.md` has an open blocker, unless you accept it. Any should-fix
+items are listed in the PR description.
 
 **Needs:** the [GitHub CLI](https://cli.github.com) (`gh`), logged in.
 
@@ -360,12 +433,16 @@ specs/
     ├── investigation.md          ← spec-investigate: what's true today, with evidence
     ├── requirements.md           ← spec-create: what we're building and why
     ├── action-required.md        ← spec-create: things only a human can do (API keys, DNS, accounts)
-    ├── README.md                 ← spec-create: batches, dependency graph, progress checkboxes
+    ├── README.md                 ← spec-create: "Resume here", batches, dependency graph, progress checkboxes
+    ├── log.md                    ← every stage: decisions, deviations, review findings (append-only)
     ├── tasks/
     │   ├── task-01-fix-pagination.md
     │   ├── task-02-add-export-test-fixtures.md
     │   └── …
-    └── verification-report.md    ← spec-verify: pass/fail per acceptance criterion
+    ├── verification-report.md    ← spec-verify: pass/fail per acceptance criterion
+    └── review.md                 ← spec-review: ranked findings; open blockers stop spec-ship
+specs/CONTEXT.md                  ← spec-setup / spec-checkpoint: project memory index (≤60 lines)
+specs/context/<area>.md           ← details per area, loaded only when needed (≤150 lines)
 ```
 
 These are plain Markdown files, so you can review them in a PR, edit them, or hand them to a
@@ -384,7 +461,13 @@ Built into the skills, not left to the agent's judgment:
 - **No guessing.** Gaps are marked UNKNOWN, and missing tickets are asked for rather than made up.
 - **Tests can't be cheated.** Coders may not delete, skip, or weaken a test to make it pass, and the
   reviewer checks for this.
-- **Pushing needs an explicit "yes".**
+- **Pushing needs an explicit "yes".** `spec-ship` also refuses while `review.md` has an open
+  blocker, unless you accept it, and that is recorded.
+- **Reviews are checked, not guessed.** `spec-review` confirms each finding against the code before
+  reporting it, never edits code without your yes, and never posts PR comments without your yes on
+  the exact text.
+- **Context costs stay small.** Project memory has hard size limits, is loaded only for the areas a
+  task touches, and is passed between stages as short digests.
 - **Investigation stays in scope.** Ideas that come up along the way go under "optional" or "out of
   scope" instead of being folded into the work.
 
@@ -408,8 +491,8 @@ config sits outside any repo, so it stays on your machine.
 Yes. No skill assumes a language or framework. Each one finds the repo's own commands.
 
 **Do I have to start every stage myself?**
-No. After you approve a spec, say "approved, run it through": implement, verify, and checkpoint then
-run one after another, stopping at the first failure. Two steps always wait for you: approving the
+No. After you approve a spec, say "approved, run it through": implement, verify, review, and checkpoint then
+run one after another, stopping at the first failure or review blocker. Two steps always wait for you: approving the
 spec, and pushing or opening the PR. You don't need slash commands either. Saying "investigate
 STP-123" or "ship it" picks the right skill.
 
@@ -480,7 +563,8 @@ spec-driven-dev --tools=cursor,codex              # pick tools without being ask
 spec-driven-dev --skills=spec-create,spec-ship    # install only some skills
 spec-driven-dev --yes                             # accept every detected default (CI-friendly)
 spec-driven-dev doctor                            # check .spec-driven.yml against the real repos
-spec-driven-dev status                            # list specs with unfinished work
+spec-driven-dev status                            # list unfinished specs and each one's next step
+spec-driven-dev context --areas=billing           # print the project memory (index, or chosen areas)
 spec-driven-dev --help                            # show all of the above
 ```
 
@@ -538,7 +622,7 @@ Codex CLI and Antigravity share the project path, so installing for one covers b
 
 ### Fallback: MCP server (for tools without Agent Skills support)
 
-If your tool supports MCP but not Agent Skills, `mcp-server/` serves the same eight skills as MCP
+If your tool supports MCP but not Agent Skills, `mcp-server/` serves the same nine skills as MCP
 tools. It reads `plugin/skills/` directly, so there's nothing to keep in sync.
 
 ```bash
@@ -560,6 +644,7 @@ Each skill becomes a tool that returns its instructions, and supporting files ar
 | `spec-create` | ✅ | ✅ | ✅ | ✅ | Planning and writing files only |
 | `spec-implement` | ✅ | ✅ | ✅ | ✅ | Parallel agents and worktrees where the tool supports them; otherwise one task at a time |
 | `spec-verify` | ✅ | ⚠️ | ⚠️ | ⚠️ | UI checks need browser automation; API and database checks work everywhere |
+| `spec-review` | ✅ | ✅ | ✅ | ✅ | git diff, or `gh` for pull requests |
 | `spec-checkpoint` | ✅ | ✅ | ✅ | ✅ | Plain git plus your repo's own check commands |
 | `spec-ship` | ✅ | ✅ | ✅ | ✅ | git plus the GitHub CLI (`gh`) |
 | `generative-seo` | ✅ | ✅ | ✅ | ✅ | Web search and writing files |
@@ -573,15 +658,16 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 117 | 1,068 | 1 |
-| `spec-investigate` | 1 · understand | 330 | 2,794 | 1 |
-| `spec-create` | 2 · plan | 166 | 1,503 | 5 |
-| `spec-implement` | 3 · build | 303 | 2,458 | 3 |
-| `spec-verify` | 4 · prove | 155 | 1,492 | 1 |
-| `spec-checkpoint` | 5 · commit | 108 | 795 | 0 |
-| `spec-ship` | 6 · PR | 220 | 1,268 | 0 |
+| `spec-setup` | 0 · configure | 142 | 1,334 | 3 |
+| `spec-investigate` | 1 · understand | 354 | 3,007 | 1 |
+| `spec-create` | 2 · plan | 183 | 1,646 | 6 |
+| `spec-implement` | 3 · build | 322 | 2,683 | 3 |
+| `spec-verify` | 4 · prove | 163 | 1,557 | 1 |
+| `spec-review` | 5 · review | 131 | 1,209 | 1 |
+| `spec-checkpoint` | 6 · commit | 131 | 1,020 | 0 |
+| `spec-ship` | 7 · PR | 230 | 1,388 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **1,654** | **13,587** | **18** |
+| **Total** | | **1,911** | **16,053** | **22** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback
@@ -602,7 +688,7 @@ plugin/skills/<name>/references/ templates and prompts the skill loads when need
 plugin/                       the Claude Code plugin (manifest + skills only, no scripts or hooks)
 .agents/skills/               symlinks so Codex/Antigravity pick the skills up inside this repo
 bin/spec-driven-dev.cjs       launcher (runs on any Node, explains if it's too old)
-bin/cli.mjs                   the `spec-driven-dev` CLI: installer, setup menus, doctor, status
+bin/cli.mjs                   the `spec-driven-dev` CLI: installer, setup menus, doctor, status, context
 package.json                  npm package (ships bin/ and plugin/skills/)
 mcp-server/                   MCP fallback server
 CHANGELOG.md                  what changed in each version
@@ -613,7 +699,7 @@ scripts/test-cli.mjs          installer self-test (fake HOME, throwaway repos)
 plugin/evals/                 `claude plugin eval` cases
 ```
 
-- **Adding a skill:** create `skills/<name>/SKILL.md`, then add the name to the two manifests, a `.agents/skills/<name>` symlink, the `STAGES` map in
+- **Adding a skill:** create `plugin/skills/<name>/SKILL.md`, then add the name to the two manifests, a `.agents/skills/<name>` symlink, the `STAGES` map in
   `scripts/check.py`, and this README. `python3 scripts/check.py` lists anything you missed.
 - **Before pushing:** run `python3 scripts/check.py --fix`, then `npm test` (which runs the checks
   and the installer self-test). CI (`.github/workflows/check.yml`) runs
@@ -631,7 +717,7 @@ plugin/evals/                 `claude plugin eval` cases
   1. Increase `version` in both `package.json` and `plugin/.claude-plugin/plugin.json` (the check fails if
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
-  3. Tag the release and push the tag: `git tag v1.4.1 && git push origin v1.4.1`.
+  3. Tag the release and push the tag: `git tag v1.10.0 && git push origin v1.10.0`.
   4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
      npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 

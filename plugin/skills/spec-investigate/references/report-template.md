@@ -16,6 +16,12 @@ Copy this structure into `specs/{feature-slug}/investigation.md`.
 - Base Branch:
 - Base Commit:
 
+## Relevant Context
+<!-- 10–20 lines max: only what applies to this work, copied from specs/CONTEXT.md and context/<area>.md. spec-create passes these on to task files. -->
+- Areas: (e.g. billing, api)
+- Conventions / decisions / pitfalls that apply: (one line each, with the source)
+- Context corrections: (where the code contradicts CONTEXT.md, with evidence; or "none")
+
 ## Business Context
 ## Problem Statement
 ## Expected Behaviour
@@ -45,6 +51,7 @@ Copy this structure into `specs/{feature-slug}/investigation.md`.
 ### Business Decisions
 ### Technical Decisions
 ### Potential Requirements
+(Number them R1, R2… so spec-create and spec-verify can trace each one.)
 ### Proposed Solutions Discussed
 ### Open Questions
 ### Conflicts / Discrepancies

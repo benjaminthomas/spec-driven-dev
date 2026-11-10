@@ -7,6 +7,15 @@ Use this structure for the README.md at the root of each spec folder. The README
 ```markdown
 # {Feature Name}
 
+## Resume here
+
+<!-- Overwritten by each spec-* skill when it finishes. A new session reads this first. Keep it ~10 lines. -->
+- **Stage:** spec created, awaiting approval
+- **Next:** review the spec, then say "implement" (or "approved, run it through")
+- **Open questions:** {none, or one line each}
+- **Last commit:** {short sha, or "none yet"}
+- **Areas:** {context areas this feature touches, e.g. billing, api}
+
 ## Overview
 
 {One paragraph summary of what the feature does and why it exists.}
@@ -15,6 +24,7 @@ Use this structure for the README.md at the root of each spec folder. The README
 
 - [Requirements](./requirements.md) — full requirements and acceptance criteria
 - [Action Required](./action-required.md) — manual steps needing human action
+- [Log](./log.md) — decisions, deviations and review findings (append-only)
 
 ## Dependency Graph
 
@@ -47,6 +57,8 @@ graph TD
 ```
 
 ## Key Points
+
+- **Resume here** is the cheap way back in. Every `spec-*` skill overwrites it when it finishes (stage, next action, open questions, last commit), so a new or compacted session reads ~10 lines instead of the whole history. `spec-driven-dev status` prints each spec's **Next** line.
 
 - The **Dependency Graph** uses Mermaid syntax (widely rendered in GitHub, VS Code, etc.). Each node shows the task number and title for quick reference.
 - The **Batches** table provides a scannable overview of what runs in parallel.

@@ -49,6 +49,26 @@ issues before proceeding — do not skip or ignore failures.
 
 Iterate until every check passes cleanly. Only then move to the next step.
 
+### Step 2b: Update project context (spec work only)
+
+Skip this step unless the changes belong to a spec (`{specs_dir}/{feature}/` exists for this work).
+
+1. Overwrite the README's **Resume here** (`Stage: committed`, `Next: spec-ship`). Write
+   `Last commit: this checkpoint (git log -1)`, because the commit's hash doesn't exist yet and
+   amending afterwards would change it again.
+2. **When the feature is done** (every task checked) and `{specs_dir}/CONTEXT.md` exists, distil
+   the lasting lessons. Use the light model tier for this where the host lets you pick a subagent
+   model.
+   - Read the feature's `log.md`. This is the one time it's read in full.
+   - Keep only what a future feature in the same area needs: decisions and why, conventions found,
+     pitfalls. Drop routine progress.
+   - Add them to the end of the right `context/<area>.md` (create it if the area has none), and add
+     one line to CONTEXT.md's **Specs** list. Follow the rules in
+     references/context-template.md inside the installed `spec-setup` skill folder (not this repo): dated, with a source, added at the end, within the size
+     limits, superseded lines moved to `context/archive.md`.
+   - Show the context changes in the report so the user can correct them.
+3. No CONTEXT.md? Skip the distilling and suggest running `spec-setup` to create one.
+
 ### Step 3: Stage Everything
 
 Stage all changes — tracked modifications, deletions, and new untracked files:
@@ -64,6 +84,9 @@ excluded and why, rather than committing it silently. Don't rely on the filename
 anything you don't recognize; skim its diff if you're unsure.
 
 ### Step 4: Craft the Commit Message
+
+Check `{specs_dir}/CONTEXT.md`'s **Conventions** first, if it exists. A recorded rule about commits
+(authorship, trailers, format) beats the defaults below.
 
 Write a commit message in the config's `git.commit_style` (`conventional` → `feat: …`, `ticket` → `STP-123: …` using the ticket ID from the branch name, `freeform`). Without config, follow the project's existing conventions (observed from `git log`). Structure:
 

@@ -4,17 +4,22 @@ description: >
   One-time discovery that teaches the spec-driven-dev pipeline how THIS project works, and saves
   the answers to .spec-driven.yml — project layout (single repo, monorepo, or multiple repos),
   issue tracker, base branch, PR target, branch naming, commit style, and the lint/typecheck/test/
-  build/dev commands. Use when the user says "set up spec-driven", "configure the pipeline",
-  "spec-setup", "change our branch rules", or when any other spec-* skill finds no
-  .spec-driven.yml. Detects everything it can from the repos first and only asks about what is
-  ambiguous. Writes config only — never changes code, branches, or commits.
+  build/dev commands. It also builds the project's memory: for an existing repo a shallow audit
+  plus one round of questions, for a new one the intended stack and conventions, saved to a small
+  specs/CONTEXT.md that later skills load cheaply. Use when the user says "set up spec-driven",
+  "configure the pipeline", "spec-setup", "audit this repo", "refresh the project context",
+  "change our branch rules", or when any other spec-* skill finds no .spec-driven.yml or no
+  CONTEXT.md. Detects everything it can first and only asks about what is ambiguous. Writes config
+  and context files only — never changes code, branches, or commits.
 license: MIT
 ---
 
 # spec-setup
 
-Learn this project's rules once, save them, and let every other `spec-*` skill reuse them. Team
-rules live in a config file the team can review and change — never in the skills themselves.
+Learn this project's rules and context once, save them, and let every other `spec-*` skill reuse
+them. Team rules live in a config file the team can review and change — never in the skills
+themselves. What the project *knows* (areas, conventions, decisions) lives in
+`{specs_dir}/CONTEXT.md`, kept small so loading it is cheap.
 
 ## Where the config lives
 
@@ -73,8 +78,10 @@ Read, don't guess. Collect a draft of every field in `references/config-template
    has for each tool they installed, only if they want to tune it: the Claude defaults (haiku /
    sonnet / opus) work as-is, and `default` is safe for the rest.
 7. **After approval.** Ask whether an approved spec should stop after each stage (`stop`), or
-   run implement → verify → checkpoint in one go (`run-through`), stopping at any failure and never
+   run implement → verify → review → checkpoint in one go (`run-through`), stopping at any failure and never
    pushing. Store it as `pipeline.after_approval`.
+8. **New or existing project.** Detect it (commit and file counts) and confirm in one line. Store
+   it as `context.project`. This decides what Step 4 does.
 
 ## Step 2 — Confirm in one round
 
@@ -103,6 +110,21 @@ for the rest.
 4. Report: the file path, a one-line summary per section, and "re-run spec-setup any time these
    change".
 
+## Step 4 — Project context
+
+Skip if `{specs_dir}/CONTEXT.md` already exists (offer a refresh instead, see `references/audit.md`).
+
+1. Read `references/audit.md` and follow it: a shallow audit for an existing project, or the
+   intended stack and conventions for a new one. One round of questions, no more.
+2. Write `{specs_dir}/CONTEXT.md` (and any area files) using `references/context-template.md`.
+   Keep the index to 60 lines and area files to 150.
+3. **Offer, don't do:** ask whether to add this one line to `CLAUDE.md` / `AGENTS.md` (whichever
+   the project uses), so hosts reload the pointer after compaction and in every new session:
+   `For spec work, read specs/CONTEXT.md first, then the "Resume here" block of any unfinished spec.`
+   Add it only on a yes.
+4. Re-run `npx -y @benjaminthomas/spec-driven-dev doctor` if available. It checks the size limits
+   and flags context lines that point to files which no longer exist.
+
 ## Updating
 
 Re-running `spec-setup` with an existing config: load it, re-detect, and show only what changed or
@@ -111,7 +133,10 @@ a value the user set by hand.
 
 ## Boundaries
 
-- Writes `.spec-driven.yml` and nothing else. No branches, commits, pushes, installs, or code.
-- Never put secrets, tokens, or credentials in the config.
+- Writes `.spec-driven.yml`, `{specs_dir}/CONTEXT.md` and `{specs_dir}/context/*.md`, plus the
+  one-line pointer in `CLAUDE.md` / `AGENTS.md` only if the user says yes. No branches, commits,
+  pushes, installs, or code. Never installs graphify or anything else.
+- Never put secrets, tokens, or credentials in the config or context files. Ask before saving
+  sensitive business details.
 - A value in the config beats a detected value. If the config looks wrong mid-run (a base
   branch that doesn't exist), the other skills stop and point back here rather than overriding it.

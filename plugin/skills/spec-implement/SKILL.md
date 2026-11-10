@@ -38,6 +38,20 @@ isn't, detect what this skill needs from the repo, ask about anything ambiguous,
 the answers to `.spec-driven.yml` (keys: `layout`, `repos`, `tracker`, `git`, `commands`,
 `specs_dir`).
 
+## Project context and memory
+
+- **Start cheap.** Read the README's **Resume here** block first. Read the last ~20 lines of
+  `log.md` only if that isn't enough. You, the orchestrator, read `{specs_dir}/CONTEXT.md` once,
+  because its **Conventions** and **Off-limits** apply to your own work too: commit messages and
+  trailers, branches, files nobody may touch. Coders don't read it. Each task file's **Project
+  Context** already carries what its coder needs. Open one `context/<area>.md` only when a review
+  finding depends on a convention the task file doesn't state.
+- **Log as you go.** Append 1–3 lines to `log.md` for each decision, deviation from the spec, user
+  answer, review finding and fix, or failed approach. Skip routine progress.
+- **Before stopping for any reason** (batch done, failure, user stop, run-through gate), overwrite
+  **Resume here** with the stage, next action, open questions, and last commit. A new or compacted
+  session must be able to continue from that block alone.
+
 ## Orchestration Model
 
 This skill's parallelism assumes your host can run multiple independent agents at once —
@@ -209,12 +223,14 @@ After the batch passes review (or the user chooses to proceed):
 
 1. **Update task files**: for each completed task, change the Status field from `pending` to `complete`
 2. **Update README.md**: change `- [ ]` to `- [x]` for each completed task
-3. **Commit the batch**:
+3. **Update memory**: append a log entry (what this batch decided or changed from the spec) and
+   overwrite the README's **Resume here** (`Stage: batch {N}/{total} done`, `Next: …`).
+4. **Commit the batch**:
    ```
    git add -A
    git commit -m "feat({feature}): complete batch {N} — {brief summary}"   # or the config's git.commit_style
    ```
-4. **Report batch completion**:
+5. **Report batch completion**:
    ```
    Batch {N} of {total} complete.
 
@@ -254,7 +270,7 @@ Next steps:
 
 ## Run-through mode (after approval)
 
-Run-through applies when the user asks for it ("approved, run it through", "build, verify and
+Run-through applies when the user asks for it ("approved, run it through", "build, verify, review and
 commit it") or when `.spec-driven.yml` has `pipeline.after_approval: run-through` and the user has
 approved the spec. In that case, don't stop after Step 9. Continue:
 
@@ -262,16 +278,18 @@ approved the spec. In that case, don't stop after Step 9. Continue:
 Run-through progress:
 - [ ] Implement all batches (Steps 1–9) — every review gate passed
 - [ ] Verify — follow the spec-verify skill; every acceptance criterion PASS
+- [ ] Review — follow the spec-review skill; no blockers (should-fix items are listed, not blocking)
 - [ ] Checkpoint — follow the spec-checkpoint skill; every check passes, commit made
 - [ ] Stop and hand off to spec-ship
 ```
 
 1. **Gate on each stage.** Move on only if the previous stage fully passed. On any failure (a review
-   gate exhausted its 3 cycles, a criterion FAILed or was SKIPPED, a check failed), stop the
+   gate exhausted its 3 cycles, a criterion FAILed or was SKIPPED, spec-review found a blocker, a
+   check failed), stop the
    run-through and report where it stopped, why, and the command to resume (e.g. "fix X, then say
    'continue the run-through'").
-2. **Verify, then checkpoint.** Follow those skills' own instructions in full, including the
-   verification report. Don't shortcut them because you're running them in sequence.
+2. **Verify, review, then checkpoint.** Follow those skills' own instructions in full, including
+   the verification report and review.md. Review fixes still need the user's yes. Don't shortcut them because you're running them in sequence.
 3. **Never push.** The run-through ends at a local commit. Finish with the summary below and ask
    whether to run `spec-ship`. `spec-ship` still shows exactly what will be pushed and waits for a
    yes.
@@ -282,6 +300,7 @@ Run-through progress:
 Run-through complete for "{feature}":
 - Implement: {N} batches, all review gates PASS
 - Verify: {P}/{P} criteria PASS (specs/{feature}/verification-report.md)
+- Review: 0 blockers · {S} should-fix · {N} nits (specs/{feature}/review.md)
 - Checkpoint: {commit hash} — {subject}
 
 Ready to push and open a PR. Run spec-ship? (it will show exactly what gets pushed first)

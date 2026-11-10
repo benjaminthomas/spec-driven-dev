@@ -32,6 +32,19 @@ isn't, detect what this skill needs from the repo, ask about anything ambiguous,
 the answers to `.spec-driven.yml` (keys: `layout`, `repos`, `tracker`, `git`, `commands`,
 `specs_dir`).
 
+## Project context
+
+- **Take context from the investigation.** Use `investigation.md`'s **Relevant Context**. Without an
+  investigation, read `{specs_dir}/CONTEXT.md` (or `spec-driven-dev context`) and only the
+  `context/<area>.md` files this feature touches. Never load the archive.
+- **Copy, don't link.** Put only the 3–5 lines each task needs into that task's **Project Context**.
+  Coders never read the context files, which keeps parallel coders from each loading them.
+- **Trace requirements.** Number them R1, R2… (keep the investigation's numbers), fill **Covers** in
+  every task and the **Coverage** table in requirements.md. Don't finish while a requirement has no
+  task.
+- **Start the memory.** Create or extend `log.md` (`references/log-template.md`) and fill the
+  README's **Resume here** block.
+
 ## When to Use
 
 - After a planning conversation where requirements and technical details have been discussed
@@ -92,6 +105,7 @@ specs/{feature-name}/
 ├── README.md
 ├── requirements.md
 ├── action-required.md
+├── log.md
 └── tasks/
     ├── task-01-{name}.md
     ├── task-02-{name}.md
@@ -103,6 +117,7 @@ Read the templates in `references/` before writing each file:
 - `references/task-template.md` — for each task file (self-contained with all context)
 - `references/requirements-template.md` — for the requirements document
 - `references/action-required-template.md` — for manual human steps
+- `references/log-template.md` — for the append-only log
 
 Task files are numbered with zero-padded two-digit prefixes in topological order: Batch 1 tasks first, then Batch 2, etc. Within a batch, order is arbitrary but stable.
 
@@ -135,6 +150,7 @@ Files created:
 - action-required.md
 - tasks/ ({T} task files)
 
+Coverage: R1–R{n} all mapped to tasks
 Model plan: {n} light · {n} standard · {n} deep
   (models from .spec-driven.yml → light: {model}, standard: {model}, deep: {model})
   Deep tasks: {task-nn — main reason}
@@ -149,7 +165,7 @@ Next steps:
 2. Review the requirements and task files
 3. When you're happy with it, either:
    - say "implement" to build it and stop for review, or
-   - say "approved, run it through" to build, verify and commit in one go (stops at any failure,
+   - say "approved, run it through" to build, verify, review and commit in one go (stops at any failure,
      never pushes without asking)
 ```
 
@@ -163,4 +179,5 @@ by default after approval. Never start implementing from this skill.
 - Tasks within the same batch must not modify overlapping files. Parallel agents on the same branch cannot safely touch the same files.
 - Keep tasks atomic — one concern per task. If a task has more than 5-7 files to modify, consider splitting it.
 - Put tests in each task's Tests section, not in separate testing tasks (unless the user asks, or it's a cross-cutting suite).
+- Every requirement (R1…) maps to at least one task, and every task lists what it **Covers**.
 - Number task files in topological order (batch 1 first, then batch 2, etc.) for easy scanning.

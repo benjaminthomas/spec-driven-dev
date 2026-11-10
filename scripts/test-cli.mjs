@@ -136,6 +136,48 @@ d = doctor(quiet);
 assert.ok(d.code === 1 && d.out.includes("models.claude.standard is missing") && d.out.includes("models.claude.huge: unknown tier") && d.out.includes('effort.deep "turbo"'), d.out);
 fs.rmSync(path.join(quiet, ".spec-driven.yml"));
 
+// 12. project memory: new/existing detected and saved, context command, doctor limits + stale paths, Resume here in status
+cfg = fs.readFileSync(path.join(ws, ".spec-driven.yml"), "utf8");
+assert.ok(/context:[^\n]*\n  project: new[^\n]*\n  graph: auto/.test(cfg), `tiny repos should read as new\n${cfg}`);
+const big = path.join(tmp, "big");
+repo(big, { test: "jest" }, Array.from({ length: 20 }, (_, i) => `feat: ${i}`));
+fs.mkdirSync(path.join(big, "src/billing"), { recursive: true });
+fs.writeFileSync(path.join(big, "src/billing/retry.ts"), "export {}\n");
+cli("setup", "--yes", `--dir=${big}`);
+assert.ok(fs.readFileSync(path.join(big, ".spec-driven.yml"), "utf8").includes("project: existing"), "20 commits should read as existing");
+fs.rmSync(path.join(big, ".spec-driven.yml"));
+cli("setup", "--yes", `--dir=${big}`, "--project=new");
+assert.ok(fs.readFileSync(path.join(big, ".spec-driven.yml"), "utf8").includes("project: new"), "--project should win over detection");
+assert.throws(() => cli("setup", "--yes", `--dir=${quiet}`, "--project=old"), /--project must be new or existing/);
+
+assert.ok(cli("context", `--dir=${big}`).includes("No specs/CONTEXT.md yet"));
+assert.ok(doctor(big).out.includes("no specs/CONTEXT.md yet"), doctor(big).out);
+fs.mkdirSync(path.join(big, "specs/context"), { recursive: true });
+fs.writeFileSync(path.join(big, "specs/CONTEXT.md"), "# Project context\n- retries live in `src/billing/retry.ts:1`\n- old helper `src/legacy/old.ts`\n- see `context/billing.md`\n- npm `@acme/pkg`\n");
+fs.writeFileSync(path.join(big, "specs/context/billing.md"), "# Billing\n- never retry more than 3 times\n");
+fs.writeFileSync(path.join(big, "specs/context/archive.md"), "x\n".repeat(500));  // archive is exempt from limits
+assert.ok(cli("context", `--dir=${big}`).includes("retries live in"));
+let ctx = cli("context", `--dir=${big}`, "--areas=billing,auth");
+assert.ok(ctx.includes("never retry more than 3") && ctx.includes("no specs/context/auth.md") && !ctx.includes("retries live in"), ctx);
+d = doctor(big);
+assert.equal(d.code, 0, d.out);
+assert.ok(d.out.includes("`src/legacy/old.ts`, which no longer exists") && !d.out.includes("retry.ts`, which") && !d.out.includes("context/billing.md`, which") && !d.out.includes("@acme/pkg"), d.out);
+fs.writeFileSync(path.join(big, "specs/context/billing.md"), "x\n".repeat(160));
+d = doctor(big);
+assert.ok(d.code === 1 && d.out.includes("context/billing.md is 161 lines (limit 150)"), d.out);
+fs.rmSync(path.join(big, "specs/context/billing.md"));
+
+fs.mkdirSync(path.join(big, "specs/feat"), { recursive: true });
+fs.writeFileSync(path.join(big, "specs/feat/README.md"), "# Feat\n\n## Resume here\n\n- **Stage:** batch 1/2 done\n- **Next:** spec-implement batch 2 (task-03 needs the API key first)\n\n## Task Status\n- [x] one\n- [ ] two\n");
+assert.ok(cli("status", `--dir=${big}`).includes("1/2 tasks done → next: spec-implement batch 2 (task-03 needs the API key first)"));
+fs.writeFileSync(path.join(big, "specs/feat/README.md"), "- [x] one\n- [x] two\n");
+fs.writeFileSync(path.join(big, "specs/feat/verification-report.md"), "ok");
+assert.ok(cli("status", `--dir=${big}`).includes("verified, not reviewed → next: spec-review"));
+fs.writeFileSync(path.join(big, "specs/feat/review.md"), "### 1. [blocker] x\n- **Where:** a\n- **Status:** open\n");
+assert.ok(cli("status", `--dir=${big}`).includes("open blockers"));
+fs.writeFileSync(path.join(big, "specs/feat/review.md"), "### 1. [blocker] x\n- **Status:** fixed in abc123\n### 2. [nit] y\n- **Status:** open\n");
+assert.equal(cli("status", `--dir=${big}`), "", "a fixed blocker and an open nit shouldn't count as unfinished");
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 

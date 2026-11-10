@@ -9,7 +9,7 @@ import json, os, re, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STAGES = {  # README table order and stage labels
     "spec-setup": "0 · configure", "spec-investigate": "1 · understand", "spec-create": "2 · plan", "spec-implement": "3 · build",
-    "spec-verify": "4 · prove", "spec-checkpoint": "5 · commit", "spec-ship": "6 · PR",
+    "spec-verify": "4 · prove", "spec-review": "5 · review", "spec-checkpoint": "6 · commit", "spec-ship": "7 · PR",
     "generative-seo": "standalone",
 }
 errors = []

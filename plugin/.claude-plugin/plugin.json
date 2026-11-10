@@ -1,7 +1,7 @@
 {
   "name": "ticket-to-pr",
-  "version": "1.9.0",
-  "description": "Parallel-batch spec-driven feature workflow (spec-setup, spec-investigate, spec-create, spec-implement, spec-verify, spec-checkpoint, spec-ship) plus a portable SEO/GEO operations skill (generative-seo) for any codebase.",
+  "version": "1.10.0",
+  "description": "Parallel-batch spec-driven feature workflow (spec-setup, spec-investigate, spec-create, spec-implement, spec-verify, spec-review, spec-checkpoint, spec-ship) plus a portable SEO/GEO operations skill (generative-seo) for any codebase.",
   "author": {
     "name": "Benjamin Thomas",
     "url": "https://github.com/benjaminthomas"
