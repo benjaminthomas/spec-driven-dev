@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.0 — 2026-11-10
+- **The Claude Code plugin is now `ticket-to-pr`** (was `spec-driven-dev`, a name another directory listing already uses). Reinstall with `/plugin install ticket-to-pr@spec-driven-dev`; the marketplace id, npm package and CLI are unchanged.
+- The plugin moved to `plugin/` and contains only its manifest, icon and skills, so it passes Anthropic's plugin directory checks.
+- Removed the session-start hook. Run `spec-driven-dev status` to list unfinished specs instead.
+- Author is now Benjamin Thomas.
+
 ## 1.8.0 — 2026-11-06
 - **Model defaults checked against the vendors' current docs** (2026-11-06) instead of written from memory.
   - Claude Code keeps family aliases (`haiku`/`sonnet`/`opus`), which follow the newest model on your provider, and gains `escalate: fable` for deep tasks that keep failing. It asks first, because Fable can bill to usage credits.

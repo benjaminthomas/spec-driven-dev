@@ -1,9 +1,10 @@
 {
-  "name": "spec-driven-dev",
-  "version": "1.8.0",
+  "name": "ticket-to-pr",
+  "version": "1.9.0",
   "description": "Parallel-batch spec-driven feature workflow (spec-setup, spec-investigate, spec-create, spec-implement, spec-verify, spec-checkpoint, spec-ship) plus a portable SEO/GEO operations skill (generative-seo) for any codebase.",
   "author": {
-    "name": "benjaminbarnabas"
+    "name": "Benjamin Thomas",
+    "url": "https://github.com/benjaminthomas"
   },
   "keywords": [
     "spec-driven-development",
@@ -12,5 +13,8 @@
     "seo",
     "geo",
     "productivity"
-  ]
+  ],
+  "homepage": "https://github.com/benjaminthomas/spec-driven-dev",
+  "repository": "https://github.com/benjaminthomas/spec-driven-dev",
+  "icon": ".claude-plugin/icon.png"
 }

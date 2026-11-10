@@ -3,8 +3,8 @@
 //
 // This exists for hosts that speak MCP but don't (yet) support the Agent Skills
 // format natively, or that only implement MCP tools (not prompts). It reads
-// directly from ../skills/ at startup — there is no separate copy of skill
-// content to keep in sync; skills/ remains the single source of truth.
+// directly from ../plugin/skills/ at startup — there is no separate copy of skill
+// content to keep in sync; plugin/skills/ remains the single source of truth.
 //
 // Each skill becomes one MCP tool. Calling the tool returns that skill's
 // SKILL.md body as the instructions the calling agent should follow, plus a
@@ -21,7 +21,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SKILLS_DIR = join(__dirname, "..", "skills");
+const SKILLS_DIR = join(__dirname, "..", "plugin", "skills");
 
 function readFrontmatterDescription(skillMdPath) {
   const text = readFileSync(skillMdPath, "utf8");

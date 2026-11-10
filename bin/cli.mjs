@@ -17,7 +17,7 @@ import prompts from "prompts";  // arrow-key menus that work in PowerShell, cmd,
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const SKILLS_DIR = path.join(ROOT, "skills");
+const SKILLS_DIR = path.join(ROOT, "plugin", "skills");
 const HOME = process.env.SPEC_DRIVEN_HOME || os.homedir(); // overridable for tests
 const ALL_SKILLS = fs.readdirSync(SKILLS_DIR).filter((d) => fs.existsSync(path.join(SKILLS_DIR, d, "SKILL.md")));
 
@@ -109,7 +109,7 @@ async function install() {
 
   // Claude Code users who already have the plugin would get every skill twice.
   const plugins = path.join(HOME, ".claude/plugins/installed_plugins.json");
-  if (tools.includes("claude") && !opt("tools") && fs.existsSync(plugins) && fs.readFileSync(plugins, "utf8").includes('"spec-driven-dev@')) {
+  if (tools.includes("claude") && !opt("tools") && fs.existsSync(plugins) && /"(spec-driven-dev|ticket-to-pr)@/.test(fs.readFileSync(plugins, "utf8"))) {
     console.log("• Claude Code already has the spec-driven-dev plugin, so it's skipped here (update it with /plugin).");
     tools = tools.filter((t) => t !== "claude");
   }

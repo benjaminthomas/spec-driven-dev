@@ -15,13 +15,13 @@ STAGES = {  # README table order and stage labels
 errors = []
 read = lambda p: open(os.path.join(ROOT, p), encoding="utf8").read()
 
-skills = sorted(d for d in os.listdir(os.path.join(ROOT, "skills"))
-                if os.path.isfile(os.path.join(ROOT, "skills", d, "SKILL.md")))
+skills = sorted(d for d in os.listdir(os.path.join(ROOT, "plugin", "skills"))
+                if os.path.isfile(os.path.join(ROOT, "plugin", "skills", d, "SKILL.md")))
 if set(skills) != set(STAGES):
-    errors.append(f"skills/ {skills} != STAGES in scripts/check.py {sorted(STAGES)}")
+    errors.append(f"plugin/skills/ {skills} != STAGES in scripts/check.py {sorted(STAGES)}")
 
 for name in skills:
-    text = read(f"skills/{name}/SKILL.md")
+    text = read(f"plugin/skills/{name}/SKILL.md")
     fm = re.match(r"^---\n(.*?)\n---\n", text, re.S)
     if not fm:
         errors.append(f"{name}: missing frontmatter"); continue
@@ -44,17 +44,17 @@ for name in skills:
     if not re.search(r"^license:", fm, re.M):
         errors.append(f"{name}: missing license")
     for ref in set(re.findall(r"`(references/[\w./-]+)`", text)):
-        if not os.path.exists(os.path.join(ROOT, "skills", name, ref)):
+        if not os.path.exists(os.path.join(ROOT, "plugin", "skills", name, ref)):
             errors.append(f"{name}: references missing file {ref}")
     link = os.path.join(ROOT, ".agents", "skills", name)
-    if not (os.path.islink(link) and os.path.realpath(link) == os.path.join(os.path.realpath(ROOT), "skills", name)):
+    if not (os.path.islink(link) and os.path.realpath(link) == os.path.join(os.path.realpath(ROOT), "plugin", "skills", name)):
         errors.append(f"{name}: .agents/skills/{name} symlink missing or wrong")
 
 pkg = json.loads(read("package.json"))
-if pkg["version"] != json.loads(read(".claude-plugin/plugin.json"))["version"]:
-    errors.append("package.json and .claude-plugin/plugin.json versions differ")
+if pkg["version"] != json.loads(read("plugin/.claude-plugin/plugin.json"))["version"]:
+    errors.append("package.json and plugin/.claude-plugin/plugin.json versions differ")
 
-for p in (".claude-plugin/plugin.json", ".claude-plugin/marketplace.json"):
+for p in ("plugin/.claude-plugin/plugin.json", ".claude-plugin/marketplace.json"):
     try:
         data = json.loads(read(p))
     except ValueError as e:
@@ -74,9 +74,9 @@ rows, tl, tw, tf = [], 0, 0, 0
 for name in STAGES:
     if name not in skills:
         continue
-    text = read(f"skills/{name}/SKILL.md")
+    text = read(f"plugin/skills/{name}/SKILL.md")
     lines, words = text.count("\n"), len(text.split())
-    files = sum(f not in ("SKILL.md", ".DS_Store") for _, _, fs in os.walk(os.path.join(ROOT, "skills", name)) for f in fs)
+    files = sum(f not in ("SKILL.md", ".DS_Store") for _, _, fs in os.walk(os.path.join(ROOT, "plugin", "skills", name)) for f in fs)
     tl, tw, tf = tl + lines, tw + words, tf + files
     rows.append(f"| `{name}` | {STAGES[name]} | {lines:,} | {words:,} | {files} |")
 table = ("| Skill | Stage | SKILL.md lines | Words | Supporting files |\n|---|---|---:|---:|---:|\n"
