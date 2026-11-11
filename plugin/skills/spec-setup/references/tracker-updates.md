@@ -38,11 +38,29 @@ people, after merge), and never move a ticket assigned to someone else without a
 | spec-implement starts | `start` | — |
 | spec-verify done | — | each acceptance criterion with pass/fail and one line of evidence; overall N of M pass |
 | spec-review done | — | blocker / should-fix / nit counts, and each blocker in one line |
-| spec-ship done | `review` | PR link, plus "verified N/M, review: no blockers" |
+| spec-ship done | `review` | PR link, plus "verified N/M, review: no blockers", with the verification screenshots attached |
 | PR feedback round done | `review` (only if people moved it back) | "review feedback round N addressed": fixes, scope changes, commit |
 
 One comment per stage. A rerun replaces nothing: it posts a new, shorter comment saying what
 changed ("re-verified after fix: 12/12 pass").
+
+## Screenshots on the final comment
+
+Attach the verification screenshots once the final review has passed (no open blockers), on
+spec-ship's comment, and again after a PR feedback round only for screenshots that changed.
+
+- Take them from `{feature}/evidence/`, the files `verification-report.md` names. At most 6: one per
+  UI criterion, the ones a reviewer most needs. Name each in the comment with its criterion
+  (`R3 thank-you page: 03-thank-you-downloads.png`).
+- **Look at every image before attaching it.** Skip (and say so) any that shows a secret, token,
+  env value, real customer's personal data or a payment detail. Test data is fine.
+- How to attach: see the **Attach a file** column in `trackers.md`. Use the connected tool's upload
+  operation if it has one; otherwise its API, only with credentials already set up on this machine.
+  Never ask for a token in chat.
+- Can't attach: post the comment anyway, list the screenshot paths, and tell the user which files
+  to drag onto the ticket.
+- Covered by `tracker.updates` (`ask` confirms it with the comment). `tracker.screenshots: off`
+  turns only the attachments off.
 
 ## What a comment looks like
 

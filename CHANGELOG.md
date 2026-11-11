@@ -1,4 +1,6 @@
 # Changelog
+## 1.19.0 — 2026-11-11
+- **Verification screenshots on the ticket.** spec-verify now saves each screenshot as a file in `{feature}/evidence/` (kept out of git, since screenshots can show customer data); before, reports named screenshot files that were never saved. Once the final review passes, spec-ship's ticket comment attaches them: up to 6, one per UI criterion, each checked first for secrets or real customer data. It works with any tracker: it uses the connected tool's upload if there is one, or the tracker's API with credentials you already have (`trackers.md` lists each one); if neither can, it lists the files for you to drag onto the ticket. `tracker.screenshots: off` turns it off.
 ## 1.18.2 — 2026-11-11
 - **One question instead of two at hand-over.** In a folder with earlier Claude Code sessions, the first question now offers the session choice directly: "Yes, in a new session", "Yes, continue my last session (2 h ago)", "Yes, pick a session to resume", or "No". In 1.18.1 the choice only came after answering yes, so it looked as if it wasn't offered.
 ## 1.18.1 — 2026-11-11

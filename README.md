@@ -200,7 +200,8 @@ updates the spec and waits for your approval first. Replies go on each thread on
 **The ticket keeps up with the work.** When your AI tool can reach the tracker (any MCP server or CLI
 for it: Jira, GitHub, GitLab, Linear, Azure Boards, ClickUp, Asana and others), the pipeline updates the ticket: investigate comments
 with the summary, implement moves it to *In Progress*, verify comments with each acceptance criterion
-and its pass/fail, review with the blocker count, and ship moves it to *In Review* with the PR link.
+and its pass/fail, review with the blocker count, and ship moves it to *In Review* with the PR link and, once the final review has passed, the verification
+screenshots attached.
 Status names come from your project's real workflow (asked once, saved in `team.yml`); it never closes
 a ticket. It asks before the first update on each ticket; say "update Jira without asking" or "stop
 updating Jira" to change that (`tracker.updates: on | ask | off`).
@@ -806,12 +807,12 @@ skips that step rather than failing.
 | `spec-investigate` | 1 · understand | 395 | 3,469 | 1 |
 | `spec-create` | 2 · plan | 198 | 1,806 | 6 |
 | `spec-implement` | 3 · build | 330 | 2,813 | 3 |
-| `spec-verify` | 4 · prove | 166 | 1,610 | 1 |
+| `spec-verify` | 4 · prove | 171 | 1,673 | 1 |
 | `spec-review` | 5 · review | 179 | 1,817 | 1 |
 | `spec-checkpoint` | 6 · commit | 140 | 1,168 | 0 |
-| `spec-ship` | 7 · PR | 238 | 1,494 | 0 |
+| `spec-ship` | 7 · PR | 239 | 1,507 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **2,215** | **19,895** | **25** |
+| **Total** | | **2,221** | **19,971** | **25** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback

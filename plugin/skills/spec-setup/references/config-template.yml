@@ -27,6 +27,7 @@ tracker:
   key: STP                      # ticket key prefix (jira/linear); omit for github/none
   url: https://example.atlassian.net   # site/org/repo URL, if any
   updates: ask                  # move the ticket and post stage comments when a tracker tool is connected: ask | on | off
+  screenshots: on               # attach verification screenshots to the final comment (after the last review passes): on | off
   # statuses: { start: In Progress, review: In Review }   # filled from the project's real workflow on first use
 
 git:

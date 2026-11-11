@@ -94,7 +94,12 @@ Look at what the behavioral criteria actually need before reaching for tools:
   automation. Use whatever browser-automation capability your host provides — a browser MCP
   server (Playwright, Puppeteer, etc.), a built-in browser tool, or a browser extension — and
   enable/load it per your host's own convention if it isn't active by default. Take a screenshot
-  as evidence for each criterion you check this way.
+  as evidence for each criterion you check this way, and **save it as a file** in
+  `{specs_dir}/{feature}/evidence/` named after the criterion (`03-thank-you-downloads.png`), so
+  the report, the PR and the ticket can point to it. Screenshots stay local: create
+  `evidence/.gitignore` containing `*` the first time, because they can show customer data and
+  bloat the repo. A screenshot your tool can't save to disk: say so in the report, don't invent a
+  file name.
 - **API-only** (no UI surface, e.g. a webhook or a cron route) → call the real route. For
   session-gated routes, log in through the actual UI once (or reuse a session cookie from a
   browser step) rather than fabricating auth state. For routes gated by a bearer secret (like a

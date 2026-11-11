@@ -208,8 +208,9 @@ If this branch belongs to a spec, overwrite its README's **Resume here** (`Stage
 agrees; otherwise leave it for the next checkpoint.
 
 **Tracker update.** If the branch came from a ticket and `tracker.updates` isn't `off`,
-follow `tracker-updates.md` in the installed `spec-setup` skill's references folder: move the ticket to its `review` status and comment with the PR link and the verify and
-review results.
+follow `tracker-updates.md` in the installed `spec-setup` skill's references folder: move the
+ticket to its `review` status and comment with the PR link and the verify and review results,
+attaching the verification screenshots once the final review has passed (no open blockers).
 
 ### Step 8: Report
 
