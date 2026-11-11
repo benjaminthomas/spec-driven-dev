@@ -1,4 +1,6 @@
 # Changelog
+## 1.18.1 — 2026-11-11
+- **Resume a session instead of always starting a new one.** After install, if you've used Claude Code in that folder before, the hand-over asks where setup should run: a new session (recommended), continue your last session (with "run spec-setup" sent in it), or pick one from Claude Code's session list. First-time folders still open a new session straight away. Codex always opens a new session for now.
 ## 1.18.0 — 2026-11-11
 - **Any ticket tracker, not just Jira, GitHub and Linear.** `tracker.type` takes any tracker's name: GitLab, Azure Boards, ClickUp, Asana, YouTrack, Shortcut, Monday, Trello and others. The skills read the ticket and post updates through whichever MCP server or CLI (`glab`, `az`, …) your AI tool has; if none can reach it, they ask you to paste the ticket and print updates for you to post.
 - Setup detects more: `AB#4512` (Azure Boards), `CU-86a1…` (ClickUp), `sc-1234` (Shortcut), and GitLab from the remote. The terminal menu adds GitLab, Azure Boards, ClickUp and "Another tracker…"; scripts can pass `--tracker=<name>`. `doctor` no longer rejects other names.

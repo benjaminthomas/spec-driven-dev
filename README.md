@@ -76,7 +76,8 @@ or several repos that change together), your tracker, branches and commit style,
 and whether your team shares them, then looks through the code and saves the project memory
 ([details below](#project-setup-your-teams-rules)). If Claude Code or Codex is installed, the
 installer asks "Open Claude Code in soreto-shopify to set up your project?" (with your folder's name)
-and opens it with "run spec-setup" already typed in.
+and opens it with "run spec-setup" already typed in. If you've used Claude Code in that folder
+before, it asks whether to start a new session, continue your last one, or pick one to resume.
 
 **3. Then run each stage in order.** You can type the slash command or just say the
 words in quotes.

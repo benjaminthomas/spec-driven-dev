@@ -191,7 +191,26 @@ Start a new session if your tool doesn't recognise it yet.`;
     return;
   }
   const { spawnSync } = await import("node:child_process");
-  spawnSync(launcher[0], ["run spec-setup"], { cwd: DIR, stdio: "inherit" });
+  const last = launcher[0] === "claude" ? lastClaudeSession(DIR) : null;
+  const how = last ? await askSelect(`You've used Claude Code in ${name} before (last session ${ago(last)}). Where should setup run?`, [
+    { title: "A new session (Recommended)", value: "new", description: "clean start; setup doesn't need your earlier conversation" },
+    { title: "Continue my last session", value: "continue", description: `the one from ${ago(last)}, with "run spec-setup" sent in it` },
+    { title: "Pick a session to resume", value: "pick", description: "opens Claude Code's session list; then say \"run spec-setup\"" },
+  ], "new") : "new";
+  const args = { new: ["run spec-setup"], continue: ["--continue", "run spec-setup"], pick: ["--resume"] }[how];
+  if (how === "pick") console.log('After you pick the session, say "run spec-setup".');
+  spawnSync(launcher[0], args, { cwd: DIR, stdio: "inherit" });
+}
+
+// Claude Code keeps each folder's sessions in ~/.claude/projects/<path with every non-alphanumeric as "-">.
+// shortcut: Claude Code only; Codex sessions aren't looked up, so Codex always opens a new one.
+function lastClaudeSession(dir) {
+  const d = path.join(os.homedir(), ".claude", "projects", real(dir).replace(/[^A-Za-z0-9]/g, "-"));
+  try { return Math.max(0, ...fs.readdirSync(d).filter((f) => f.endsWith(".jsonl")).map((f) => fs.statSync(path.join(d, f)).mtimeMs)) || null; } catch { return null; }
+}
+function ago(ms) {
+  const m = Math.round((Date.now() - ms) / 60000);
+  return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
 }
 
 // ---------- discovery ----------
