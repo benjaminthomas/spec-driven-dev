@@ -52,6 +52,11 @@ Group the candidates:
   with this one. Some systems connect only through a shared database or a message queue the code
   doesn't name.
 
+Ask it with the host's interactive question tool when there is one: after the layout question, a
+`multiSelect` question with **one option per repo** (never bundles of repos), the recommended ones
+first, evidence in each option's description, 2–4 options. End the question text with the other
+repos found by name and how to add them ("choose *Type something* and enter names or paths, e.g.
+`old-admin, ~/Work/billing`"), since the menu only shows 4. Otherwise as text.
 Shape of the question, with placeholders rather than real names:
 
 > I found 6 repos under ~/code/github.com/acme. Based on the code, I'd include:

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.2 — 2026-11-11
+- **Adding repos the menu can't show.** The repo question names the other repos it found and says how to add them, or a repo from another folder, under *Type something*, since the menu only fits 4.
+- **GitRisk is part of the shared project memory.** `spec-driven-dev risk` now keeps a short "Risk hotspots" block in `CONTEXT.md` (the top 5 files, the counts per tier, the date), replaced in place on every run. `CONTEXT.md` is shared, so teammates see the hotspots even though the full `context/risk.md` stays gitignored.
+- **Setup choices are interactive menus again.** 1.14.1 moved open questions to plain text, and the agent then asked everything that way. Now real choices (layout and repos, sharing, specs location, after-approval mode, guessed commands) use the host's question tool, such as Claude Code's menus: up to 4 per call, 2–4 options each, the recommendation first, and evidence in each option. Layout is asked on its own first. If you choose several repos, they're a tick-box list with one option per repo and its evidence, never preset bundles. Base branch, PR target, branch naming and commit style are always confirmed in their own menu, and the tracker in the next one, each with the detected value first and its evidence. Open questions follow as plain text. Tools without menus get a numbered text list.
+
 ## 1.14.1 — 2026-11-11
 Fixes from a first-time setup on a real multi-repo project.
 - **Choosing repos comes with context.** In a multi-repo setup, spec-setup no longer skips the repo question or shows bare folder names. It says what each repo is, shows evidence of how it connects to the current one (env vars, API calls, docs, with `path:line`), notes whether you commit to it, and recommends a selection with a reason for each. It asks once and writes nothing until you answer.

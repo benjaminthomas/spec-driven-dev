@@ -20,7 +20,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import prompts from "prompts";  // arrow-key menus that work in PowerShell, cmd, macOS and Linux terminals
 import { fileURLToPath } from "node:url";
-import { scoreRepo, riskMarkdown, normWeights, weightProblems, setConfigValue } from "./risk.mjs";
+import { scoreRepo, riskMarkdown, normWeights, weightProblems, setConfigValue, riskSummaryBlock, withRiskSummary } from "./risk.mjs";
 import { SHARE_MODES, shareState, planShare, shareTitle } from "./share.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -818,6 +818,11 @@ function risk() {
   const out = path.join(specs, "context", "risk.md");
   fs.writeFileSync(out, riskMarkdown({ rows, repos: scored, weights, since, top: Number(opt("top")) || 40 }));
   ignoreGenerated(out);
+  const ctx = path.join(specs, "CONTEXT.md");
+  if (fs.existsSync(ctx)) {
+    fs.writeFileSync(ctx, withRiskSummary(fs.readFileSync(ctx, "utf8"), riskSummaryBlock(rows, new Date().toISOString().slice(0, 10))));
+    console.log(`  Updated the "Risk hotspots" summary in ${path.relative(DIR, ctx) || ctx}, which is shared with the team.`);
+  }
   const count = (t) => rows.filter((r) => r.tier === t).length;
   console.log(`✓ Scored ${rows.length} files from ${scored.reduce((t, s) => t + s.commits, 0)} commits → ${path.relative(DIR, out) || out}`);
   console.log(`  ${count("critical")} critical · ${count("high")} high · ${count("medium")} medium · ${count("new")} new. Top 5:`);

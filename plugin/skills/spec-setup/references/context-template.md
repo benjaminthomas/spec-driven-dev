@@ -54,7 +54,17 @@ Project: existing · audited at a1b2c3d (2026-11-10) · graph: none
 
 ## Specs
 - {stp-123: retry failed webhooks, touched billing (2026-11-10)}
+
+<!-- risk:start (written by spec-driven-dev risk; don't edit) -->
+## Risk hotspots
+GitRisk on 2026-11-10: 0 critical · 8 high · 30 medium. Full table: context/risk.md (regenerate: spec-driven-dev risk).
+- `app/services/billing.ts` 61.7 high
+<!-- risk:end -->
 ```
+
+The **Risk hotspots** block is written by `spec-driven-dev risk` (setup, every batch, checkpoint) and
+replaced in place, so don't edit it. It's the shared part of GitRisk: `context/risk.md` itself is
+gitignored because it's regenerated on every run.
 
 ## context/<area>.md
 

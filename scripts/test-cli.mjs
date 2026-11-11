@@ -413,6 +413,24 @@ uo = ucli("uninstall", "--yes", "--all", `--dir=${un}`);
 assert.ok(!fs.existsSync(path.join(un, ".spec-driven.yml")) && uo.includes("Removed settings file"), uo);
 assert.ok(ucli("uninstall", "--yes", `--dir=${un}`).includes("Nothing to remove"));
 
+// 24. risk keeps a short, shared "Risk hotspots" block in CONTEXT.md, replaced in place on each run
+const rh = path.join(tmp, "riskctx");
+fs.mkdirSync(rh, { recursive: true }); sh(rh, "init", "-q", "-b", "main");
+const OLD2 = { ...process.env, GIT_AUTHOR_DATE: "2025-01-01T10:00:00", GIT_COMMITTER_DATE: "2025-01-01T10:00:00" };
+const cf = (f, b, m) => { fs.writeFileSync(path.join(rh, f), b); execFileSync("git", ["add", "-A"], { cwd: rh, env: OLD2 }); execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", m], { cwd: rh, env: OLD2 }); };
+cf("a.ts", "export const a = 1;\n", "feat: a"); cf("b.ts", "import { a } from './a';\n", "feat: b"); cf("c.ts", "import { a } from './a';\n", "feat: c");
+["fix: one", "fix: two", "fix: three", "chore: x"].forEach((m, i) => cf("a.ts", `export const a = ${i + 2};\n`, m));
+fs.writeFileSync(path.join(rh, ".spec-driven.yml"), "layout: single\n");
+fs.mkdirSync(path.join(rh, "specs"), { recursive: true });
+fs.writeFileSync(path.join(rh, "specs/CONTEXT.md"), "# Project context\n\n## Areas\n- app\n");
+let rco = cli("risk", `--dir=${rh}`);
+let ctxText = fs.readFileSync(path.join(rh, "specs/CONTEXT.md"), "utf8");
+assert.ok(rco.includes("Risk hotspots") && ctxText.startsWith("# Project context\n\n## Areas\n- app\n") && ctxText.includes("## Risk hotspots") && ctxText.includes("- `a.ts` ") && ctxText.includes("context/risk.md"), ctxText);
+cli("risk", `--dir=${rh}`);
+ctxText = fs.readFileSync(path.join(rh, "specs/CONTEXT.md"), "utf8");
+assert.equal((ctxText.match(/## Risk hotspots/g) || []).length, 1, "block must be replaced, not appended again");
+assert.ok(!fs.readFileSync(path.join(rh, ".gitignore"), "utf8").includes("CONTEXT.md"), "CONTEXT.md stays shared");
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 

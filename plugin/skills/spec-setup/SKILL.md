@@ -125,23 +125,74 @@ Read, don't guess. Collect a draft of every field in `references/config-template
 
 ## How to ask
 
-- **Real choices** (layout, keep these repos, sharing, after-approval mode) can be a menu, but only
-  with **two or more** options. A menu with one option is rejected by the tool and the user never
-  sees the question. "Other" doesn't count as an option.
-- **Open questions** (what the product does, fragile spots, direction, unwritten rules, anything
-  else to add) are plain text in **one chat message**. The user answers in their own words or says
-  "skip". Never turn an open question into a menu.
+Two kinds of question, asked two different ways:
+
+1. **Choices** (layout and repos, sharing, specs location, after-approval mode, a guessed command):
+   use the host's **interactive question tool** when it has one (Claude Code: `AskUserQuestion`).
+   - Up to 4 questions per call; each needs **2 to 4 options** (a one-option question is rejected
+     and the user never sees it; "Other" is added automatically and doesn't count).
+   - Put the recommended option first and end its label with "(Recommended)". Put the evidence in
+     each option's description (e.g. "called via BACKBONE_URL, app/services/x.ts:105").
+   - **Layout and repos are two separate calls, always** (Step 2). Never ask layout together with
+     other questions.
+   - **Repos are never offered as preset bundles** ("+backend +melissa", "all four"); bundles don't
+     scale and stop people mixing their own. Ask in two calls:
+     1. **Layout first**, on its own: "Single repo" vs "Several repos that change together"
+        (vs "Monorepo" when it fits), recommendation first with the evidence.
+     2. **Only if several:** a `multiSelect` question with **one option per repo**: label = repo
+        name (the recommended ones first, marked "(Recommended)"), description = what it is plus the
+        link evidence. At most 4 options. The menu can't show the rest, so the **question text** must
+        end by naming the other repos found ("Also found: a, b, c (no code link).") and saying how to
+        add them: "To add any of these, or a repo from another folder, choose *Type something* and
+        enter names or paths, e.g. `a, ~/Work/billing`." Put the remaining choices (specs location,
+        sharing, pipeline) in this same call.
+   - If the tool isn't available (or a call fails), ask the same choices as a short numbered list
+     in text instead. Never drop a question.
+2. **Open questions** (what the product does, fragile spots, direction, unwritten rules): plain text
+   in **one chat message**, asked **after** the choices are answered. Never turn these into a menu.
 
 ## Step 2 — Confirm in one round
 
 Show the draft as a short table grouped by layout, tracker, git, commands, and specs location.
-Mark each value **detected** (with where it came from) or **guess**. Then ask only about guesses
-and conflicts — in one message, not a drip of questions. Typical ones:
+Mark each value **detected** (with where it came from) or **guess**. Then ask in exactly this order
+(interactive question tool when there is one; see How to ask):
 
-- "Your repos default to `master`, but recent PRs targeted `staging`. Cut work from `staging`?"
-- "Recent branches are bare ticket IDs (`STP-282`). Keep that, or use `fix/STP-282-short-slug`?"
-- "These 6 repos share the `acme` GitHub org. Do they form one workspace for the pipeline?"
-- "Where should specs live — this folder's `specs/`, or inside one repo so they go through PRs?"
+**Call 1: layout, alone. Nothing else in this call.** Use these option labels exactly; no repo names
+in them:
+- `Single repo`: "Only <this repo>." (+ the evidence for or against)
+- `Several repos`: "<this repo> changes together with other repos. You'll pick which next."
+- `Monorepo`: only when workspace markers were found.
+
+Recommend one (first, with "(Recommended)") and put the evidence in the question text.
+
+**Call 2: repos (only if the answer was `Several repos`).** The repo tick-box list (`multiSelect`, one
+option per repo, see `references/repo-picker.md`) and where specs live (a dedicated specs repo, inside
+one code repo, or this machine only).
+
+**Call 3: git conventions, always, even when detected.** These decide how every branch and commit is
+made, and detection can be wrong, so confirm them. Four questions, the detected value first with its
+evidence in the description, then the common alternatives:
+- **Base branch** (work starts from): e.g. `staging (Recommended)`: "16 of the last 20 merged PRs";
+  `main`; `develop`. In multi-repo, say which repos differ ("staging; soreto-cms has none, uses main").
+- **PR target**: usually the same as the base branch.
+- **Branch names**: e.g. `STP-123 (Recommended)` (bare ticket id, seen in recent branches);
+  `feat/STP-123-short-name`; `feat/short-name`.
+- **Commit style**: e.g. `STP-123: message (Recommended)`; `feat: message`; free text. In multi-repo,
+  name any repo that uses a different style.
+
+**Call 4: tracker, team and pipeline.** The tracker, confirmed like the git conventions (e.g.
+`Jira, key STP (Recommended)`: "STP-123 in recent branches", `GitHub Issues`, `Linear`, `None`), then
+sharing (if specs are inside a repo), after approval (stop / run straight through), and any command
+that's a guess (e.g. typecheck). At most 4; a guessed command that doesn't fit goes in the summary as
+"I'll use X, say if that's wrong".
+
+Then the open questions, as plain text (see How to ask).
+
+Typical things to flag in the descriptions:
+
+- "Your repos default to `master`, but recent PRs targeted `staging`."
+- "Recent branches are bare ticket IDs (`STP-282`)."
+- "These 6 repos share the `acme` GitHub org."
 
 If the user says "just use the defaults", accept the detected values and the template defaults
 for the rest.

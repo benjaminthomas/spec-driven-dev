@@ -760,7 +760,7 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 222 | 2,329 | 4 |
+| `spec-setup` | 0 · configure | 273 | 2,829 | 4 |
 | `spec-investigate` | 1 · understand | 387 | 3,367 | 1 |
 | `spec-create` | 2 · plan | 198 | 1,782 | 6 |
 | `spec-implement` | 3 · build | 327 | 2,753 | 3 |
@@ -769,7 +769,7 @@ skips that step rather than failing.
 | `spec-checkpoint` | 6 · commit | 140 | 1,144 | 0 |
 | `spec-ship` | 7 · PR | 230 | 1,388 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **2,059** | **17,823** | **23** |
+| **Total** | | **2,110** | **18,323** | **23** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback
@@ -822,7 +822,7 @@ plugin/evals/                 `claude plugin eval` cases
   1. Increase `version` in both `package.json` and `plugin/.claude-plugin/plugin.json` (the check fails if
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
-  3. Tag the release and push the tag: `git tag v1.14.1 && git push origin v1.14.1`.
+  3. Tag the release and push the tag: `git tag v1.14.2 && git push origin v1.14.2`.
   4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
      npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 

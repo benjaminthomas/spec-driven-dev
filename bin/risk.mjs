@@ -167,3 +167,18 @@ export function setConfigValue(text, blockName, key, value) {
   const body = line.test(block[0]) ? block[0].replace(line, `$1${value}`) : block[0].replace(new RegExp(`^${blockName}:.*\\n`), `$&  ${key}: ${value}\n`);
   return text.replace(block[0], body);
 }
+
+// A short, committed summary inside CONTEXT.md, so the hotspots are part of the shared project memory
+// (risk.md itself is gitignored: it's regenerated on every run). Replaced in place between markers.
+const RB = "<!-- risk:start (written by spec-driven-dev risk; don't edit) -->", RE = "<!-- risk:end -->";
+export function riskSummaryBlock(rows, date) {
+  const top = rows.filter((r) => r.tier === "critical" || r.tier === "high").slice(0, 5);
+  const counts = ["critical", "high", "medium"].map((t) => `${rows.filter((r) => r.tier === t).length} ${t}`).join(" · ");
+  return [RB, "## Risk hotspots", `GitRisk on ${date}: ${counts}. Full table: context/risk.md (regenerate: spec-driven-dev risk).`,
+    ...(top.length ? top.map((r) => `- \`${r.file}\` ${r.score} ${r.tier}`) : ["- No high or critical files."]), RE].join("\n");
+}
+export function withRiskSummary(text, block) {
+  const i = text.indexOf(RB), j = text.indexOf(RE);
+  if (i >= 0 && j > i) return text.slice(0, i) + block + text.slice(j + RE.length);
+  return `${text.replace(/\n*$/, "")}\n\n${block}\n`;
+}

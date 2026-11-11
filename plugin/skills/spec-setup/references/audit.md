@@ -41,7 +41,8 @@ never ask again.
 ## 3. Discovery questions (one round)
 
 Show the draft map first, with each line marked **detected** (with its source) or **guess**. Then
-ask only what the code can't answer, as **plain text in one message**. These are open questions, so
+ask only what the code can't answer, as **plain text in one message**, after the setup choices have
+been answered. These are open questions, so
 never put them in a menu or multiple-choice tool (a menu needs two or more real options, and these
 have none). The user replies in their own words, or "skip":
 
