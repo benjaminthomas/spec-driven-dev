@@ -1,4 +1,8 @@
 # Changelog
+## 1.21.0 — 2026-11-11
+- **Build report: which models ran and how many tokens it took.** New `spec-driven-dev usage STP-123` reads Claude Code's own session files (including every subagent) and shows tokens per stage and model, how much came from cache, subagent count and time span. `--summary` gives three lines, `--json` the raw numbers. It works out which feature each reply belongs to from what you typed and the skill that was running, and counts a response only once.
+- spec-ship adds a **Built with spec-driven-dev** section to the PR, and the ticket comment carries it too: models per stage, tokens, verified N/M, review result, escalations. Totals only, never content. `usage.report: all | pr | ticket | local | off` (default `all`).
+- spec-implement logs the model each coder ran on, so tools whose token counts can't be read (Cursor, Antigravity, OpenCode, Codex for now) still get the models line.
 ## 1.20.0 — 2026-11-11
 - **OpenCode support.** The installer offers OpenCode and puts the skills in `~/.config/opencode/skills` (all projects) or `.opencode/skills` (this project). OpenCode also reads the Claude Code and `.agents` skill folders, so an install for those already covers it. `models.opencode` takes `provider/model` values.
 - **Model per task tier now works beyond Claude Code.** Based on each tool's current docs: Codex CLI (`spawn_agent` or `.codex/agents/*.toml` with `model`), Cursor (Task tool `model`, or `.cursor/agents/*.md`), OpenCode (agent files with `model:`) and Antigravity (Gemini tiers only: `flash`, `pro`). A new `host-models.md` reference tells spec-implement how to dispatch on each. Before, only Claude Code switched models; the others asked you to switch the session.

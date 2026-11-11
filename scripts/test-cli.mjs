@@ -541,6 +541,34 @@ cli("setup", "--yes", `--dir=${toc}`);
 assert.ok(/models:[\s\S]*opencode:/.test(fs.readFileSync(path.join(toc, ".spec-driven.yml"), "utf8")));
 assert.equal(doctor(toc).code, 0, doctor(toc).out);
 
+// 29. usage: tokens per stage and model, from fake Claude Code session files
+{
+  const uw = path.join(tmp, "usagews"); repo(uw, {}, ["STP-9: a"]);
+  cli("setup", "--yes", `--dir=${uw}`);
+  for (const f of ["stp-9-cart", "stp-10-other"]) { fs.mkdirSync(path.join(uw, "specs", f), { recursive: true }); fs.writeFileSync(path.join(uw, "specs", f, "README.md"), "# x\n"); }
+  const pd = path.join(home, ".claude", "projects", fs.realpathSync(uw).replace(/[^A-Za-z0-9]/g, "-"));
+  fs.mkdirSync(path.join(pd, "s1", "subagents"), { recursive: true });
+  const a = (id, skill, model, out, extra = {}) => ({ type: "assistant", sessionId: "s1", timestamp: `2026-11-11T10:${String(out).padStart(2, "0")}:00Z`, attributionSkill: skill, message: { id, model, usage: { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 90, output_tokens: out }, content: extra.content || [] } });
+  const lines = [
+    { type: "user", message: { content: "investigate STP-9" } },
+    a("m1", "spec-investigate", "claude-opus-5-5", 5), a("m1", "spec-investigate", "claude-opus-5-5", 5), // same response twice: counted once
+    a("m2", "spec-implement", "claude-opus-5-5", 3, { content: [{ type: "tool_use", name: "Agent", id: "tu1", input: {} }] }),
+    { type: "user", message: { content: "now STP-10 please" } },
+    a("m3", "spec-investigate", "claude-opus-5-5", 50), // other feature: not counted
+  ];
+  fs.writeFileSync(path.join(pd, "s1.jsonl"), lines.map((l) => JSON.stringify(l)).join("\n"));
+  fs.writeFileSync(path.join(pd, "s1", "subagents", "agent-x.meta.json"), JSON.stringify({ toolUseId: "tu1", description: "Implement task-01" }));
+  fs.writeFileSync(path.join(pd, "s1", "subagents", "agent-x.jsonl"), JSON.stringify(a("m4", null, "claude-haiku-5-5", 7)));
+  const ucli = (...x) => execFileSync("node", [CLI, ...x], { env: { ...process.env, SPEC_DRIVEN_HOME: home }, cwd: uw, stdio: "pipe" }).toString();
+  const j = JSON.parse(ucli("usage", "STP-9", "--json"));
+  assert.equal(j.target, "stp-9-cart");
+  assert.equal(j.totals.output, 15, "5 + 3 + 7: the duplicate and the other feature are left out");
+  assert.ok(j.rows.some((r) => r.stage === "implement" && r.model === "claude-haiku-5-5"), "a subagent counts under the stage that started it");
+  const sm = ucli("usage", "stp-9", "--summary");
+  assert.ok(sm.includes("Haiku 5.5 (implement)") && sm.includes("1 subagent") && sm.includes("90% from cache"), sm);
+  assert.throws(() => ucli("usage", "STP-404"), /No spec folder matches/);
+}
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 

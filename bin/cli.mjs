@@ -11,6 +11,7 @@
 //   spec-driven-dev doctor          check .spec-driven.yml against the real repos (exit 1 on problems)
 //   spec-driven-dev status          list specs with unfinished work and each one's "Resume here" next step
 //   spec-driven-dev context         print specs/CONTEXT.md; --areas=billing,api prints only those area files
+//   spec-driven-dev usage [STP-123] models and tokens a feature used, from Claude Code's session files (--summary  --json)
 //   spec-driven-dev risk            GitRisk: score files from git history into specs/context/risk.md (--files=a,b  --json  --top=N  --since=…)
 //   spec-driven-dev settings        switch features from a menu (GitRisk, run-through, sharing); or --risk=on|off --after-approval=… --share=all|memory|none
 //   spec-driven-dev risk-eval       U8 experiment: run tickets with risk on vs off and compare agent behaviour (--tickets=<file> --runs=N --model=… --arms=on,off --timeout=20)
@@ -25,6 +26,7 @@ import prompts from "prompts";  // arrow-key menus that work in PowerShell, cmd,
 import { fileURLToPath } from "node:url";
 import { scoreRepo, riskMarkdown, normWeights, weightProblems, setConfigValue, riskSummaryBlock, withRiskSummary } from "./risk.mjs";
 import { SHARE_MODES, shareState, planShare, shareTitle } from "./share.mjs";
+import { featureUsage, summary as usageSummary, table as usageTable, resolveFeature, claudeDirName, totals as usageTotals } from "./usage.mjs";
 import { mergeConfig, overrides, splitConfig, dumpYaml, TEAM_HEADER, PERSONAL_HEADER, teamFileFor, readIf } from "./team.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -685,6 +687,7 @@ function doctor() {
   }
   if (!["single", "monorepo", "multi-repo"].includes(c.layout)) problems.push(`layout "${c.layout}" must be single, monorepo, or multi-repo`);
   if (c.tracker && !TRACKER_NAME.test(String(c.tracker.type || ""))) problems.push(`tracker.type "${c.tracker.type}" must be a tracker name in lower case, e.g. jira, github, gitlab, linear, azure-boards, clickup, asana, or none`);
+  if (c.usage?.report && !["all", "pr", "ticket", "local", "off"].includes(c.usage.report)) problems.push(`usage.report "${c.usage.report}" must be all, pr, ticket, local, or off`);
   if (c.git?.commit_style && !["conventional", "ticket", "freeform"].includes(c.git.commit_style)) problems.push(`git.commit_style "${c.git.commit_style}" must be conventional, ticket, or freeform`);
   for (const [tool, m] of Object.entries(c.models || {})) {
     if (typeof m !== "object") { problems.push(`models.${tool} must list light / standard / deep`); continue; }
@@ -865,6 +868,28 @@ function ignoreGenerated(file) {
 function loadConfig() {
   const file = findConfig(DIR);
   return { file, root: file ? path.dirname(file) : gitTop(DIR), c: file ? readConfig(file) : {} };
+}
+
+// ---------- usage: models and tokens per feature ----------
+function usage() {
+  const { file, root, c } = loadConfig();
+  const specs = path.resolve(root, c.specs_dir || "specs");
+  const features = (() => { try { return fs.readdirSync(specs).filter((f) => fs.existsSync(path.join(specs, f, "README.md"))); } catch { return []; } })();
+  if (!features.length) throw new Error(`No spec folders in ${specs}. Usage is counted per feature.`);
+  const wanted = args.filter((a) => !a.startsWith("-"))[1] || run("git", ["branch", "--show-current"], DIR);
+  const target = resolveFeature(wanted, features);
+  if (!target) throw new Error(`No spec folder matches "${wanted}". Pass one: spec-driven-dev usage ${features[0]}`);
+  // Sessions can start in any repo of the workspace, the workspace folder, the specs repo, or a coder's worktree.
+  const places = [root, specs, ...(c.layout === "multi-repo" ? (c.repos || []).map((r) => path.resolve(root, expandHome(String(r.path || "")))) : [])].map((p) => claudeDirName(real(p)));
+  const projects = path.join(HOME, ".claude", "projects");
+  let dirs = [];
+  try { dirs = fs.readdirSync(projects).filter((d) => places.includes(d) || (d.includes("-worktrees-") && places.some((p) => d.startsWith(p.replace(/-[^-]*$/, ""))))); } catch {}
+  const u = featureUsage({ projectDirs: dirs.map((d) => path.join(projects, d)), features, target });
+  if (flag("json")) { console.log(JSON.stringify({ ...u, rows: [...u.rows.values()], totals: usageTotals(u) }, null, 2)); return; }
+  const s = usageSummary(u);
+  if (!s) { console.log(`No Claude Code sessions found for ${target}. Token counts come from Claude Code's session files; other tools show models from log.md only.`); return; }
+  if (flag("summary")) { console.log(s); return; }
+  console.log(`${s}\n\n${usageTable(u)}\n\nFrom Claude Code's session files on this machine${file ? "" : " (no .spec-driven.yml found, so only this folder's sessions)"}. Follow-up = chat about the feature outside a stage.`);
 }
 
 function risk() {
@@ -1205,6 +1230,7 @@ try {
   else if (command === "status") status();
   else if (command === "context") context();
   else if (command === "risk") risk();
+  else if (command === "usage") usage();
   else if (command === "settings") await settings();
   else if (command === "uninstall") await uninstall();
   else if (command === "ci") ci();

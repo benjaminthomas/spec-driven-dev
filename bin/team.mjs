@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 // Shared: decided once by the team. Personal: differs per machine or per person.
-export const TEAM_KEYS = ["tracker", "git", "commands", "models", "effort", "risk", "context"];
+export const TEAM_KEYS = ["tracker", "git", "commands", "models", "effort", "risk", "context", "usage"];
 export const PERSONAL_KEYS = ["version", "layout", "repos", "specs_dir", "pipeline"];
 const REPO_TEAM_KEYS = ["role", "git", "commands"];
 

@@ -38,7 +38,7 @@ people, after merge), and never move a ticket assigned to someone else without a
 | spec-implement starts | `start` | — |
 | spec-verify done | — | each acceptance criterion with pass/fail and one line of evidence; overall N of M pass |
 | spec-review done | — | blocker / should-fix / nit counts, and each blocker in one line |
-| spec-ship done | `review` | PR link, plus "verified N/M, review: no blockers", with the verification screenshots attached |
+| spec-ship done | `review` | PR link, plus "verified N/M, review: no blockers", the build report (models and tokens, when `usage.report` is `all` or `ticket`), and the verification screenshots attached |
 | PR feedback round done | `review` (only if people moved it back) | "review feedback round N addressed": fixes, scope changes, commit |
 
 One comment per stage. A rerun replaces nothing: it posts a new, shorter comment saying what

@@ -197,6 +197,19 @@ choose which to act on. The changes then go through the stages again (implement 
 checkpoint → ship) onto the same PR, never as a quick push. A comment that changes the requirements
 updates the spec and waits for your approval first. Replies go on each thread once you've seen them.
 
+**What it cost.** `spec-driven-dev usage STP-123` shows which models ran each stage and the tokens
+used (from Claude Code's session files, subagents included), and spec-ship puts a short version in the
+PR and the ticket:
+
+```
+Built with spec-driven-dev · stp-297-pricing-fixer-conversion · over 1 h 25 min
+Models: Opus 5.5 (investigate, create, implement, verify, review, follow-up) · Sonnet 5.5 (implement, review)
+Tokens: 40.6 M in (96% from cache) · 108 k out · 8 subagents · 1 session
+```
+
+Totals only, never content. Turn it off or keep it local with `usage.report: local | off`. Other tools
+get the models line from `log.md`; their token counts aren't read yet.
+
 **The ticket keeps up with the work.** When your AI tool can reach the tracker (any MCP server or CLI
 for it: Jira, GitHub, GitLab, Linear, Azure Boards, ClickUp, Asana and others), the pipeline updates the ticket: investigate comments
 with the summary, implement moves it to *In Progress*, verify comments with each acceptance criterion
@@ -691,6 +704,7 @@ spec-driven-dev setup --join=../team-specs        # join a team that's already s
 spec-driven-dev ci --notify                       # GitHub Actions: refresh GitRisk hotspots on every merge
 spec-driven-dev uninstall                         # remove the skills, plugin and cache (--all: settings too)
 spec-driven-dev risk                              # GitRisk: score files from git history → specs/context/risk.md
+spec-driven-dev usage STP-123                     # models and tokens a feature used (--summary, --json)
 spec-driven-dev risk-eval --tickets=tickets.md    # compare agent behaviour with the risk signal on vs off
                                                   #   (--runs=3 --arms=on --timeout=20 --model=sonnet)
 spec-driven-dev --help                            # show all of the above
@@ -815,13 +829,13 @@ skips that step rather than failing.
 | `spec-setup` | 0 · configure | 314 | 3,509 | 6 |
 | `spec-investigate` | 1 · understand | 395 | 3,469 | 1 |
 | `spec-create` | 2 · plan | 198 | 1,806 | 6 |
-| `spec-implement` | 3 · build | 332 | 2,842 | 4 |
+| `spec-implement` | 3 · build | 334 | 2,872 | 4 |
 | `spec-verify` | 4 · prove | 171 | 1,673 | 1 |
 | `spec-review` | 5 · review | 179 | 1,817 | 1 |
 | `spec-checkpoint` | 6 · commit | 140 | 1,168 | 0 |
-| `spec-ship` | 7 · PR | 239 | 1,507 | 0 |
+| `spec-ship` | 7 · PR | 256 | 1,683 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **2,223** | **20,000** | **26** |
+| **Total** | | **2,242** | **20,206** | **26** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **5** tools supported natively (Claude Code, Codex CLI, Cursor, OpenCode, Antigravity), plus an MCP fallback

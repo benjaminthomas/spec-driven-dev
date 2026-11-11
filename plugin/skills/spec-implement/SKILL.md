@@ -147,7 +147,9 @@ The coder agents should NOT commit their changes — the orchestrator handles co
 - If the mapped value is `default`, use whatever model the session already runs, without
   recommending a switch.
 
-Report the model used for each task in the batch summary.
+Report the model used for each task in the batch summary, and append one line to `log.md`, e.g.
+`models: task-01 haiku, task-02 sonnet, task-03 opus (escalated from sonnet)`. spec-ship's build
+report uses it on hosts whose token counts it can't read.
 
 **Isolate parallel coders in git worktrees when the host allows it.** Coders sharing one working
 tree can clobber each other's edits and each other's lint/test runs. If your host can run an agent

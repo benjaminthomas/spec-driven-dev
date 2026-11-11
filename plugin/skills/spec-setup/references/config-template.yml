@@ -30,6 +30,9 @@ tracker:
   screenshots: on               # attach verification screenshots to the final comment (after the last review passes): on | off
   # statuses: { start: In Progress, review: In Review }   # filled from the project's real workflow on first use
 
+usage:
+  report: all                   # models and token totals in the final report: all (PR and ticket) | pr | ticket | local (log.md only) | off
+
 git:
   remote: origin
   base_branch: default          # branch work is cut from; "default" = the remote's default branch
