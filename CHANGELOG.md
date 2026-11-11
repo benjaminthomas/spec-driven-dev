@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.16.0 — 2026-11-11
+- **Join a team that's already set up.** A team's shared rules (tracker, git conventions, per-repo commands, models, GitRisk, sharing) now live in `team.yml` in the specs repo, committed with the specs. Each person's `.spec-driven.yml` keeps only local paths and personal preferences, and overrides the team for them only (`doctor` lists any overrides).
+  - `spec-setup` looks for an existing team setup first and offers **Join**, which asks only which of the team's repos you have. No audit, no convention questions, and the shared files aren't changed.
+  - `spec-driven-dev setup --join=<specs repo path or git URL>` does the same from a terminal, with clone commands for team repos you don't have.
+  - `spec-driven-dev team init` converts an existing setup: it writes `team.yml` and keeps a backup of your old file.
+  - `settings` saves team rules (GitRisk, sharing) to `team.yml` when there is one, and every skill reads it.
+
 ## 1.15.0 — 2026-11-11
 - **`spec-driven-dev ci`: GitRisk hotspots refresh on every merge.** It writes a GitHub Actions workflow into the specs repo that checks out every repo in `team-repos.yml` (full history), runs `risk`, and commits `CONTEXT.md`'s Risk hotspots only when they changed, not for a date-only change. It runs when a code repo pings it, nightly, and on demand. `--notify` also writes the small trigger workflow into each code repo, on its base branch. It needs one secret, `GITRISK_TOKEN`, and commits nothing for you.
 - `risk --repos=a,b --specs-dir=…` scores a checkout without a personal settings file, as used in CI.

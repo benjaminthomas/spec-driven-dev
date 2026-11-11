@@ -28,7 +28,7 @@ investigate → create → approve → implement → verify → review → check
 Load `.spec-driven.yml`: walk up from the current directory to the home folder, and the first one
 found wins (a `multi-repo` config only applies inside the repos it lists). If none is found, check
 `~/.spec-driven/workspaces.json`, which maps each multi-repo config to its repo paths. Use the config
-whose repos contain the current directory. Its values beat anything you would detect or assume. This
+whose repos contain the current directory. Its values beat anything you would detect or assume. If `{specs_dir}/team.yml` exists, it holds the team's shared rules (tracker, git conventions, commands, models, GitRisk, sharing): read it first, and let `.spec-driven.yml` override it. This
 skill uses `git` (base branch, PR target), `commands` (lint/typecheck/test), `models`/`effort`,
 `layout`/`repos`, and `specs_dir`.
 

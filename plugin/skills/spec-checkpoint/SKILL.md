@@ -20,7 +20,7 @@ Load `.spec-driven.yml`: walk up from the current directory to the home folder, 
 found wins (a `multi-repo` config only applies inside the repos it lists). If none is found, check
 `~/.spec-driven/workspaces.json`, which maps each multi-repo config to its repo paths. Use the config
 whose repos contain the current directory, because a workspace's repos can live in unrelated folders. Its values beat anything
-you would detect or assume. This skill uses `commands` (lint/typecheck/test/build), `git.commit_style`, and `layout`/`repos`.
+you would detect or assume. If `{specs_dir}/team.yml` exists, it holds the team's shared rules (tracker, git conventions, commands, models, GitRisk, sharing): read it first, and let `.spec-driven.yml` override it. This skill uses `commands` (lint/typecheck/test/build), `git.commit_style`, and `layout`/`repos`.
 
 **Multi-repo:** run this in every listed repo that has changes, making one commit per repo with the same subject. **Monorepo:** run the checks for the packages that changed, or the root commands if that's how the repo works.
 

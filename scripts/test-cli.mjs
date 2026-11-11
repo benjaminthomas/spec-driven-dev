@@ -466,6 +466,45 @@ assert.ok(!changed(), "a date-only change must not be committed");
 fs.writeFileSync(ctxp, fs.readFileSync(ctxp, "utf8").replace(/^- .*$/m, "- `shop/other.ts` 99 critical"));
 assert.ok(changed(), "a hotspot change must be committed");
 
+// 26. team: person A shares the rules (team init); person B, on another machine with fewer repos, joins
+const tA = path.join(tmp, "teamA"), tB = path.join(tmp, "teamB"), homeB = path.join(tmp, "homeB");
+repo(path.join(tA, "shop"), { lint: "eslint ." }, ["STP-1: a", "STP-2: b", "STP-3: c"], ["staging"]);
+repo(path.join(tA, "api"), { test: "jest" }, ["STP-4: d"], ["staging"]);
+repo(path.join(tA, "dash"), {}, ["feat: e"]);
+repo(path.join(tA, "team-specs"), {}, ["docs: start"]);
+fs.writeFileSync(path.join(tA, "team-specs/team-repos.yml"), `repos:\n  - name: shop\n    url: ${path.join(tA, "shop")}\n  - name: api\n    url: ${path.join(tA, "api")}\n  - name: dash\n    url: ${path.join(tA, "dash")}\n`);
+cli("setup", "--yes", `--dir=${tA}`, "--layout=multi-repo", "--repos=shop,api,dash", `--workspace=${tA}`, "--specs-dir=team-specs");
+const beforeA = fs.readFileSync(path.join(tA, ".spec-driven.yml"), "utf8");
+const ti = cli("team", "init", `--dir=${tA}`);
+const teamYml = fs.readFileSync(path.join(tA, "team-specs/team.yml"), "utf8"), personalA = fs.readFileSync(path.join(tA, ".spec-driven.yml"), "utf8");
+assert.ok(ti.includes("Wrote") && teamYml.includes("tracker:") && teamYml.includes("base_branch: staging") && teamYml.includes("commit_style:") && teamYml.includes("risk:"), teamYml);
+assert.ok(!personalA.includes("tracker:") && !personalA.includes("base_branch") && personalA.includes("specs_dir: team-specs") && personalA.includes("path: shop"), personalA);
+assert.equal(fs.readFileSync(path.join(tA, ".spec-driven.yml.bak"), "utf8"), beforeA, "old config is backed up");
+assert.equal(doctor(tA).code, 0, doctor(tA).out);
+assert.ok(doctor(tA).out.includes("team rules come from"), doctor(tA).out);
+assert.throws(() => cli("team", "init", `--dir=${tA}`), /already exists/);
+sh(path.join(tA, "team-specs"), "add", "-A"); sh(path.join(tA, "team-specs"), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "team rules");
+// person B: different machine, clones the specs repo plus only shop and api
+fs.mkdirSync(tB);
+for (const n of ["shop", "api", "team-specs"]) execFileSync("git", ["clone", "-q", path.join(tA, n), path.join(tB, n)]);
+const bcli = (...a) => execFileSync("node", [CLI, ...a], { env: { ...process.env, SPEC_DRIVEN_HOME: homeB }, stdio: "pipe" }).toString();
+const jo = bcli("setup", `--dir=${tB}`, `--join=${path.join(tB, "team-specs")}`);
+const personalB = fs.readFileSync(path.join(tB, ".spec-driven.yml"), "utf8");
+assert.ok(jo.includes("Joined the team") && jo.includes("shop, api") && jo.includes("dash isn't cloned here") && jo.includes(`git clone ${path.join(tA, "dash")}`), jo);
+assert.ok(personalB.includes("layout: multi-repo") && personalB.includes("specs_dir: team-specs") && !personalB.includes("tracker"), personalB);
+const dB = execFileSync("node", [CLI, "doctor", `--dir=${tB}`], { env: { ...process.env, SPEC_DRIVEN_HOME: homeB } }).toString();
+assert.ok(dB.includes("team rules come from") && dB.includes("Config matches the repos"), dB);
+fs.writeFileSync(path.join(tA, "team-specs/team-repos.yml"), fs.readFileSync(path.join(tA, "team-specs/team-repos.yml"), "utf8").replace("  - name: shop\n", "  - name: shop\n    role: the storefront app\n"));
+assert.ok(!doctor(tA).out.includes("shop: no role"), "roles come from team-repos.yml, not each person's file");
+assert.ok(!fs.readFileSync(path.join(tB, "team-specs/team.yml"), "utf8").includes("personal"), "joining must not change the team's file");
+assert.equal(execFileSync("git", ["status", "--short"], { cwd: path.join(tB, "team-specs") }).toString().trim(), "", "joining leaves the specs repo untouched");
+assert.throws(() => bcli("setup", `--dir=${tB}`, `--join=${path.join(tB, "team-specs")}`), /already exists/);
+// a personal override is reported; a team setting changed from settings goes to team.yml
+fs.appendFileSync(path.join(tB, ".spec-driven.yml"), "git:\n  base_branch: main\n");
+assert.ok(execFileSync("node", [CLI, "doctor", `--dir=${tB}`], { env: { ...process.env, SPEC_DRIVEN_HOME: homeB } }).toString().includes('your git.base_branch ("main") overrides the team\'s ("staging")'));
+const so3 = bcli("settings", `--dir=${tB}`, "--risk=off");
+assert.ok(so3.includes("shared with the team") && fs.readFileSync(path.join(tB, "team-specs/team.yml"), "utf8").includes("enabled: off"), so3);
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 

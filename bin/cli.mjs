@@ -4,6 +4,8 @@
 //
 //   spec-driven-dev                 install the skills, then hand over to your AI tool ("run spec-setup")
 //   spec-driven-dev setup           scripted setup for CI: needs --yes or answer flags (people: say "run spec-setup")
+//   spec-driven-dev team init       move the team's shared rules into the specs repo (team.yml) so colleagues can join
+//   spec-driven-dev setup --join=<specs repo path or git URL>   join a team that's already set up (asks nothing else)
 //   spec-driven-dev ci              write GitHub Actions that refresh GitRisk hotspots on every merge (--notify also writes the per-repo trigger)
 //   spec-driven-dev uninstall       remove the skills (all tools), the Claude Code plugin and the download cache; --all also removes the settings file
 //   spec-driven-dev doctor          check .spec-driven.yml against the real repos (exit 1 on problems)
@@ -23,6 +25,7 @@ import prompts from "prompts";  // arrow-key menus that work in PowerShell, cmd,
 import { fileURLToPath } from "node:url";
 import { scoreRepo, riskMarkdown, normWeights, weightProblems, setConfigValue, riskSummaryBlock, withRiskSummary } from "./risk.mjs";
 import { SHARE_MODES, shareState, planShare, shareTitle } from "./share.mjs";
+import { mergeConfig, overrides, splitConfig, dumpYaml, TEAM_HEADER, PERSONAL_HEADER, teamFileFor, readIf } from "./team.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SKILLS_DIR = path.join(ROOT, "plugin", "skills");
@@ -41,7 +44,7 @@ const args = process.argv.slice(2);
 const flag = (n) => args.includes(`--${n}`);
 const opt = (n) => args.find((a) => a.startsWith(`--${n}=`))?.split("=")[1];
 const command = args.find((a) => !a.startsWith("-")) || "install";
-const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status", "context", "risk", "risk-eval", "setup", "ci"].includes(command) || (command === "uninstall" && flag("yes"));
+const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status", "context", "risk", "risk-eval", "setup", "ci", "team"].includes(command) || (command === "uninstall" && flag("yes"));
 const DIR = path.resolve(opt("dir") || process.cwd());
 
 // Colour only for a person at a terminal; pipes, CI and NO_COLOR get plain text (and the tests stay plain).
@@ -65,7 +68,7 @@ if (flag("version") || flag("v")) {
 }
 // No terminal to answer in (e.g. `!` in Claude Code, an IDE task, a pipe) and nothing passed explicitly:
 // stop rather than write a config from guesses.
-const ANSWER_FLAGS = ["share", "specs-dir", "risk", "yes", "y", "layout", "repos", "packages", "tools", "workspace", "after-approval", "skills", "global", "no-setup", "project"];
+const ANSWER_FLAGS = ["join", "share", "specs-dir", "risk", "yes", "y", "layout", "repos", "packages", "tools", "workspace", "after-approval", "skills", "global", "no-setup", "project"];
 const NO_TTY = !process.stdin.isTTY && !args.some((a) => ANSWER_FLAGS.some((f) => a === `--${f}` || a.startsWith(`--${f}=`)));
 // Installing the skills needs no answers, so the default command still does that without a terminal
 // (e.g. `!` in Claude Code) and hands the questions to the spec-setup skill, which asks them in the chat.
@@ -589,6 +592,21 @@ function configApplies(f, dir) {
   return here === real(base) || c.repos.some((r) => { const p = real(path.resolve(base, expandHome(String(r.path || "")))); return here === p || here.startsWith(p + path.sep); });
 }
 
+// The effective config: the team's rules (team.yml in the specs repo) with the personal file on top.
+function readConfig(file) {
+  const personal = parseYaml(fs.readFileSync(file, "utf8"));
+  const tf = teamFileFor(file, personal.specs_dir);
+  const team = readIf(tf);
+  const c = team ? { ...mergeConfig(personal, parseYaml(team)), _teamFile: tf, _personal: personal, _team: parseYaml(team) } : personal;
+  // Repo roles are team knowledge kept in team-repos.yml; fill them in rather than copying them into each person's file.
+  const listed = parseYaml(readIf(path.join(path.dirname(tf), "team-repos.yml")) || "").repos;
+  if (Array.isArray(listed) && Array.isArray(c.repos)) {
+    const roles = new Map(listed.map((r) => [r.name, r.role]));
+    c.repos = c.repos.map((r) => (r.role ? r : { ...r, role: roles.get(path.basename(String(r.path || "").replace(/[\\/]+$/, ""))) || r.role }));
+  }
+  return c;
+}
+
 function findConfig(dir) {
   for (let d = dir; ; d = path.dirname(d)) {
     const f = path.join(d, ".spec-driven.yml");
@@ -608,8 +626,12 @@ function doctor() {
   if (!file) throw new Error(`No .spec-driven.yml in ${DIR} or above. In your AI tool, say "run spec-setup".`);
   const root = path.dirname(file);
   let c;
-  try { c = parseYaml(fs.readFileSync(file, "utf8")); } catch (e) { throw new Error(`${file} could not be read: ${e.message}`); }
+  try { c = readConfig(file); } catch (e) { throw new Error(`${file} could not be read: ${e.message}`); }
   const problems = [], notes = [];
+  if (c._teamFile) {
+    notes.push(`team rules come from ${c._teamFile}`);
+    for (const o of overrides(c._personal, c._team)) notes.push(`your ${o.key} (${JSON.stringify(o.yours)}) overrides the team's (${JSON.stringify(o.team)}) for you only`);
+  }
   if (!["single", "monorepo", "multi-repo"].includes(c.layout)) problems.push(`layout "${c.layout}" must be single, monorepo, or multi-repo`);
   if (c.tracker && !["jira", "github", "linear", "none"].includes(c.tracker.type)) problems.push(`tracker.type "${c.tracker.type}" must be jira, github, linear, or none`);
   if (c.git?.commit_style && !["conventional", "ticket", "freeform"].includes(c.git.commit_style)) problems.push(`git.commit_style "${c.git.commit_style}" must be conventional, ticket, or freeform`);
@@ -707,7 +729,7 @@ function checkContext(specs, specsName, repoRoots, problems, notes) {
 function context() {
   const file = findConfig(DIR);
   const root = file ? path.dirname(file) : DIR;
-  const specsName = (file && parseYaml(fs.readFileSync(file, "utf8")).specs_dir) || "specs";
+  const specsName = (file && readConfig(file).specs_dir) || "specs";
   const index = path.join(root, specsName, "CONTEXT.md");
   const areas = splitList(opt("areas"));
   if (!areas.length) {
@@ -791,7 +813,7 @@ function ignoreGenerated(file) {
 
 function loadConfig() {
   const file = findConfig(DIR);
-  return { file, root: file ? path.dirname(file) : gitTop(DIR), c: file ? parseYaml(fs.readFileSync(file, "utf8")) : {} };
+  return { file, root: file ? path.dirname(file) : gitTop(DIR), c: file ? readConfig(file) : {} };
 }
 
 function risk() {
@@ -857,7 +879,7 @@ async function riskEvalCmd() {
 
 // Plain-language switches, so anyone can change them without editing YAML.
 const SETTINGS = [
-  { block: "risk", key: "enabled", flag: "risk", name: "GitRisk", about: "extra care on files with a history of bugs",
+  { block: "risk", key: "enabled", flag: "risk", team: true, name: "GitRisk", about: "extra care on files with a history of bugs",
     get: (c) => c.risk?.enabled || "on", options: [
       { value: "on", title: "On", description: "investigations, plans and reviews look harder at historically risky files" },
       { value: "off", title: "Off", description: "the skills ignore risk completely" }] },
@@ -865,7 +887,7 @@ const SETTINGS = [
     get: (c) => c.pipeline?.after_approval || "stop", options: [
       { value: "stop", title: "Stop after each stage", description: "you start implement, verify, review and commit yourself" },
       { value: "run-through", title: "Run straight through", description: "implement → verify → review → commit; stops at any failure, never pushes" }] },
-  { block: "context", key: "share", flag: "share", name: "Share specs with the team", about: "what's committed from the specs folder",
+  { block: "context", key: "share", flag: "share", team: true, name: "Share specs with the team", about: "what's committed from the specs folder",
     get: (c) => c.context?.share || "all", after: (file, c, v) => applyShare(path.dirname(file), c.specs_dir || "specs", v), options: [
       { value: "all", title: "Share everything", description: "commit plans, investigations, reviews and project memory" },
       { value: "memory", title: "Share project memory only", description: "commit CONTEXT.md and context/; keep feature files local" },
@@ -876,18 +898,22 @@ async function settings() {
   const file = findConfig(DIR);
   if (!file) throw new Error(`No .spec-driven.yml in ${DIR} or above. In your AI tool, say "run spec-setup" first.`);
   let text = fs.readFileSync(file, "utf8");
+  const tf = readConfig(file)._teamFile;
   const label = (s, v) => s.options.find((o) => o.value === v)?.title || v;
   const save = async (s, v) => {
     if (!s.options.some((o) => o.value === v)) throw new Error(`--${s.flag} must be ${s.options.map((o) => o.value).join(" or ")}`);
-    text = setConfigValue(text, s.block, s.key, v);
-    fs.writeFileSync(file, text);
-    console.log(`✓ ${s.name}: ${label(s, v)}  (saved in ${file})`);
-    if (s.after) await s.after(file, parseYaml(text), v);
+    // Team rules go to the shared team.yml when there is one; the rest stays personal.
+    const target = s.team && tf ? tf : file;
+    const updated = setConfigValue(fs.readFileSync(target, "utf8"), s.block, s.key, v);
+    fs.writeFileSync(target, updated);
+    if (target === file) text = updated;
+    console.log(`✓ ${s.name}: ${label(s, v)}  (saved in ${target}${target === tf ? ": shared with the team, commit it" : ""})`);
+    if (s.after) await s.after(file, readConfig(file), v);
   };
   const given = SETTINGS.filter((s) => opt(s.flag));
   if (given.length) for (const s of given) await save(s, opt(s.flag));
   else for (;;) {
-    const c = parseYaml(text);
+    const c = readConfig(file);
     const pick = await askSelect("Settings: pick one to change", [
       ...SETTINGS.map((s) => ({ title: `${s.name}: ${label(s, s.get(c))}`, description: s.about, value: s })),
       { title: "Done", value: null }], null);
@@ -895,7 +921,7 @@ async function settings() {
     const v = await askSelect(`${pick.name}`, pick.options, pick.get(c));
     if (v !== pick.get(c)) await save(pick, v);
   }
-  const c = parseYaml(text);
+  const c = readConfig(file);
   if (c.risk?.enabled !== "off" && !fs.existsSync(path.join(path.dirname(file), c.specs_dir || "specs", "context", "risk.md"))) {
     if (given.length || !(await askConfirm("GitRisk is on but files haven't been scored yet. Score them now? (uses git only, takes seconds)", true)))
       console.log("  GitRisk is on, but nothing is scored yet. Run: spec-driven-dev risk");
@@ -940,6 +966,56 @@ async function uninstall() {
     console.log(`✓ Removed ${f.what}`);
   }
   console.log("Done. Reinstall any time with: npx @benjaminthomas/spec-driven-dev@latest");
+}
+
+// ---------- team: shared rules in the specs repo ----------
+function teamInit() {
+  const file = findConfig(DIR);
+  if (!file) throw new Error('No .spec-driven.yml found. Say "run spec-setup" in your AI tool first.');
+  const personal = parseYaml(fs.readFileSync(file, "utf8"));
+  const tf = teamFileFor(file, personal.specs_dir);
+  if (fs.existsSync(tf)) throw new Error(`${tf} already exists. To change a team rule, edit it and commit, or say "change our branch rules" in your AI tool.`);
+  if (!specsInGit(path.dirname(file), personal.specs_dir || "specs")) console.log(`• ${path.dirname(tf)} isn't in a git repo, so team.yml can't be shared yet. Keep specs in a repo (a dedicated specs repo is best).`);
+  const { team, personal: mine } = splitConfig(personal);
+  fs.mkdirSync(path.dirname(tf), { recursive: true });
+  fs.writeFileSync(tf, TEAM_HEADER + dumpYaml(team));
+  fs.copyFileSync(file, `${file}.bak`);
+  fs.writeFileSync(file, PERSONAL_HEADER(path.relative(path.dirname(file), tf)) + dumpYaml(mine));
+  step(1, "Team rules shared", ink.cyan);
+  console.log(`✓ Wrote ${tf} (tracker, git conventions, commands, models, GitRisk, sharing)
+✓ ${file} now keeps only your local settings (the old file is ${path.basename(file)}.bak)
+Next: commit team.yml in the specs repo. Colleagues who clone it run: spec-driven-dev setup --join=<path to the specs repo>
+or say "run spec-setup" in their AI tool, which finds it and offers to join.`);
+}
+
+function join() {
+  const target = opt("join");
+  let specsDir = /^(https?:|git@|ssh:)/.test(target) ? "" : path.resolve(DIR, expandHome(target));
+  const workspace = path.resolve(DIR, expandHome(opt("workspace") || (specsDir ? path.dirname(specsDir) : DIR)));
+  if (!specsDir) {
+    const name = path.basename(target).replace(/\.git$/, "");
+    specsDir = path.join(workspace, name);
+    if (!fs.existsSync(specsDir)) execFileSync("git", ["clone", "-q", target, specsDir], { stdio: "inherit" });
+  }
+  const team = parseYaml(readIf(path.join(specsDir, "team.yml")) || "");
+  const repoList = parseYaml(readIf(path.join(specsDir, "team-repos.yml")) || "").repos;
+  if (!Object.keys(team).length && !Array.isArray(repoList)) throw new Error(`${specsDir} has no team.yml or team-repos.yml, so there's no team to join. Ask whoever set it up to run: spec-driven-dev team init`);
+  const known = Array.isArray(repoList) ? repoList : (team.repos || []);
+  const wanted = opt("repos") ? splitList(opt("repos")) : known.map((r) => r.name);
+  const have = wanted.filter((n) => isRepo(path.join(workspace, n)));
+  const missing = known.filter((r) => wanted.includes(r.name) && !have.includes(r.name));
+  if (!have.length) throw new Error(`None of the team's repos (${known.map((r) => r.name).join(", ")}) are cloned in ${workspace}. Clone the ones you work on, then join again (or pass --workspace=<folder>).`);
+  const file = path.join(workspace, ".spec-driven.yml");
+  if (fs.existsSync(file) && !flag("force")) throw new Error(`${file} already exists. Add --force to replace it with the team's setup (it's backed up first).`);
+  if (fs.existsSync(file)) fs.copyFileSync(file, `${file}.bak`);
+  const mine = { version: 1, layout: have.length > 1 ? "multi-repo" : "single", repos: have.map((n) => ({ path: n })), specs_dir: path.relative(workspace, specsDir) || ".", pipeline: { after_approval: opt("after-approval") || "stop" } };
+  if (mine.layout === "single") { delete mine.repos; }
+  fs.writeFileSync(file, PERSONAL_HEADER(path.relative(workspace, path.join(specsDir, "team.yml"))) + dumpYaml(mine));
+  if (mine.layout === "multi-repo") register(real(file), have.map((n) => real(path.join(workspace, n))));
+  step(1, "Joined the team", ink.cyan);
+  console.log(`✓ Wrote ${file} with your repos: ${have.join(", ")}
+  Team rules (tracker, branches, commits, commands, GitRisk) come from ${path.join(specsDir, "team.yml")}${Object.keys(team).length ? "" : " (not created yet: team-repos.yml only)"}.`);
+  for (const r of missing) console.log(`  • ${r.name} isn't cloned here${r.url ? `: git clone ${r.url} ${path.join(workspace, r.name)}` : ""}`);
 }
 
 // ---------- CI: refresh GitRisk hotspots on merge ----------
@@ -1052,7 +1128,7 @@ Next:
 function status() {
   const file = findConfig(DIR);
   const root = file ? path.dirname(file) : DIR;
-  const specsName = (file && parseYaml(fs.readFileSync(file, "utf8")).specs_dir) || "specs";
+  const specsName = (file && readConfig(file).specs_dir) || "specs";
   const specs = path.join(root, specsName);
   const lines = [];
   for (const name of subdirs(specs)) {
@@ -1080,14 +1156,16 @@ try {
   else if (command === "settings") await settings();
   else if (command === "uninstall") await uninstall();
   else if (command === "ci") ci();
+  else if (command === "team") { if (args.includes("init")) teamInit(); else throw new Error("Use: spec-driven-dev team init"); }
   else if (command === "risk-eval") await riskEvalCmd();
   else if (command === "install") {
     if (HANDOFF) console.log("No interactive terminal (for example a \"!\" command in Claude Code), so the skills go to the AI tools it finds, for this project.\n");
     const tools = await install();
     if (tools.length && !flag("no-setup")) await handOver(tools);
-  } else if (SETUP_IN_AGENT) handOver([], true);
+  } else if (command === "setup" && opt("join")) join();
+  else if (SETUP_IN_AGENT) handOver([], true);
   else if (command === "setup") await setup();
-  else throw new Error(`Unknown command "${command}" — use install (default), setup, settings, ci, uninstall, doctor, status, context, risk, or risk-eval`);
+  else throw new Error(`Unknown command "${command}" — use install (default), setup, settings, team, ci, uninstall, doctor, status, context, risk, or risk-eval`);
   if (command === "setup" && !SETUP_IN_AGENT) console.log('\nNext: in your AI tool, say "investigate <ticket>" or "create a spec".');
 } catch (e) {
   console.error(`✗ ${e.message}`);

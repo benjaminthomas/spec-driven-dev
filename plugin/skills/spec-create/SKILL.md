@@ -23,7 +23,7 @@ Load `.spec-driven.yml`: walk up from the current directory to the home folder, 
 found wins (a `multi-repo` config only applies inside the repos it lists). If none is found, check
 `~/.spec-driven/workspaces.json`, which maps each multi-repo config to its repo paths. Use the config
 whose repos contain the current directory, because a workspace's repos can live in unrelated folders. Its values beat anything
-you would detect or assume. This skill uses `layout`/`repos` and `specs_dir`.
+you would detect or assume. If `{specs_dir}/team.yml` exists, it holds the team's shared rules (tracker, git conventions, commands, models, GitRisk, sharing): read it first, and let `.spec-driven.yml` override it. This skill uses `layout`/`repos` and `specs_dir`.
 
 **Monorepo / multi-repo:** every task names its package or repo, and its file paths are relative to that. Keep each task inside one repo. Cross-repo work becomes separate tasks, with the contract (API shape, event, schema) written into both.
 

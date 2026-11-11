@@ -180,6 +180,16 @@ every team repo with its git URL, so setup offers them, `doctor` shows which are
 the clone command), and an investigation stops and says so when a ticket needs a repo that isn't on
 this machine.
 
+**Joining a team that's already set up.** The first person's setup moves the team's rules (tracker,
+base branch, branch and commit style, per-repo commands, models, GitRisk, sharing) into **`team.yml`
+in the specs repo**, which is committed with the specs. Each person's own `.spec-driven.yml` keeps only
+where their repos are on that machine and personal preferences. A colleague clones the specs repo and
+the code repos they work on, then says "run spec-setup": it finds the team's setup, offers **Join**, and
+asks only which of the team's repos they have. No audit, no convention questions, and nothing shared
+changes. From a terminal: `spec-driven-dev setup --join=../soreto-specs`. Changing a team rule is an
+edit to `team.yml` and a commit, and anything set in your own file overrides it for you only (`doctor`
+lists those overrides). An existing setup can be converted with `spec-driven-dev team init`.
+
 **For scripts and CI** there's `spec-driven-dev setup` with flags (it asks nothing):
 `--yes`, `--layout=multi-repo --repos=~/Projects/frontend,~/Work/backend --workspace=~/Projects`,
 `--layout=monorepo --packages=apps/web,packages/ui`, `--specs-dir=<path>`, `--share=all|memory|none`,
@@ -660,6 +670,8 @@ spec-driven-dev doctor                            # check .spec-driven.yml again
 spec-driven-dev status                            # list unfinished specs and each one's next step
 spec-driven-dev context --areas=billing           # print the project memory (index, or chosen areas)
 spec-driven-dev settings                          # switch GitRisk, run-through and sharing from a menu
+spec-driven-dev team init                         # share the team's rules in the specs repo (team.yml)
+spec-driven-dev setup --join=../team-specs        # join a team that's already set up
 spec-driven-dev ci --notify                       # GitHub Actions: refresh GitRisk hotspots on every merge
 spec-driven-dev uninstall                         # remove the skills, plugin and cache (--all: settings too)
 spec-driven-dev risk                              # GitRisk: score files from git history → specs/context/risk.md
@@ -775,16 +787,16 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 273 | 2,829 | 4 |
-| `spec-investigate` | 1 · understand | 387 | 3,367 | 1 |
-| `spec-create` | 2 · plan | 198 | 1,782 | 6 |
-| `spec-implement` | 3 · build | 327 | 2,753 | 3 |
-| `spec-verify` | 4 · prove | 163 | 1,557 | 1 |
-| `spec-review` | 5 · review | 137 | 1,294 | 1 |
-| `spec-checkpoint` | 6 · commit | 140 | 1,144 | 0 |
-| `spec-ship` | 7 · PR | 230 | 1,388 | 0 |
+| `spec-setup` | 0 · configure | 298 | 3,141 | 4 |
+| `spec-investigate` | 1 · understand | 387 | 3,391 | 1 |
+| `spec-create` | 2 · plan | 198 | 1,806 | 6 |
+| `spec-implement` | 3 · build | 327 | 2,777 | 3 |
+| `spec-verify` | 4 · prove | 163 | 1,581 | 1 |
+| `spec-review` | 5 · review | 137 | 1,318 | 1 |
+| `spec-checkpoint` | 6 · commit | 140 | 1,168 | 0 |
+| `spec-ship` | 7 · PR | 230 | 1,412 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **2,110** | **18,323** | **23** |
+| **Total** | | **2,135** | **18,803** | **23** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback
@@ -837,7 +849,7 @@ plugin/evals/                 `claude plugin eval` cases
   1. Increase `version` in both `package.json` and `plugin/.claude-plugin/plugin.json` (the check fails if
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
-  3. Tag the release and push the tag: `git tag v1.15.0 && git push origin v1.15.0`.
+  3. Tag the release and push the tag: `git tag v1.16.0 && git push origin v1.16.0`.
   4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
      npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 

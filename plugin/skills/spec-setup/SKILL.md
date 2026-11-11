@@ -32,10 +32,29 @@ first one found wins.
 |---|---|---|
 | `single` | the repo root | Commit it — the whole team gets the same rules |
 | `monorepo` | the repo root | Commit it |
-| `multi-repo` | the shared parent folder of the repos (usually not itself a git repo) | Personal by default; offer to also commit a copy into the repo the team treats as "home" |
+| `multi-repo` | the shared parent folder of the repos (usually not itself a git repo) | The team's rules go in `team.yml` in the specs repo (shared); this file keeps only local paths |
 
 A multi-repo config only applies inside the repos it lists. If the current repo sits under that
 folder but isn't listed, treat it as having no config (ask whether to add it).
+
+## Step 0 — Join a team that's already set up
+
+Before detecting anything, look for a team setup someone already shared: a folder next to this repo
+(or in the workspace folder) containing `team.yml` or `team-repos.yml`, or a specs repo the user
+names (a path, or a git URL to clone). If you find one, say so with what it is, and ask with a menu:
+
+> Found your team's setup in ~/Projects/soreto-specs: 5 repos, Jira STP, branches from staging.
+> `Join it (Recommended)`: use the team's rules; I'll only ask which of its repos you have here.
+> `Set up separately`: ignore it and answer everything yourself.
+
+**Joining:** ask only which of the team's repos you work on (tick boxes, from `team-repos.yml`;
+mark the ones not cloned here and offer their `git clone` command, cloning only on a yes), then run
+`spec-driven-dev setup --join=<specs repo> --repos=<chosen>` (or `npx -y @benjaminthomas/spec-driven-dev …`).
+Don't audit, don't ask about conventions, and never change the team's files: `CONTEXT.md`,
+`team.yml` and `team-repos.yml` are shared. Then run `doctor`, and finish with "You've joined. Say
+*investigate STP-123* to start." Only `team-repos.yml` and no `team.yml` (an older setup): join
+anyway, and tell the user the team's rules aren't shared yet, so the person who set it up should
+run `spec-driven-dev team init`.
 
 ## Step 1 — Detect before asking
 
@@ -204,6 +223,11 @@ for the rest.
    under `repos:` where they differ from the top level.
 2. If it's inside a repo, tell the user it's meant to be committed (so teammates get the same
    rules) — don't commit it yourself.
+   **Multi-repo with specs in a repo:** run `spec-driven-dev team init` right after writing the
+   file. It moves the team's rules (tracker, git conventions, commands, models, GitRisk, sharing)
+   into `{specs_dir}/team.yml`, which is committed with the specs, and leaves only local paths in
+   `.spec-driven.yml`. Tell the user to commit `team.yml`, and that colleagues then just say
+   "run spec-setup" and choose *Join*.
 3. If `npx` is available, run `npx -y @benjaminthomas/spec-driven-dev doctor` from the config's folder. It checks
    that every branch, folder, and `npm run` script in the file really exists. Fix anything it
    reports before finishing.
@@ -249,6 +273,7 @@ keep every other line and comment, and confirm in one sentence. Don't re-run dis
 | "turn GitRisk on", "use the risk scores" | `risk.enabled: on`, then run `spec-driven-dev risk` if `{specs_dir}/context/risk.md` doesn't exist yet |
 | "run straight through after I approve", "fewer stops" | `pipeline.after_approval: run-through` |
 | "stop after each stage" | `pipeline.after_approval: stop` |
+| "change our branch rules", "use main for PRs" (when `team.yml` exists) | edit `team.yml`, since it's a team rule, and remind them to commit it; only change `.spec-driven.yml` if they say it's just for them |
 | "add reverb-react to the workspace", "I also work on X" | add it under `repos:` (clone first if needed, from `team-repos.yml`), and to `team-repos.yml` if it's new to the team |
 | "share the specs with the team", "keep specs local", "share only the project memory" | `context.share: all / none / memory`: show the `.gitignore` change, then run `spec-driven-dev settings --share=…` on a yes |
 
