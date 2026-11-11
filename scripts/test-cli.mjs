@@ -300,6 +300,15 @@ assert.ok(d.code === 1 && d.out.includes("risk.md is committed to git") && d.out
 sh(gr, "rm", "-q", "--cached", "specs/context/risk.md");
 assert.equal(doctor(gr).code, 0, doctor(gr).out);
 
+// 18. no terminal and no flags: install still installs the skills (detected tools, this project) and hands setup to the AI tool
+const hand = path.join(tmp, "handoff");
+repo(hand, {}, ["x"]);
+const ho = cli(`--dir=${hand}`);
+assert.ok(fs.existsSync(path.join(hand, ".cursor/skills/spec-setup/SKILL.md")), "skills should be installed for detected tools");
+assert.ok(!fs.existsSync(path.join(hand, ".spec-driven.yml")), "no config without answers");
+assert.ok(ho.includes('say "run spec-setup"') && !ho.includes("Nothing was changed") && !ho.includes('"investigate <ticket>"'), ho);
+assert.throws(() => cli("setup", `--dir=${hand}`), /run spec-setup/);  // setup still refuses, and points at the AI tool
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.2 — 2026-11-11
+- **Works from inside your AI tool.** Running `npx @benjaminthomas/spec-driven-dev` with no terminal to answer in (for example `!` in Claude Code) used to stop and change nothing. It now installs the skills for the AI tools it finds, in this project, and tells you to say "run spec-setup", which asks the setup questions in the chat. The settings file is still only written from your answers. Found during a first-time install.
+- `spec-driven-dev setup` without a terminal now also points to "run spec-setup" in your AI tool.
+
 ## 1.11.1 — 2026-11-11
 - **GitRisk keeps up with new code.** Files added in the last 90 days with fewer than 3 commits, or not committed yet, are labelled `new` instead of scoring as low risk. Each shows the riskiest file it connects to (imports or is imported by), and skills give it that file's care when it's high or critical. Uncommitted files are now scored, so fan-out on the files they import rises straight away.
 - `spec-implement` re-scores after every batch commit, so later batches and reviewers see current scores, not the ones from before the feature started.

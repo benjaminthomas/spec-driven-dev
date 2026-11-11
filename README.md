@@ -63,9 +63,11 @@ start a new session and continue where you left off.
 npx @benjaminthomas/spec-driven-dev@latest
 ```
 
-This one command downloads the tool, installs the skills, and sets up the project. It asks its
-questions in your terminal, so run it in a real terminal, not through another tool. If there's no
-terminal to answer in, it says so and uses the detected values.
+This one command downloads the tool, installs the skills, and sets up the project. In a terminal
+window it asks its setup questions there. Run it with `!` inside Claude Code (or any other place
+without a terminal to answer in) and it installs the skills for the AI tools it finds, then tells
+you to say **"run spec-setup"**, which asks the same questions in the chat. It never writes the
+settings file from guesses.
 
 > **Why not `npm install -g`?** npm doesn't let a package ask questions while it installs, and an
 > install doesn't know which project it's for. That's why setup is a separate step you run inside
@@ -579,8 +581,9 @@ STP-123" or "ship it" picks the right skill.
 Update to 1.5.1 or later (`npx @benjaminthomas/spec-driven-dev@latest --version`). Earlier versions
 crashed on Node 14 or 16, which nvm often switches to inside older projects, and wrote a config
 silently when there was no terminal. Now it runs on Node 14+. With no terminal to answer in (a `!`
-command in Claude Code, an editor task, piped input), it stops, changes nothing, and tells you to run
-it in a terminal window or pass flags such as `--layout=multi-repo --repos=…`.
+command in Claude Code, an editor task, piped input), it installs the skills and hands the questions
+to your AI tool: say "run spec-setup" there. `spec-driven-dev setup` on its own still needs a
+terminal, or flags such as `--layout=multi-repo --repos=…`.
 
 **Setup didn't ask me about repos.**
 It only asks about repos for a multi-repo or monorepo layout. If it detected `single`, type
@@ -802,7 +805,7 @@ plugin/evals/                 `claude plugin eval` cases
   1. Increase `version` in both `package.json` and `plugin/.claude-plugin/plugin.json` (the check fails if
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
-  3. Tag the release and push the tag: `git tag v1.11.1 && git push origin v1.11.1`.
+  3. Tag the release and push the tag: `git tag v1.11.2 && git push origin v1.11.2`.
   4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
      npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 

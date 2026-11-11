@@ -48,13 +48,19 @@ if (flag("version") || flag("v")) {
 // No terminal to answer in (e.g. `!` in Claude Code, an IDE task, a pipe) and nothing passed explicitly:
 // stop rather than write a config from guesses.
 const ANSWER_FLAGS = ["risk", "yes", "y", "layout", "repos", "packages", "tools", "workspace", "after-approval", "skills", "global", "no-setup", "project"];
-if (["install", "setup", "settings"].includes(command) && !process.stdin.isTTY && !args.some((a) => ANSWER_FLAGS.some((f) => a === `--${f}` || a.startsWith(`--${f}=`)))) {
+const NO_TTY = !process.stdin.isTTY && !args.some((a) => ANSWER_FLAGS.some((f) => a === `--${f}` || a.startsWith(`--${f}=`)));
+// Installing the skills needs no answers, so the default command still does that without a terminal
+// (e.g. `!` in Claude Code) and hands the questions to the spec-setup skill, which asks them in the chat.
+const HANDOFF = command === "install" && NO_TTY;
+if (["setup", "settings"].includes(command) && NO_TTY) {
   console.log(`✗ No interactive terminal, so ${command === "settings" ? "the settings menu can't open" : "setup can't ask its questions"}. Nothing was changed.
 
   This happens when it runs through another program: a "!" command in Claude Code, an editor task,
   or piped input. Either:
     • run it yourself in a terminal window (Terminal, iTerm, or your editor's terminal panel):
-        npx @benjaminthomas/spec-driven-dev@latest ${command === "install" ? "" : command}
+        npx @benjaminthomas/spec-driven-dev@latest ${command}${command === "setup" ? `
+    • or, in your AI tool (Claude Code, Cursor, Codex), say "run spec-setup": it asks the same
+      questions in the chat` : ""}
     • or give the answers as flags, for example:
         npx @benjaminthomas/spec-driven-dev@latest ${command === "settings" ? "settings --risk=off" : "setup --layout=multi-repo --repos=~/Projects/frontend,~/Projects/backend"}
       (add --yes to accept everything it detects)`);
@@ -137,7 +143,8 @@ async function install() {
     }
     console.log(`✓ ${skills.length} skills → ${dest}`);
   }
-  if (!dests.length) console.log("• No tools selected — nothing installed.");
+  if (!dests.length) console.log(HANDOFF ? "• No AI coding tools found (Claude Code, Cursor, Codex or Antigravity). Install one, or pass --tools=claude,cursor." : "• No tools selected — nothing installed.");
+  return dests.length;
 }
 
 // ---------- discovery ----------
@@ -788,12 +795,20 @@ try {
   else if (command === "risk") risk();
   else if (command === "settings") await settings();
   else if (command === "risk-eval") await riskEvalCmd();
-  else if (command === "install") {
+  else if (command === "install" && HANDOFF) {
+    console.log("No interactive terminal (for example a \"!\" command in Claude Code), so this installs the skills\nwith the detected defaults and leaves the setup questions to your AI tool.\n");
+    const n = await install();
+    if (n) console.log(`
+Next: in your AI tool, say "run spec-setup". It asks the setup questions in the chat
+(single repo, monorepo or multi-repo, tracker, branches) and writes .spec-driven.yml.
+If your AI tool doesn't recognise it yet, start a new session so it loads the new skills.
+To answer in a terminal instead, open Terminal or iTerm and run: npx @benjaminthomas/spec-driven-dev setup`);
+  } else if (command === "install") {
     await install();
     if (!flag("no-setup") && (await askConfirm("Set up this project now?", true))) await setup();
   } else if (command === "setup") await setup();
   else throw new Error(`Unknown command "${command}" — use install (default), setup, settings, doctor, status, context, risk, or risk-eval`);
-  if (["install", "setup"].includes(command)) console.log('\nNext: in your AI tool, say "investigate <ticket>" or "create a spec".');
+  if (["install", "setup"].includes(command) && !HANDOFF) console.log('\nNext: in your AI tool, say "investigate <ticket>" or "create a spec".');
 } catch (e) {
   console.error(`✗ ${e.message}`);
   process.exitCode = 1;
