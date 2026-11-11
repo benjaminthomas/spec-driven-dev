@@ -393,6 +393,26 @@ fs.writeFileSync(path.join(ws5, "team-specs", "team-repos.yml"), "repos:\n  - na
 d = doctor(ws5);
 assert.ok(d.code === 0 && d.out.includes('dash is cloned at') && d.out.includes('add dash to the workspace') && d.out.includes("team repo zoe isn't on this machine") && d.out.includes("git clone git@x:t/zoe.git") && !d.out.includes("team repo shop"), d.out);
 
+// 23. uninstall: lists, refuses without --yes when there's no terminal, removes only our skills, keeps config unless --all
+const un = path.join(tmp, "uninstall"), unHome = path.join(tmp, "uninstall-home");
+repo(un, {}, ["x"]);
+fs.mkdirSync(path.join(unHome, ".cursor/skills/my-own-skill"), { recursive: true });
+fs.writeFileSync(path.join(unHome, ".cursor/skills/my-own-skill/SKILL.md"), "mine");
+fs.mkdirSync(path.join(unHome, ".npm/_npx/abc/node_modules/@benjaminthomas/spec-driven-dev"), { recursive: true });
+const ucli = (...a) => execFileSync("node", [CLI, ...a], { env: { ...process.env, SPEC_DRIVEN_HOME: unHome }, stdio: "pipe" }).toString();
+ucli("--yes", "--global", "--no-setup", "--tools=cursor,codex", `--dir=${un}`);
+ucli("setup", "--yes", `--dir=${un}`);
+let uo = ucli("uninstall", `--dir=${un}`);
+assert.ok(uo.includes("9 skills in") && uo.includes("npx download cache") && uo.includes("Nothing removed") && uo.includes("Kept: your settings file"), uo);
+assert.ok(fs.existsSync(path.join(unHome, ".cursor/skills/spec-setup/SKILL.md")), "listing must not delete");
+uo = ucli("uninstall", "--yes", `--dir=${un}`);
+assert.ok(!fs.existsSync(path.join(unHome, ".cursor/skills/spec-setup")) && !fs.existsSync(path.join(unHome, ".agents/skills/spec-create")), uo);
+assert.ok(fs.existsSync(path.join(unHome, ".cursor/skills/my-own-skill/SKILL.md")), "other skills must stay");
+assert.ok(fs.existsSync(path.join(un, ".spec-driven.yml")) && !fs.existsSync(path.join(unHome, ".npm/_npx/abc")), "config kept, cache removed");
+uo = ucli("uninstall", "--yes", "--all", `--dir=${un}`);
+assert.ok(!fs.existsSync(path.join(un, ".spec-driven.yml")) && uo.includes("Removed settings file"), uo);
+assert.ok(ucli("uninstall", "--yes", `--dir=${un}`).includes("Nothing to remove"));
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 

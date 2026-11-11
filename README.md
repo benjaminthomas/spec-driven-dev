@@ -646,6 +646,7 @@ spec-driven-dev doctor                            # check .spec-driven.yml again
 spec-driven-dev status                            # list unfinished specs and each one's next step
 spec-driven-dev context --areas=billing           # print the project memory (index, or chosen areas)
 spec-driven-dev settings                          # switch GitRisk, run-through and sharing from a menu
+spec-driven-dev uninstall                         # remove the skills, plugin and cache (--all: settings too)
 spec-driven-dev risk                              # GitRisk: score files from git history → specs/context/risk.md
 spec-driven-dev risk-eval --tickets=tickets.md    # compare agent behaviour with the risk signal on vs off
                                                   #   (--runs=3 --arms=on --timeout=20 --model=sonnet)
@@ -718,6 +719,23 @@ Each skill becomes a tool that returns its instructions, and supporting files ar
 `skill://<name>/<path>` resources. Prefer native skills support where your tool has it.
 
 ---
+
+### Uninstall
+
+```bash
+npx @benjaminthomas/spec-driven-dev@latest uninstall
+```
+
+It lists everything an install put on your machine (the skills in each AI tool, the Claude Code
+plugin, the npx download cache), then removes it after one confirmation. Your other skills stay.
+
+- **Kept by default:** your `.spec-driven.yml` settings file. Add `--all` to remove it and the
+  workspace registry (`~/.spec-driven/`) too.
+- **Never touched:** specs, `CONTEXT.md`, `team-repos.yml` and your code. They're your team's work.
+  Delete them yourself if you want them gone.
+- **In scripts or with `!` in Claude Code:** add `--yes`, since there's no terminal to confirm in.
+- **Plugin installs:** `/plugin uninstall ticket-to-pr@spec-driven-dev` in Claude Code, if the
+  command can't do it for you.
 
 ## Compatibility
 
@@ -804,7 +822,7 @@ plugin/evals/                 `claude plugin eval` cases
   1. Increase `version` in both `package.json` and `plugin/.claude-plugin/plugin.json` (the check fails if
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
-  3. Tag the release and push the tag: `git tag v1.13.1 && git push origin v1.13.1`.
+  3. Tag the release and push the tag: `git tag v1.14.0 && git push origin v1.14.0`.
   4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
      npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 

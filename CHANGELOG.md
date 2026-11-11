@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.14.0 — 2026-11-11
+- **`spec-driven-dev uninstall`.** Lists everything an install put on this machine (the skills in each AI tool, the Claude Code plugin, the npx download cache) and removes it after one confirmation. Other skills are left alone. `--all` also removes the settings file and workspace registry. Specs, `CONTEXT.md` and code are never touched. Without a terminal it only lists, unless you pass `--yes`.
+
 ## 1.13.1 — 2026-11-11
 - Clearer hand-over after installing: "Open Claude Code in soreto-shopify to set up your project? It first asks how your project is organised…". The folder says where it opens; "project" says what gets set up, since that can span several repos. The step is now "Set up your project in your AI tool", and the explanation is shown once, in the question.
 - `spec-investigate` must look up GitRisk for the files it touches when risk is on, and say so in **Risk Hotspots** even when none are high (a live run had skipped it).

@@ -4,6 +4,7 @@
 //
 //   spec-driven-dev                 install the skills, then hand over to your AI tool ("run spec-setup")
 //   spec-driven-dev setup           scripted setup for CI: needs --yes or answer flags (people: say "run spec-setup")
+//   spec-driven-dev uninstall       remove the skills (all tools), the Claude Code plugin and the download cache; --all also removes the settings file
 //   spec-driven-dev doctor          check .spec-driven.yml against the real repos (exit 1 on problems)
 //   spec-driven-dev status          list specs with unfinished work and each one's "Resume here" next step
 //   spec-driven-dev context         print specs/CONTEXT.md; --areas=billing,api prints only those area files
@@ -39,7 +40,7 @@ const args = process.argv.slice(2);
 const flag = (n) => args.includes(`--${n}`);
 const opt = (n) => args.find((a) => a.startsWith(`--${n}=`))?.split("=")[1];
 const command = args.find((a) => !a.startsWith("-")) || "install";
-const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status", "context", "risk", "risk-eval", "setup"].includes(command);
+const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status", "context", "risk", "risk-eval", "setup"].includes(command) || (command === "uninstall" && flag("yes"));
 const DIR = path.resolve(opt("dir") || process.cwd());
 
 // Colour only for a person at a terminal; pipes, CI and NO_COLOR get plain text (and the tests stay plain).
@@ -893,6 +894,45 @@ async function settings() {
   }
 }
 
+// Finds everything an install put on this machine and removes it after one confirmation.
+// Specs, CONTEXT.md and code are never touched: they're the team's work, not part of the install.
+async function uninstall() {
+  const found = [];
+  const ours = (d) => ALL_SKILLS.map((s) => path.join(d, s)).filter((f) => fs.existsSync(path.join(f, "SKILL.md")));
+  const dirs = [...new Set(Object.values(TOOLS).flatMap((t) => [path.join(HOME, t.global), path.join(DIR, t.project)]))];
+  for (const d of dirs) { const f = ours(d); if (f.length) found.push({ what: `${f.length} skills in ${d}`, paths: f }); }
+  const plugins = readJson(path.join(HOME, ".claude/plugins/installed_plugins.json"));
+  const pluginIds = Object.keys(plugins?.plugins || plugins || {}).filter((k) => /^(ticket-to-pr|spec-driven-dev)@/.test(k));
+  for (const id of pluginIds) found.push({ what: `Claude Code plugin ${id}`, plugin: id });
+  const npx = path.join(HOME, ".npm", "_npx");
+  for (const c of subdirs(npx)) if (fs.existsSync(path.join(npx, c, "node_modules", "@benjaminthomas", "spec-driven-dev")) && process.platform !== "win32")
+    found.push({ what: `npx download cache ${path.join(npx, c)}`, paths: [path.join(npx, c)] });
+  const config = findConfig(DIR);
+  const reg = readRegistry();
+  if (flag("all")) {
+    if (config) found.push({ what: `settings file ${config}`, paths: [config], config });
+    if (fs.existsSync(path.join(HOME, ".spec-driven"))) found.push({ what: `workspace registry ${path.join(HOME, ".spec-driven")}`, paths: [path.join(HOME, ".spec-driven")] });
+  }
+  step(1, "Uninstall spec-driven-dev", ink.red);
+  if (!found.length) { console.log("✓ Nothing to remove: no skills, plugin or cache from spec-driven-dev were found."); return; }
+  console.log("Found:\n" + found.map((f) => `  • ${f.what}`).join("\n"));
+  if (!flag("all") && (config || Object.keys(reg).length)) console.log(`  Kept: your settings file${config ? ` (${config})` : ""}. Add --all to remove it too.`);
+  console.log("  Never touched: specs, CONTEXT.md and your code.");
+  if (!process.stdin.isTTY && !flag("yes")) { console.log("Nothing removed. To remove the above, run: spec-driven-dev uninstall --yes"); return; }
+  if (!flag("yes") && !(await askConfirm("Remove everything listed above?", false))) { console.log("Nothing removed."); return; }
+  for (const f of found) {
+    if (f.plugin) {
+      let ok = false;
+      if (onPath("claude")) try { execFileSync("claude", ["plugin", "uninstall", f.plugin], { stdio: "ignore" }); ok = true; } catch {}
+      console.log(ok ? `✓ Removed ${f.what}` : `• Remove the plugin in Claude Code: /plugin uninstall ${f.plugin}`);
+      continue;
+    }
+    for (const p of f.paths) fs.rmSync(p, { recursive: true, force: true });
+    console.log(`✓ Removed ${f.what}`);
+  }
+  console.log("Done. Reinstall any time with: npx @benjaminthomas/spec-driven-dev@latest");
+}
+
 // Silent unless something is unfinished, so it's cheap to run at the start of a session.
 function status() {
   const file = findConfig(DIR);
@@ -923,6 +963,7 @@ try {
   else if (command === "context") context();
   else if (command === "risk") risk();
   else if (command === "settings") await settings();
+  else if (command === "uninstall") await uninstall();
   else if (command === "risk-eval") await riskEvalCmd();
   else if (command === "install") {
     if (HANDOFF) console.log("No interactive terminal (for example a \"!\" command in Claude Code), so the skills go to the AI tools it finds, for this project.\n");
@@ -930,7 +971,7 @@ try {
     if (tools.length && !flag("no-setup")) await handOver(tools);
   } else if (SETUP_IN_AGENT) handOver([], true);
   else if (command === "setup") await setup();
-  else throw new Error(`Unknown command "${command}" — use install (default), setup, settings, doctor, status, context, risk, or risk-eval`);
+  else throw new Error(`Unknown command "${command}" — use install (default), setup, settings, uninstall, doctor, status, context, risk, or risk-eval`);
   if (command === "setup" && !SETUP_IN_AGENT) console.log('\nNext: in your AI tool, say "investigate <ticket>" or "create a spec".');
 } catch (e) {
   console.error(`✗ ${e.message}`);
