@@ -31,6 +31,7 @@ together, even when those repos live in different folders. To set it up, run
 - [Compatibility](#compatibility)
 - [By the numbers](#by-the-numbers)
 - [Working on this repo](#working-on-this-repo)
+- [License](#license)
 - [Changelog](CHANGELOG.md)
 
 ---
@@ -77,7 +78,8 @@ and whether your team shares them, then looks through the code and saves the pro
 ([details below](#project-setup-your-teams-rules)). If Claude Code or Codex is installed, the
 installer asks "Open Claude Code in soreto-shopify to set up your project?" (with your folder's name)
 and opens it with "run spec-setup" already typed in. If you've used Claude Code in that folder
-before, it asks whether to start a new session, continue your last one, or pick one to resume.
+before, that one question offers the choice directly: "Yes, in a new session", "Yes, continue my
+last session", "Yes, pick a session to resume", or "No". Codex always opens a new session for now.
 
 **3. Then run each stage in order.** You can type the slash command or just say the
 words in quotes.
@@ -120,10 +122,17 @@ contracts, unclear requirements). `spec-implement` then runs each task on the mo
   [Cursor's model list](https://cursor.com/help/models-and-usage/available-models). Claude Code
   uses family aliases, which always point to the newest model. Cursor uses `fast` (its cheaper model)
   for light tasks and your chat's model (`inherit`) for the rest; put a slug from its model picker
-  in `models.cursor.deep` to pin a stronger one.
+  in `models.cursor.deep` to pin a stronger one. Configs written before 1.21.1 keep their values;
+  set `models.cursor.light: fast` to get the switch. Antigravity uses `flash` for light tasks and
+  `pro` for the rest. OpenCode takes `provider/model` values.
+- **Other vendors' models:** Cursor, OpenCode and Copilot offer Claude, GPT/Codex and Gemini
+  models. spec-setup offers to put a cheaper one on light tasks and a stronger one on deep tasks,
+  reading the names from the tool's own list of accepted models or its model picker, never from
+  memory.
 - **Per-task switching by tool:** Claude Code and Cursor switch per subagent (both tried live);
-  Codex CLI and OpenCode should too, and Antigravity only between Gemini tiers. A tool that can't
-  switch doesn't do it silently: before a heavier batch it pauses and tells you which model to use.
+  Codex CLI and OpenCode should too (from their docs, not tried live yet), and Antigravity only
+  between Gemini tiers. A tool that can't switch doesn't do it silently: before a heavier batch it
+  pauses and tells you which model to use.
 - **Changing the models:** edit the `models:` section of `.spec-driven.yml`, for example to use a
   newer model for `deep`.
 
@@ -155,7 +164,7 @@ before it writes the file. If any skill finds no config, it runs this setup firs
 | How the project is organised | git repos and workspace files (`pnpm-workspace.yaml`, `turbo.json`, `nx.json`, `go.work`, …). A Shopify app's `extensions/` count as one app | `single`, `monorepo`, or `multi-repo` |
 | *multi-repo:* which repos you work on | each repo's purpose, evidence of how it connects to this one (env vars, API calls, docs), your recent commits, and `team-repos.yml`; it recommends a selection with reasons | `soreto-shopify, reverb-backend` |
 | *multi-repo:* where specs live | (you choose) | a dedicated specs repo, a code repo, or this machine only |
-| Issue tracker | ticket keys in branch names and commits | Jira, key `STP` |
+| Issue tracker | ticket keys in branch names and commits (`STP-123`, `#482`, `AB#4512`, `CU-86a1…`, `sc-1234`), and GitLab from the remote | Jira, key `STP` |
 | Base branch / PR target | default branch, `staging`/`develop`, recent PR targets | `staging` |
 | Branch name pattern | your recent branch names | `{ticket}` → `STP-123` |
 | Commit style | recent commit messages, judged per repo | `ticket` (`STP-123: …`), with one repo on `conventional` |
@@ -183,6 +192,16 @@ every team repo with its git URL, so setup offers them, `doctor` shows which are
 the clone command), and an investigation stops and says so when a ticket needs a repo that isn't on
 this machine.
 
+**Adding a repo later.** Say "add reverb-react to the workspace". For each repo named, setup first
+says whether it's already in the workspace (nothing changes), in the team's list but not cloned here
+(it offers the clone), not found, or new. Only a new repo is audited: it gets its areas in
+`CONTEXT.md`, a fresh GitRisk score, the pointer offer and a `doctor` run.
+
+**The project-memory pointer.** Setup offers one line in `AGENTS.md`/`CLAUDE.md` that points the
+agent at the project memory. In a multi-repo workspace it offers it for every repo you have, in one
+question, and skips repos that already have it. It never commits: it lists one commit per repo in
+that repo's style, and warns when a repo is on a feature branch.
+
 **Joining a team that's already set up.** The first person's setup moves the team's rules (tracker,
 base branch, branch and commit style, per-repo commands, models, GitRisk, sharing) into **`team.yml`
 in the specs repo**, which is committed with the specs. Each person's own `.spec-driven.yml` keeps only
@@ -191,7 +210,9 @@ the code repos they work on, then says "run spec-setup": it finds the team's set
 asks only which of the team's repos they have. No audit, no convention questions, and nothing shared
 changes. From a terminal: `spec-driven-dev setup --join=../soreto-specs`. Changing a team rule is an
 edit to `team.yml` and a commit, and anything set in your own file overrides it for you only (`doctor`
-lists those overrides). An existing setup can be converted with `spec-driven-dev team init`.
+lists those overrides). An existing setup can be converted with `spec-driven-dev team init`; it
+backs up your old file first, and `--fresh` skips the backup when setup wrote the file in the same
+run. Both files leave out unset values instead of writing empty ones.
 
 **After the PR is reviewed.** When reviewers leave comments, say "address the PR comments". Each
 comment is checked against the code and sorted (fix, scope change, question, disagree, nit), and you
@@ -209,22 +230,27 @@ Models: Opus 5.5 (investigate, create, implement, verify, review, follow-up) · 
 Tokens: 40.6 M in (96% from cache) · 108 k out · 8 subagents · 1 session
 ```
 
-Totals only, never content. Turn it off or keep it local with `usage.report: local | off`. Other tools
-get the models line from `log.md`; their token counts aren't read yet.
+Totals only, never content. Choose where it goes with `usage.report: all | pr | ticket | local | off`
+(default `all`; `local` keeps it in `log.md`). `--summary` prints three lines, `--json` the raw
+numbers. Other tools (Cursor, Antigravity, OpenCode, Codex) get the models line from `log.md`; their
+token counts aren't read yet.
 
 **The ticket keeps up with the work.** When your AI tool can reach the tracker (any MCP server or CLI
 for it: Jira, GitHub, GitLab, Linear, Azure Boards, ClickUp, Asana and others), the pipeline updates the ticket: investigate comments
 with the summary, implement moves it to *In Progress*, verify comments with each acceptance criterion
 and its pass/fail, review with the blocker count, and ship moves it to *In Review* with the PR link and, once the final review has passed, the verification
-screenshots attached.
-Status names come from your project's real workflow (asked once, saved in `team.yml`); it never closes
-a ticket. It asks before the first update on each ticket; say "update Jira without asking" or "stop
-updating Jira" to change that (`tracker.updates: on | ask | off`).
+screenshots attached (`tracker.screenshots: off` turns that off).
+Status names come from your project's real workflow (read once, saved in `team.yml` as
+`tracker.statuses`); it never closes a ticket or moves it backwards. It asks before the first update
+on each ticket; say "update Jira without asking" or "stop updating Jira" to change that
+(`tracker.updates: on | ask | off`). If no tool can reach the tracker, it prints the comment for you
+to paste. `tracker.type` takes any tracker's name, and `trackers.md` lists the ID shapes and tools
+for each.
 
 **For scripts and CI** there's `spec-driven-dev setup` with flags (it asks nothing):
 `--yes`, `--layout=multi-repo --repos=~/Projects/frontend,~/Work/backend --workspace=~/Projects`,
 `--layout=monorepo --packages=apps/web,packages/ui`, `--specs-dir=<path>`, `--share=all|memory|none`,
-`--after-approval=run-through`, `--project=new|existing`. Installer flags: `--tools=cursor,codex`,
+`--after-approval=run-through`, `--project=new|existing`, `--tracker=jira|github|gitlab|linear|azure-boards|clickup|<any>|none`. Installer flags: `--tools=cursor,codex`,
 `--global`, `--no-setup`, `--version`.
 
 To change the rules later, edit the file or run setup again, then run `spec-driven-dev doctor`
@@ -394,7 +420,8 @@ Results go to `experiments/` with the transcripts, and every run, including fail
 builds the [project memory](#project-memory-so-context-isnt-lost-between-sessions-and-features): a
 shallow audit and one round of questions for an existing repo, or your intended stack and conventions
 for a new one, saved to `specs/CONTEXT.md`. It adds a one-line pointer to `CLAUDE.md`/`AGENTS.md`
-only if you say yes. No branches, commits, or code.
+only if you say yes (in a multi-repo workspace, offered for every repo at once). It also adds repos
+to the workspace later ("add X to the workspace"). No branches, commits, or code.
 
 ### 1. `spec-investigate`: understand before planning
 
@@ -407,6 +434,7 @@ only if you say yes. No branches, commits, or code.
 | Jira ticket | `STP-123` or `https://acme.atlassian.net/browse/STP-123` |
 | GitHub issue | `#482` or `https://github.com/acme/app/issues/482` |
 | Linear issue | `https://linear.app/acme/issue/ENG-91` |
+| Other trackers | GitLab, Azure Boards (`AB#4512`), ClickUp (`CU-86a1…`), Shortcut (`sc-1234`), Asana, YouTrack… through any MCP server or CLI your tool has; otherwise paste the ticket |
 | Transcript / notes / PRD / log file | `./call-transcript.txt`, `./prd.md`, `./error.log` |
 | Plain text | `"Checkout times out for EU users since Tuesday's deploy"` |
 | Pasted material | a Slack thread or stack trace pasted into the same message |
@@ -489,7 +517,9 @@ database only to confirm the result.
 
 **You get:** `specs/<feature>/verification-report.md`, with pass or fail for each criterion and the
 evidence (screenshots, responses, data), grouped by requirement number (R1…) where the spec has them. If there's no spec, it asks you what "working" means and
-checks that instead.
+checks that instead. Screenshots are saved in `specs/<feature>/evidence/`, which is kept out of git
+because they can show customer data. Once the final review passes, `spec-ship` attaches up to 6 of
+them to the ticket, each checked first for secrets or real customer data.
 
 ### 5. `spec-review`: review the whole change
 
@@ -505,7 +535,9 @@ With GitRisk on, high-risk files get a line-by-line read of their error paths an
 **You get:** `specs/<feature>/review.md`, with findings ranked blocker, should-fix, nit, or question,
 each with `file:line` and a suggested fix. Blockers stop `spec-ship` and run-through. It then asks
 whether to fix them, and fixes go through `spec-implement`'s fix loop only after you say yes. It also
-reviews any branch or a teammate's PR, and posts PR comments only after you approve the text.
+reviews any branch or a teammate's PR ("review PR #42"), and posts PR comments only after you
+approve the text. Once your PR has review comments, say "address the PR comments" (see
+[After the PR is reviewed](#project-setup-your-teams-rules)).
 
 ### 6. `spec-checkpoint`: commit safely
 
@@ -533,7 +565,9 @@ PR per repo, each linking the others. If a PR already exists for the branch, it 
 instead of opening another one.
 
 It won't open a PR while `review.md` has an open blocker, unless you accept it. Any should-fix
-items are listed in the PR description.
+items are listed in the PR description, along with a short **Built with spec-driven-dev** section
+(models and token totals, see [What it cost](#project-setup-your-teams-rules)). When a tracker is
+connected, it moves the ticket to your review status and comments with the PR link.
 
 **Needs:** the [GitHub CLI](https://cli.github.com) (`gh`), logged in.
 
@@ -562,6 +596,7 @@ specs/
     │   ├── task-02-add-export-test-fixtures.md
     │   └── …
     ├── verification-report.md    ← spec-verify: pass/fail per acceptance criterion
+    ├── evidence/                 ← spec-verify: screenshots (kept out of git)
     └── review.md                 ← spec-review: ranked findings; open blockers stop spec-ship
 specs/CONTEXT.md                  ← spec-setup / spec-checkpoint: project memory index (≤60 lines)
 specs/context/<area>.md           ← details per area, loaded only when needed (≤150 lines)
@@ -768,7 +803,8 @@ reads the Claude Code and `.agents` folders, so installing for Claude Code or Co
 
 **Model per task tier, by tool.** Tasks are rated light, standard or deep, and each coder agent runs
 on that tier's model (`models.<tool>` in `.spec-driven.yml`). Claude Code, Codex CLI, Cursor and
-OpenCode can give each subagent its own model; Antigravity only switches between Gemini tiers
+OpenCode can give each subagent its own model (Claude Code and Cursor tried live, Codex CLI and
+OpenCode from their docs); Antigravity only switches between Gemini tiers
 (`flash`, `pro`) for subagents. Where a tool can't switch, the batch stops and asks you to change the
 session's model for deep tasks instead of running them on a light one. Details per tool:
 `plugin/skills/spec-implement/references/host-models.md`.
@@ -810,7 +846,7 @@ plugin, the npx download cache), then removes it after one confirmation. Your ot
 | Skill | Claude Code | Codex CLI | Cursor | OpenCode | Antigravity | Notes |
 |---|---|---|---|---|---|---|
 | `spec-setup` | ✅ | ✅ | ✅ | ✅ | ✅ | Reads git and project files, and writes one config file |
-| `spec-investigate` | ✅ | ✅ | ✅ | ✅ | ✅ | Fetches tickets via whatever access the tool has (Atlassian/Linear MCP, `gh`); otherwise asks you to paste the ticket. Files and text need nothing extra |
+| `spec-investigate` | ✅ | ✅ | ✅ | ✅ | ✅ | Fetches tickets from any tracker the tool can reach (an MCP server, or a CLI such as `gh`, `glab`, `az`); otherwise asks you to paste the ticket. Files and text need nothing extra |
 | `spec-create` | ✅ | ✅ | ✅ | ✅ | ✅ | Planning and writing files only |
 | `spec-implement` | ✅ | ✅ | ✅ | ✅ | ✅ | Parallel agents and worktrees where the tool supports them; otherwise one task at a time |
 | `spec-verify` | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | UI checks need browser automation; API and database checks work everywhere |
@@ -839,7 +875,7 @@ skips that step rather than failing.
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
 | **Total** | | **2,251** | **20,328** | **26** |
 
-- **8** skills: **1** setup + **6** workflow stages + **1** standalone
+- **9** skills: **1** setup + **7** workflow stages + **1** standalone
 - **5** tools supported natively (Claude Code, Codex CLI, Cursor, OpenCode, Antigravity), plus an MCP fallback
 - **3** layouts: single repo, monorepo, multi-repo
 - **1** npm package, `@benjaminthomas/spec-driven-dev`, plus the Claude Code plugin `ticket-to-pr` and an MCP fallback
@@ -858,7 +894,9 @@ plugin/skills/<name>/references/ templates and prompts the skill loads when need
 plugin/                       the Claude Code plugin (manifest + skills only, no scripts or hooks)
 .agents/skills/               symlinks so Codex/Antigravity pick the skills up inside this repo
 bin/spec-driven-dev.cjs       launcher (runs on any Node, explains if it's too old)
-bin/cli.mjs                   the `spec-driven-dev` CLI: installer, setup menus, doctor, status, context, risk
+bin/cli.mjs                   the `spec-driven-dev` CLI: installer, setup menus, doctor, status, context, usage, risk
+bin/team.mjs                  team.yml / personal config split and merge
+bin/usage.mjs                 build report: models and tokens from Claude Code's session files
 bin/risk.mjs                  GitRisk scoring (churn, bug density, fan-out, security)
 bin/risk-eval.mjs             risk on/off experiment harness
 bin/share.mjs                 what's committed from the specs folder (.gitignore block)
@@ -890,7 +928,7 @@ plugin/evals/                 `claude plugin eval` cases
   1. Increase `version` in both `package.json` and `plugin/.claude-plugin/plugin.json` (the check fails if
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
-  3. Tag the release and push the tag: `git tag v1.16.1 && git push origin v1.16.1`.
+  3. Tag the release and push the tag: `git tag v1.21.1 && git push origin v1.21.1`.
   4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
      npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 
