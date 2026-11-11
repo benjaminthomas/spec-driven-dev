@@ -1,4 +1,6 @@
 # Changelog
+## 1.18.2 — 2026-11-11
+- **One question instead of two at hand-over.** In a folder with earlier Claude Code sessions, the first question now offers the session choice directly: "Yes, in a new session", "Yes, continue my last session (2 h ago)", "Yes, pick a session to resume", or "No". In 1.18.1 the choice only came after answering yes, so it looked as if it wasn't offered.
 ## 1.18.1 — 2026-11-11
 - **Resume a session instead of always starting a new one.** After install, if you've used Claude Code in that folder before, the hand-over asks where setup should run: a new session (recommended), continue your last session (with "run spec-setup" sent in it), or pick one from Claude Code's session list. First-time folders still open a new session straight away. Codex always opens a new session for now.
 ## 1.18.0 — 2026-11-11

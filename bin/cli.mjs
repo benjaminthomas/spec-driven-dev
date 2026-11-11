@@ -186,17 +186,19 @@ Start a new session if your tool doesn't recognise it yet.`;
   const launcher = LAUNCHERS.find(([bin]) => tools.includes(bin) && onPath(bin));
   if (!launcher || !process.stdin.isTTY || YES) { console.log(`Skills installed.\n${next}`); return; }
   // The question carries the explanation, so there's no paragraph to read twice.
-  if (!(await askConfirm(`Open ${launcher[1]} in ${name} to set up your project? ${what} (A few minutes, on your ${launcher[1]} plan.)`, true))) {
-    console.log(next);
-    return;
-  }
-  const { spawnSync } = await import("node:child_process");
+  // One question: open or not, and, if this folder has earlier Claude Code sessions, which session.
   const last = launcher[0] === "claude" ? lastClaudeSession(DIR) : null;
-  const how = last ? await askSelect(`You've used Claude Code in ${name} before (last session ${ago(last)}). Where should setup run?`, [
-    { title: "A new session (Recommended)", value: "new", description: "clean start; setup doesn't need your earlier conversation" },
-    { title: "Continue my last session", value: "continue", description: `the one from ${ago(last)}, with "run spec-setup" sent in it` },
-    { title: "Pick a session to resume", value: "pick", description: "opens Claude Code's session list; then say \"run spec-setup\"" },
-  ], "new") : "new";
+  const question = `Open ${launcher[1]} in ${name} to set up your project? ${what} (A few minutes, on your ${launcher[1]} plan.)`;
+  const how = last
+    ? await askSelect(question, [
+      { title: "Yes, in a new session (Recommended)", value: "new", description: "clean start; setup doesn't need your earlier conversation" },
+      { title: `Yes, continue my last session (${ago(last)})`, value: "continue", description: "reopens it with \"run spec-setup\" sent" },
+      { title: "Yes, pick a session to resume", value: "pick", description: "opens Claude Code's session list; then say \"run spec-setup\"" },
+      { title: "No, I'll open it myself", value: "no" },
+    ], "new")
+    : (await askConfirm(question, true)) ? "new" : "no";
+  if (how === "no") { console.log(next); return; }
+  const { spawnSync } = await import("node:child_process");
   const args = { new: ["run spec-setup"], continue: ["--continue", "run spec-setup"], pick: ["--resume"] }[how];
   if (how === "pick") console.log('After you pick the session, say "run spec-setup".');
   spawnSync(launcher[0], args, { cwd: DIR, stdio: "inherit" });
