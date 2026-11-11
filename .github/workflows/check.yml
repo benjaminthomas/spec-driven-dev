@@ -32,14 +32,16 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: npm install --no-package-lock --no-audit --no-fund   # npm 6 (Node 14) can't read lockfile v3
-      - name: Smoke test (version, install + setup with flags, doctor, refuses without a terminal)
+      - name: Smoke test (version, install hands over, scripted setup, doctor, no config without answers)
         run: |
           set -e
           node bin/spec-driven-dev.cjs --version
           d=$(mktemp -d) && git -C "$d" init -q
-          SPEC_DRIVEN_HOME="$d/home" node bin/spec-driven-dev.cjs --yes --tools=cursor,codex --dir="$d"
+          SPEC_DRIVEN_HOME="$d/home" node bin/spec-driven-dev.cjs --yes --tools=cursor,codex --dir="$d" | grep -q "run spec-setup"
           test -f "$d/.cursor/skills/spec-create/SKILL.md"
+          test ! -f "$d/.spec-driven.yml"
+          SPEC_DRIVEN_HOME="$d/home" node bin/spec-driven-dev.cjs setup --yes --dir="$d"
           node bin/spec-driven-dev.cjs doctor --dir="$d"
           e=$(mktemp -d) && git -C "$e" init -q
-          if node bin/spec-driven-dev.cjs setup --dir="$e" </dev/null; then echo "should refuse without a terminal"; exit 1; fi
+          node bin/spec-driven-dev.cjs setup --dir="$e" </dev/null | grep -q "run spec-setup"
           test ! -f "$e/.spec-driven.yml"
