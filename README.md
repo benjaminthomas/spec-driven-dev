@@ -787,7 +787,7 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 308 | 3,333 | 4 |
+| `spec-setup` | 0 · configure | 308 | 3,393 | 4 |
 | `spec-investigate` | 1 · understand | 387 | 3,391 | 1 |
 | `spec-create` | 2 · plan | 198 | 1,806 | 6 |
 | `spec-implement` | 3 · build | 327 | 2,777 | 3 |
@@ -796,7 +796,7 @@ skips that step rather than failing.
 | `spec-checkpoint` | 6 · commit | 140 | 1,168 | 0 |
 | `spec-ship` | 7 · PR | 230 | 1,412 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **2,145** | **18,995** | **23** |
+| **Total** | | **2,145** | **19,055** | **23** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback

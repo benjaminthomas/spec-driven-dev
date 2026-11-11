@@ -284,7 +284,7 @@ keep every other line and comment, and confirm in one sentence. Don't re-run dis
 | "run straight through after I approve", "fewer stops" | `pipeline.after_approval: run-through` |
 | "stop after each stage" | `pipeline.after_approval: stop` |
 | "change our branch rules", "use main for PRs" (when `team.yml` exists) | edit `team.yml`, since it's a team rule, and remind them to commit it; only change `.spec-driven.yml` if they say it's just for them |
-| "add reverb-react to the workspace", "I also work on X" | add it under `repos:` (clone first if needed, from `team-repos.yml`), and to `team-repos.yml` if it's new to the team |
+| "add reverb-react to the workspace", "I also work on X" | check each named repo first and say what you found, per repo: **already in the workspace** (change nothing for it), **in `team-repos.yml` but not cloned here** (offer the `git clone`), **not found** (ask for its path), or **new**. For new ones: add under `repos:` and to `team-repos.yml` if new to the team, audit only that repo and add its areas to `CONTEXT.md` (Step 4), re-run `spec-driven-dev risk`, offer the pointer line for it (Step 4, item 5), then `doctor` |
 | "share the specs with the team", "keep specs local", "share only the project memory" | `context.share: all / none / memory`: show the `.gitignore` change, then run `spec-driven-dev settings --share=…` on a yes |
 
 Reply with what changed and what it means, for example: "GitRisk is now off. Investigations, plans

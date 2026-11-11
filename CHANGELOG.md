@@ -1,4 +1,6 @@
 # Changelog
+## 1.16.4 — 2026-11-11
+- **"Add X to the workspace" checks first.** For each repo named, spec-setup now says whether it's already in the workspace (and changes nothing), in the team's list but not cloned here (and offers the clone), not found, or new. A new repo is audited on its own, gets its areas in `CONTEXT.md`, a fresh GitRisk score, the pointer offer and a `doctor` run. Before, it was only added to the repo list.
 ## 1.16.3 — 2026-11-11
 - **Project-memory pointer in every repo.** In a multi-repo workspace, spec-setup now offers the one-line `AGENTS.md`/`CLAUDE.md` pointer for every repo you have, in one question, and skips repos that already have it. The line names the specs repo instead of assuming it sits next door. Joining offers it for any of your repos that lack it. Setup still never commits: it lists one commit per repo in that repo's style, and warns when a repo is on a feature branch.
 ## 1.16.2 — 2026-11-11
