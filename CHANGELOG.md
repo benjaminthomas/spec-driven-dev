@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.0 — 2026-11-11
+- **Setup asks whether to share specs with your team:** share everything (recommended), share project memory only, or keep everything local. It first says what your `.gitignore` does today, and with `--yes` it keeps that. It changes `.gitignore` only through one marked block, replacing only lines about the specs folder, and asks before replacing any. `risk.md` stays ignored either way. Saved as `context.share`.
+- **Multi-repo:** when the workspace folder isn't a git repo, setup explains that specs kept there can't be shared and offers a specs folder inside one of the repos (`--specs-dir=<repo>/specs`).
+- `spec-driven-dev settings --share=all|memory|none` (or the menu) changes it later, and so does saying "share the specs with the team" in your AI tool. `doctor` warns when `.gitignore` no longer matches the choice.
+
 ## 1.11.2 — 2026-11-11
 - **Works from inside your AI tool.** Running `npx @benjaminthomas/spec-driven-dev` with no terminal to answer in (for example `!` in Claude Code) used to stop and change nothing. It now installs the skills for the AI tools it finds, in this project, and tells you to say "run spec-setup", which asks the setup questions in the chat. The settings file is still only written from your answers. Found during a first-time install.
 - `spec-driven-dev setup` without a terminal now also points to "run spec-setup" in your AI tool.

@@ -82,6 +82,18 @@ Read, don't guess. Collect a draft of every field in `references/config-template
    pushing. Store it as `pipeline.after_approval`.
 8. **New or existing project.** Detect it (commit and file counts) and confirm in one line. Store
    it as `context.project`. This decides what Step 4 does.
+9. **Sharing with the team.** Find out what git does with the specs folder today:
+   `git check-ignore -v {specs_dir}/CONTEXT.md` and `git check-ignore -v {specs_dir}/x/README.md`.
+   Then ask once, saying what's true now (e.g. "your .gitignore ignores `specs/`, so nothing is
+   shared today"):
+   - **Share everything (recommended):** commit plans, investigations, reviews and project memory,
+     so teammates and PR reviewers see the reasoning and the memory grows for everyone.
+   - **Share project memory only:** commit `CONTEXT.md` and `context/`; feature files stay local.
+   - **Keep everything local:** ignore the specs folder.
+
+   **Multi-repo:** if the config folder isn't a git repo, specs kept there can't be shared. Say so
+   and offer `specs_dir: <repo>/specs` inside the repo the team treats as home.
+   Store the answer as `context.share`.
 
 ## Step 2 — Confirm in one round
 
@@ -118,15 +130,19 @@ Skip if `{specs_dir}/CONTEXT.md` already exists (offer a refresh instead, see `r
    intended stack and conventions for a new one. One round of questions, no more.
 2. Write `{specs_dir}/CONTEXT.md` (and any area files) using `references/context-template.md`.
    Keep the index to 60 lines and area files to 150.
-3. **Risk scores.** For an existing project, run `spec-driven-dev risk` (or
+3. **Apply the sharing choice.** Show the exact `.gitignore` lines that will be replaced or added,
+   and change it only after a yes, by running `spec-driven-dev settings --share=<all|memory|none>`
+   (it manages one marked block and only replaces lines about the specs folder). Never rewrite
+   other `.gitignore` lines.
+4. **Risk scores.** For an existing project, run `spec-driven-dev risk` (or
    `npx -y @benjaminthomas/spec-driven-dev risk`) to write `{specs_dir}/context/risk.md`. It uses
    git only, no model, and adds `risk.md` to `.gitignore` because it's regenerated on every run. Skip it for a new project with no history. Mention the hotspot count in the
    report. Set `risk.enabled: off` only if the user doesn't want it.
-4. **Offer, don't do:** ask whether to add this one line to `CLAUDE.md` / `AGENTS.md` (whichever
+5. **Offer, don't do:** ask whether to add this one line to `CLAUDE.md` / `AGENTS.md` (whichever
    the project uses), so hosts reload the pointer after compaction and in every new session:
    `For spec work, read specs/CONTEXT.md first, then the "Resume here" block of any unfinished spec.`
    Add it only on a yes.
-5. Re-run `npx -y @benjaminthomas/spec-driven-dev doctor` if available. It checks the size limits
+6. Re-run `npx -y @benjaminthomas/spec-driven-dev doctor` if available. It checks the size limits
    and flags context lines that point to files which no longer exist.
 
 ## Quick switches (plain words, no YAML)
@@ -140,6 +156,7 @@ keep every other line and comment, and confirm in one sentence. Don't re-run dis
 | "turn GitRisk on", "use the risk scores" | `risk.enabled: on`, then run `spec-driven-dev risk` if `{specs_dir}/context/risk.md` doesn't exist yet |
 | "run straight through after I approve", "fewer stops" | `pipeline.after_approval: run-through` |
 | "stop after each stage" | `pipeline.after_approval: stop` |
+| "share the specs with the team", "keep specs local", "share only the project memory" | `context.share: all / none / memory`: show the `.gitignore` change, then run `spec-driven-dev settings --share=…` on a yes |
 
 Reply with what changed and what it means, for example: "GitRisk is now off. Investigations, plans
 and reviews will ignore risk scores until you turn it back on." People who prefer a menu can run

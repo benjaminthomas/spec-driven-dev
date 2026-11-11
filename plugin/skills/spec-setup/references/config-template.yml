@@ -97,5 +97,8 @@ pipeline:
 context:
   project: existing             # existing (audited) | new (intent recorded) — set by setup
   graph: auto                   # auto = use graphify if installed or graphify-out/ exists | off
+  share: all                    # all = commit specs + project memory (recommended) | memory = commit only
+                                # CONTEXT.md + context/ | none = ignore the specs folder. risk.md is always ignored.
+                                # Change with: spec-driven-dev settings --share=…
 
 specs_dir: specs                # where specs/<feature>/ folders go (relative to this file)

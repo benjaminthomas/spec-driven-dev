@@ -8,11 +8,11 @@
 //   spec-driven-dev status          list specs with unfinished work and each one's "Resume here" next step
 //   spec-driven-dev context         print specs/CONTEXT.md; --areas=billing,api prints only those area files
 //   spec-driven-dev risk            GitRisk: score files from git history into specs/context/risk.md (--files=a,b  --json  --top=N  --since=…)
-//   spec-driven-dev settings        switch features on or off from a menu (GitRisk, run-through); or --risk=on|off --after-approval=…
+//   spec-driven-dev settings        switch features from a menu (GitRisk, run-through, sharing); or --risk=on|off --after-approval=… --share=all|memory|none
 //   spec-driven-dev risk-eval       U8 experiment: run tickets with risk on vs off and compare agent behaviour (--tickets=<file> --runs=N --model=… --arms=on,off --timeout=20)
 //   flags: --yes  --global  --tools=claude,cursor  --skills=spec-create,...  --no-setup  --dir=<path>
 //          --layout=single|monorepo|multi-repo  --repos=~/Projects/frontend,/srv/backend  --workspace=<config dir>
-//          --packages=apps/web,packages/ui  --after-approval=stop|run-through  --project=new|existing  --risk=on|off  --version
+//          --packages=apps/web,packages/ui  --after-approval=stop|run-through  --project=new|existing  --risk=on|off  --share=all|memory|none  --specs-dir=<path>  --version
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -20,6 +20,7 @@ import { execFileSync } from "node:child_process";
 import prompts from "prompts";  // arrow-key menus that work in PowerShell, cmd, macOS and Linux terminals
 import { fileURLToPath } from "node:url";
 import { scoreRepo, riskMarkdown, normWeights, weightProblems, setConfigValue } from "./risk.mjs";
+import { SHARE_MODES, shareState, planShare, shareTitle } from "./share.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SKILLS_DIR = path.join(ROOT, "plugin", "skills");
@@ -47,7 +48,7 @@ if (flag("version") || flag("v")) {
 }
 // No terminal to answer in (e.g. `!` in Claude Code, an IDE task, a pipe) and nothing passed explicitly:
 // stop rather than write a config from guesses.
-const ANSWER_FLAGS = ["risk", "yes", "y", "layout", "repos", "packages", "tools", "workspace", "after-approval", "skills", "global", "no-setup", "project"];
+const ANSWER_FLAGS = ["share", "specs-dir", "risk", "yes", "y", "layout", "repos", "packages", "tools", "workspace", "after-approval", "skills", "global", "no-setup", "project"];
 const NO_TTY = !process.stdin.isTTY && !args.some((a) => ANSWER_FLAGS.some((f) => a === `--${f}` || a.startsWith(`--${f}=`)));
 // Installing the skills needs no answers, so the default command still does that without a terminal
 // (e.g. `!` in Claude Code) and hands the questions to the spec-setup skill, which asks them in the chat.
@@ -252,7 +253,7 @@ function toYaml(c) {
     .map(([tool, m]) => `  ${tool}:\n` + MODEL_KEYS.map((t) => `    ${t}: ${m[t]}\n`).join("")).join("");
   out += "effort:   # effort / reasoning level per tier (Claude Code, Codex): low | medium | high | xhigh | max | default\n"
     + MODEL_KEYS.map((t) => `  ${t}: ${EFFORT_DEFAULTS[t]}\n`).join("");
-  out += `context:   # project memory: {specs_dir}/CONTEXT.md (index) + context/<area>.md\n  project: ${c.project || "existing"}   # existing | new\n  graph: auto   # auto = use graphify if installed | off\n`;
+  out += `context:   # project memory: {specs_dir}/CONTEXT.md (index) + context/<area>.md\n  project: ${c.project || "existing"}   # existing | new\n  graph: auto   # auto = use graphify if installed | off\n  share: ${c.share || "all"}   # all | memory | none: what's committed from the specs folder\n`;
   out += "risk:   # GitRisk: historical risk per file from git (spec-driven-dev risk). Weights are a hypothesis to calibrate\n  enabled: on   # on | off (off = skills ignore risk; risk-eval compares the two)\n  since: \"2 years ago\"\n  weights:\n    churn: 0.30\n    bug_density: 0.35\n    fan_out: 0.20\n    security: 0.15\n";
   out += `pipeline:\n  after_approval: ${c.afterApproval || "stop"}   # stop | run-through (implement → verify → review → checkpoint; ship always asks)\n`;
   return out + `specs_dir: ${y(c.specsDir)}\n`;
@@ -460,7 +461,8 @@ async function setup() {
     { title: `${ex}-123: add login${det("ticket", g.commitStyle)}`, value: "ticket", description: "ticket ID first" },
     { title: `Add login${det("freeform", g.commitStyle)}`, value: "freeform", description: "no fixed format" },
   ], g.commitStyle);
-  const specsDir = await askText("Folder for specs (one sub-folder per feature)", "specs");
+  const specsDir = await chooseSpecsDir(layout, root, repos);
+  const share = await chooseShare(root, specsDir);
   const afterApproval = opt("after-approval") || await askSelect("After you approve a spec…", [
     { title: "Stop after each stage", value: "stop", description: "you start implement, verify and checkpoint yourself" },
     { title: "Run straight through", value: "run-through", description: "implement → verify → review → commit in one go; stops at any failure or review blocker, never pushes without asking" },
@@ -473,7 +475,7 @@ async function setup() {
   ], pd.kind);
 
   const config = {
-    project, layout, tracker: { type: trackerType, key, url }, specsDir, devUrl: "", afterApproval,
+    project, share: share || "none", layout, tracker: { type: trackerType, key, url }, specsDir, devUrl: "", afterApproval,
     git: { remote: "origin", base_branch: base, pr_target: pr, branch_name: branchName, commit_style: commitStyle },
     commands: layout === "single" ? commandsFor(repoDirs[0]) : commandsFor(root),
     repos: repos.map((r) => {
@@ -485,6 +487,7 @@ async function setup() {
   fs.writeFileSync(file, toYaml(config));
   if (layout === "multi-repo") register(real(file), repos.map((r) => real(path.resolve(root, r))));
   console.log(`✓ Wrote ${file}`);
+  if (share) await applyShare(root, specsDir, share, { quietIfSame: true });
   console.log(isRepo(root) ? "  Commit it so your team shares the same rules." : "  This folder isn't a git repo, so the config is personal to this machine.");
   console.log(project === "existing"
     ? `  Next: ask your AI tool to "run spec-setup". It audits the ${layout === "multi-repo" ? "repos" : "repo"}, asks a few questions, and saves ${specsDir}/CONTEXT.md.`
@@ -598,8 +601,16 @@ function doctor() {
   if (!fs.existsSync(specs)) notes.push(`${c.specs_dir || "specs"}/ doesn't exist yet — created on first spec`);
   if (c.context?.project && !["new", "existing"].includes(c.context.project)) problems.push(`context.project "${c.context.project}" must be new or existing`);
   if (c.context?.graph && !["auto", "off"].includes(c.context.graph)) problems.push(`context.graph "${c.context.graph}" must be auto or off`);
-  const repoRoots = c.layout === "multi-repo" ? (c.repos || []).map((r) => path.resolve(root, expandHome(r.path))) : [root];
+  // Multi-repo context names paths from the workspace folder (soreto-shopify/app/) or from inside a repo (app/).
+  const repoRoots = c.layout === "multi-repo" ? [root, ...(c.repos || []).map((r) => path.resolve(root, expandHome(r.path)))] : [root];
   checkContext(specs, c.specs_dir || "specs", repoRoots, problems, notes);
+  if (c.context?.share) {
+    if (!SHARE_MODES.includes(c.context.share)) problems.push(`context.share "${c.context.share}" must be all, memory or none`);
+    const g = specsInGit(root, c.specs_dir || "specs");
+    if (!g && c.context.share !== "none") notes.push(`context.share is ${c.context.share}, but ${c.specs_dir || "specs"} isn't inside a git repo, so nothing can be shared`);
+    else if (g && SHARE_MODES.includes(c.context.share) && shareState(g.top, g.rel) !== c.context.share)
+      notes.push(`context.share is ${c.context.share}, but .gitignore makes it "${shareTitle[shareState(g.top, g.rel)].toLowerCase()}". Fix: spec-driven-dev settings --share=${c.context.share}`);
+  }
   const rmd = path.join(specs, "context", "risk.md"), rtop = run("git", ["rev-parse", "--show-toplevel"], root);
   if (rtop && fs.existsSync(rmd) && run("git", ["ls-files", path.relative(path.resolve(rtop), real(rmd))], rtop))
     problems.push(`${c.specs_dir || "specs"}/context/risk.md is committed to git. It's regenerated on every run, so it causes merge conflicts. Run: git rm --cached ${path.relative(path.resolve(rtop), real(rmd))}  (spec-driven-dev risk adds it to .gitignore)`);
@@ -649,6 +660,58 @@ function context() {
     if (fs.existsSync(f)) process.stdout.write(fs.readFileSync(f, "utf8").replace(/\n*$/, "\n\n"));
     else console.log(`(no ${specsName}/context/${a}.md — nothing recorded for this area yet)\n`);
   }
+}
+
+// ---------- sharing specs through git ----------
+function specsInGit(root, specsDir) {
+  const abs = path.resolve(root, specsDir);
+  let probe = abs;
+  while (!fs.existsSync(probe)) probe = path.dirname(probe);
+  const top = run("git", ["rev-parse", "--show-toplevel"], probe);
+  if (!top) return null;
+  const rel = path.relative(path.resolve(top), real(probe)).split(path.sep).concat(path.relative(probe, abs).split(path.sep)).filter((x) => x && x !== ".").join("/");
+  return rel.startsWith("..") ? null : { top, rel };
+}
+
+async function chooseSpecsDir(layout, root, repos) {
+  if (opt("specs-dir")) return opt("specs-dir");
+  if (layout !== "multi-repo" || isRepo(root)) return askText("Folder for specs (one sub-folder per feature)", "specs");
+  // The workspace folder isn't a repo, so specs kept there can never be shared through git.
+  return askSelect("Where should specs and project memory live?", [
+    { title: `In this workspace folder (${path.join(root, "specs")})`, value: "specs", description: "on this machine only; it isn't a git repo, so it can't be shared" },
+    ...repos.map((r) => ({ title: `Inside ${r}/specs`, value: `${r}/specs`.replace(/^\.\//, ""), description: "can be shared with the team through that repo" })),
+  ], "specs");
+}
+
+async function chooseShare(root, specsDir) {
+  const g = specsInGit(root, specsDir);
+  if (opt("share") && !SHARE_MODES.includes(opt("share"))) throw new Error("--share must be all, memory or none");
+  if (!g) { if (opt("share") && opt("share") !== "none") console.log(`  • ${specsDir} isn't inside a git repo, so it can't be shared. Choose a folder inside a repo (--specs-dir) to share it.`); return null; }
+  const now = shareState(g.top, g.rel);
+  if (now !== "all") console.log(`  • Your .gitignore currently makes ${g.rel}: ${shareTitle[now].toLowerCase()}.`);
+  return opt("share") || askSelect("Share specs and project memory with your team?", [
+    { title: `Share everything${now === "all" ? "  (current)" : ""}  (recommended)`, value: "all", description: "commit plans, investigations, reviews and project memory; teammates and PR reviewers see the reasoning" },
+    { title: `Share project memory only${now === "memory" ? "  (current)" : ""}`, value: "memory", description: "commit CONTEXT.md and context/; keep each feature's working files local" },
+    { title: `Keep everything local${now === "none" ? "  (current)" : ""}`, value: "none", description: "ignore the specs folder; nothing is shared" },
+  ], now === "custom" ? "all" : now);
+}
+
+async function applyShare(root, specsDir, mode, { quietIfSame } = {}) {
+  const g = specsInGit(root, specsDir);
+  if (!g) { console.log(`  • ${specsDir} isn't inside a git repo, so there's nothing to share or ignore.`); return; }
+  if (quietIfSame && shareState(g.top, g.rel) === mode && mode !== "all") return;
+  const gi = path.join(g.top, ".gitignore");
+  const before = fs.existsSync(gi) ? fs.readFileSync(gi, "utf8") : "";
+  const plan = planShare(before, g.rel, mode);
+  if (plan.text === before) return;
+  if (plan.removed.length && !opt("share") && !(await askConfirm(`To ${shareTitle[mode].toLowerCase()}, these .gitignore lines would be replaced: ${plan.removed.join(", ")}. Go ahead?`, true))) {
+    console.log("  • Left .gitignore as it was. Change it later with: spec-driven-dev settings");
+    return;
+  }
+  fs.writeFileSync(gi, plan.text);
+  console.log(`  ✓ .gitignore updated: ${shareTitle[mode].toLowerCase()}${plan.removed.length ? ` (replaced: ${plan.removed.join(", ")})` : ""}.`);
+  const now = shareState(g.top, g.rel);
+  if (now !== mode) console.log(`  • Another ignore rule (a nested .gitignore or your global git excludes) still makes it "${shareTitle[now].toLowerCase()}". Check: git check-ignore -v ${g.rel}/CONTEXT.md`);
 }
 
 // risk.md is regenerated on every run (it carries a date), so committing it means noisy diffs and merge
@@ -732,6 +795,11 @@ const SETTINGS = [
     get: (c) => c.pipeline?.after_approval || "stop", options: [
       { value: "stop", title: "Stop after each stage", description: "you start implement, verify, review and commit yourself" },
       { value: "run-through", title: "Run straight through", description: "implement → verify → review → commit; stops at any failure, never pushes" }] },
+  { block: "context", key: "share", flag: "share", name: "Share specs with the team", about: "what's committed from the specs folder",
+    get: (c) => c.context?.share || "all", after: (file, c, v) => applyShare(path.dirname(file), c.specs_dir || "specs", v), options: [
+      { value: "all", title: "Share everything", description: "commit plans, investigations, reviews and project memory" },
+      { value: "memory", title: "Share project memory only", description: "commit CONTEXT.md and context/; keep feature files local" },
+      { value: "none", title: "Keep everything local", description: "ignore the specs folder" }] },
 ];
 
 async function settings() {
@@ -739,14 +807,15 @@ async function settings() {
   if (!file) throw new Error(`No .spec-driven.yml in ${DIR} or above. Run: spec-driven-dev setup`);
   let text = fs.readFileSync(file, "utf8");
   const label = (s, v) => s.options.find((o) => o.value === v)?.title || v;
-  const save = (s, v) => {
+  const save = async (s, v) => {
     if (!s.options.some((o) => o.value === v)) throw new Error(`--${s.flag} must be ${s.options.map((o) => o.value).join(" or ")}`);
     text = setConfigValue(text, s.block, s.key, v);
     fs.writeFileSync(file, text);
     console.log(`✓ ${s.name}: ${label(s, v)}  (saved in ${file})`);
+    if (s.after) await s.after(file, parseYaml(text), v);
   };
   const given = SETTINGS.filter((s) => opt(s.flag));
-  if (given.length) given.forEach((s) => save(s, opt(s.flag)));
+  if (given.length) for (const s of given) await save(s, opt(s.flag));
   else for (;;) {
     const c = parseYaml(text);
     const pick = await askSelect("Settings: pick one to change", [
@@ -754,7 +823,7 @@ async function settings() {
       { title: "Done", value: null }], null);
     if (!pick) break;
     const v = await askSelect(`${pick.name}`, pick.options, pick.get(c));
-    if (v !== pick.get(c)) save(pick, v);
+    if (v !== pick.get(c)) await save(pick, v);
   }
   const c = parseYaml(text);
   if (c.risk?.enabled !== "off" && !fs.existsSync(path.join(path.dirname(file), c.specs_dir || "specs", "context", "risk.md"))) {

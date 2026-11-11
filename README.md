@@ -211,7 +211,7 @@ example, from inside `/Projects/frontend`:
 Every question also has a flag, for scripts and CI:
 `--layout=multi-repo --repos=~/Projects/frontend,~/Work/backend --workspace=~/Projects`,
 `--layout=monorepo --packages=apps/web,packages/ui`, `--after-approval=run-through`,
-`--project=new|existing`, `--tools=cursor,codex`, `--global`, `--yes` (accept everything detected), and `--version`.
+`--project=new|existing`, `--share=all|memory|none`, `--specs-dir=<path>`, `--tools=cursor,codex`, `--global`, `--yes` (accept everything detected), and `--version`.
 
 To change the rules later, edit the file or run setup again, then run `spec-driven-dev doctor`
 to confirm the file still matches your repos. Setup never overwrites the file without
@@ -248,6 +248,25 @@ prints just those areas, with no model involved. `doctor` checks the size limits
 lines that point to files that no longer exist. If you install
 [graphify](https://github.com/Graphify-Labs/graphify), the skills use it for cheaper code
 navigation. It's optional (`context.graph: off` turns it off), and nothing is installed for you.
+
+### Sharing specs with your team
+
+Setup asks whether to commit the specs folder, and shows what your `.gitignore` does today:
+
+| Choice | What's committed | Good for |
+|---|---|---|
+| **Share everything** (recommended) | plans, investigations, reviews and project memory | teams that review plans in PRs, and handovers |
+| **Share project memory only** | `specs/CONTEXT.md` and `specs/context/` | sharing what the project knows, keeping per-ticket files local |
+| **Keep everything local** | nothing (`specs/` is ignored) | trying it out, or personal use |
+
+Setup changes `.gitignore` only after you agree, edits one marked block, and replaces only lines about
+the specs folder. `risk.md` is always ignored. Change your mind any time with
+`spec-driven-dev settings --share=all|memory|none`, or say "share the specs with the team" in your AI
+tool. `doctor` warns if `.gitignore` drifts from your choice.
+
+**Multi-repo:** the workspace folder usually isn't a git repo, so specs kept there stay on your
+machine. To share them, choose a specs folder inside the repo your team treats as home, for example
+`--specs-dir=frontend/specs`.
 
 ### GitRisk: which files have a history of breaking
 
@@ -568,6 +587,11 @@ confirm. To change it, edit `git.base_branch` / `git.branch_name` or run setup a
 For a single repo or monorepo, yes: the whole team then follows the same rules. A multi-repo
 config sits outside any repo, so it stays on your machine.
 
+**Should I commit the specs?**
+Setup asks. Sharing everything is recommended: teammates and reviewers see the plans and the
+reasoning, and the project memory builds up for everyone. See
+[Sharing specs with your team](#sharing-specs-with-your-team).
+
 **Does it work with my stack?**
 Yes. No skill assumes a language or framework. Each one finds the repo's own commands.
 
@@ -647,7 +671,7 @@ spec-driven-dev --yes                             # accept every detected defaul
 spec-driven-dev doctor                            # check .spec-driven.yml against the real repos
 spec-driven-dev status                            # list unfinished specs and each one's next step
 spec-driven-dev context --areas=billing           # print the project memory (index, or chosen areas)
-spec-driven-dev settings                          # switch GitRisk and run-through on/off from a menu
+spec-driven-dev settings                          # switch GitRisk, run-through and sharing from a menu
 spec-driven-dev risk                              # GitRisk: score files from git history → specs/context/risk.md
 spec-driven-dev risk-eval --tickets=tickets.md    # compare agent behaviour with the risk signal on vs off
                                                   #   (--runs=3 --arms=on --timeout=20 --model=sonnet)
@@ -744,7 +768,7 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 162 | 1,545 | 3 |
+| `spec-setup` | 0 · configure | 179 | 1,747 | 3 |
 | `spec-investigate` | 1 · understand | 373 | 3,211 | 1 |
 | `spec-create` | 2 · plan | 198 | 1,782 | 6 |
 | `spec-implement` | 3 · build | 327 | 2,753 | 3 |
@@ -753,7 +777,7 @@ skips that step rather than failing.
 | `spec-checkpoint` | 6 · commit | 140 | 1,144 | 0 |
 | `spec-ship` | 7 · PR | 230 | 1,388 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **1,985** | **16,883** | **22** |
+| **Total** | | **2,002** | **17,085** | **22** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback
@@ -777,6 +801,7 @@ bin/spec-driven-dev.cjs       launcher (runs on any Node, explains if it's too o
 bin/cli.mjs                   the `spec-driven-dev` CLI: installer, setup menus, doctor, status, context, risk
 bin/risk.mjs                  GitRisk scoring (churn, bug density, fan-out, security)
 bin/risk-eval.mjs             risk on/off experiment harness
+bin/share.mjs                 what's committed from the specs folder (.gitignore block)
 package.json                  npm package (ships bin/ and plugin/skills/)
 mcp-server/                   MCP fallback server
 CHANGELOG.md                  what changed in each version
@@ -805,7 +830,7 @@ plugin/evals/                 `claude plugin eval` cases
   1. Increase `version` in both `package.json` and `plugin/.claude-plugin/plugin.json` (the check fails if
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
-  3. Tag the release and push the tag: `git tag v1.11.2 && git push origin v1.11.2`.
+  3. Tag the release and push the tag: `git tag v1.12.0 && git push origin v1.12.0`.
   4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
      npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 

@@ -309,6 +309,54 @@ assert.ok(!fs.existsSync(path.join(hand, ".spec-driven.yml")), "no config withou
 assert.ok(ho.includes('say "run spec-setup"') && !ho.includes("Nothing was changed") && !ho.includes('"investigate <ticket>"'), ho);
 assert.throws(() => cli("setup", `--dir=${hand}`), /run spec-setup/);  // setup still refuses, and points at the AI tool
 
+// 19. sharing: detect the current state, never change it under --yes, switch modes cleanly, and handle multi-repo
+const sh2 = path.join(tmp, "share");
+repo(sh2, {}, ["x"]);
+fs.writeFileSync(path.join(sh2, ".gitignore"), "node_modules/\nspecs/\n.env\n");     // like soreto-shopify today
+const ign = (rel) => { try { execFileSync("git", ["check-ignore", "--no-index", rel], { cwd: sh2, stdio: "pipe" }); return true; } catch { return false; } };
+let so2 = cli("setup", "--yes", `--dir=${sh2}`);
+assert.ok(so2.includes("currently makes specs: keep everything local"), so2);
+assert.ok(fs.readFileSync(path.join(sh2, ".spec-driven.yml"), "utf8").includes("share: none"));
+assert.equal(fs.readFileSync(path.join(sh2, ".gitignore"), "utf8"), "node_modules/\nspecs/\n.env\n", "--yes must keep the existing choice");
+assert.equal(doctor(sh2).code, 0, doctor(sh2).out);
+so2 = cli("settings", `--dir=${sh2}`, "--share=memory");
+let gi2 = fs.readFileSync(path.join(sh2, ".gitignore"), "utf8");
+assert.ok(so2.includes("replaced: specs/") && gi2.startsWith("node_modules/\n.env\n") && gi2.includes("specs/*\n!specs/CONTEXT.md\n!specs/context/\nspecs/context/risk.md"), so2 + gi2);
+assert.ok(!ign("specs/CONTEXT.md") && !ign("specs/context/billing.md") && ign("specs/stp-1/README.md") && ign("specs/context/risk.md"), "memory mode patterns");
+cli("settings", `--dir=${sh2}`, "--share=all");
+gi2 = fs.readFileSync(path.join(sh2, ".gitignore"), "utf8");
+assert.ok(!ign("specs/stp-1/README.md") && !ign("specs/CONTEXT.md") && ign("specs/context/risk.md") && (gi2.match(/spec-driven-dev: what/g) || []).length === 1, gi2);
+cli("risk", `--dir=${sh2}`);
+assert.ok(!fs.readFileSync(path.join(sh2, ".gitignore"), "utf8").includes("# GitRisk scores"), "risk must not add a second ignore line");
+cli("settings", `--dir=${sh2}`, "--share=none");
+assert.ok(ign("specs/CONTEXT.md") && ign("specs/x/README.md"));
+fs.writeFileSync(path.join(sh2, ".gitignore"), "node_modules/\n");                       // config says none, git says shared
+d = doctor(sh2);
+assert.ok(d.out.includes("context.share is none, but .gitignore makes it \"share everything\"") && d.out.includes("settings --share=none"), d.out);
+assert.throws(() => cli("settings", `--dir=${sh2}`, "--share=team"), /--share must be all or memory or none/);
+// a fresh repo with no rule: --yes picks "share everything", which only ignores risk.md
+const sh3 = path.join(tmp, "share3");
+repo(sh3, {}, ["x"]);
+cli("setup", "--yes", `--dir=${sh3}`);
+assert.ok(fs.readFileSync(path.join(sh3, ".spec-driven.yml"), "utf8").includes("share: all") && fs.readFileSync(path.join(sh3, ".gitignore"), "utf8").includes("specs/context/risk.md"));
+// multi-repo: the workspace folder isn't a repo, so specs only share when kept inside one of the repos
+const ws3 = path.join(tmp, "ws3");
+repo(path.join(ws3, "shop"), {}, ["x"]);
+repo(path.join(ws3, "api"), {}, ["x"]);
+let mo = cli("setup", "--yes", `--dir=${ws3}`, "--share=all");
+assert.ok(mo.includes("isn't inside a git repo, so it can't be shared") && fs.readFileSync(path.join(ws3, ".spec-driven.yml"), "utf8").includes("share: none"), mo);
+fs.rmSync(path.join(ws3, ".spec-driven.yml"));
+mo = cli("setup", "--yes", `--dir=${ws3}`, "--specs-dir=shop/specs", "--share=memory");
+const y3 = fs.readFileSync(path.join(ws3, ".spec-driven.yml"), "utf8");
+assert.ok(y3.includes('specs_dir: "shop/specs"') && y3.includes("share: memory"), y3);
+assert.ok(fs.readFileSync(path.join(ws3, "shop", ".gitignore"), "utf8").includes("specs/*\n!specs/CONTEXT.md"), "the rule goes in the repo that holds the specs");
+assert.equal(doctor(ws3).code, 0, doctor(ws3).out);
+fs.mkdirSync(path.join(ws3, "shop/specs"), { recursive: true });
+fs.mkdirSync(path.join(ws3, "shop/app"), { recursive: true });
+fs.writeFileSync(path.join(ws3, "shop/specs/CONTEXT.md"), "- routes in `shop/app/` and `app/`; gone: `shop/old/`\n");
+d = doctor(ws3);
+assert.ok(!d.out.includes("`shop/app/`, which") && !d.out.includes("`app/`, which") && d.out.includes("`shop/old/`, which no longer exists"), d.out);
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 
