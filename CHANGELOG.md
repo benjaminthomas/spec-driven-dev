@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.1 — 2026-11-11
+Fixes from a first-time setup on a real multi-repo project.
+- **Choosing repos comes with context.** In a multi-repo setup, spec-setup no longer skips the repo question or shows bare folder names. It says what each repo is, shows evidence of how it connects to the current one (env vars, API calls, docs, with `path:line`), notes whether you commit to it, and recommends a selection with a reason for each. It asks once and writes nothing until you answer.
+- **No more "Invalid tool parameters" during setup.** Open questions (fragile spots, direction, unwritten rules) are asked as plain text in one message. Menus are only used for real choices with two or more options. A one-option menu was being rejected, and the question was lost.
+
 ## 1.14.0 — 2026-11-11
 - **`spec-driven-dev uninstall`.** Lists everything an install put on this machine (the skills in each AI tool, the Claude Code plugin, the npx download cache) and removes it after one confirmation. Other skills are left alone. `--all` also removes the settings file and workspace registry. Specs, `CONTEXT.md` and code are never touched. Without a terminal it only lists, unless you pass `--yes`.
 

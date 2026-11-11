@@ -51,10 +51,13 @@ Read, don't guess. Collect a draft of every field in `references/config-template
      multi-repo workspace). The same goes for any repo whose "packages" are plug-ins of one app.
    - **Ask when one repo works with others.** Even inside a single repo, ask once: "Does this repo
      change together with other repos (for example a backend)?" A yes means `multi-repo`.
-   - Not inside a git repo, but sibling folders are git repos → candidate `multi-repo`. Group them
-     by remote owner (`git remote get-url origin`) and show the groups — the user picks which repos
-     belong together. Never assume every folder in the parent belongs. Always also ask whether
-     repos in **other folders** belong (e.g. `~/clients/billing`). Check each path is a git repo,
+   - Not inside a git repo, but sibling folders are git repos → candidate `multi-repo`.
+   - **Choosing the repos is a required question for `multi-repo`, never a detection.** Someone new
+     doesn't know what `soreto-melissa` is, so never show bare folder names. Follow
+     `references/repo-picker.md`: say what each candidate repo is, show evidence of how it connects
+     to the current repo, note whether the user commits to it, and recommend a selection with a
+     reason per repo. Ask once, and don't write the config until they've answered. Always also
+     offer repos in **other folders** (e.g. `~/clients/billing`). Check each path is a git repo,
      and store paths inside the workspace as relative and paths outside it as absolute.
    - The repos of one workspace can live in unrelated places (`/Projects/frontend`,
      `~/Work/backend`, `/srv/database`). Put the config in their shared parent folder, or in
@@ -119,6 +122,15 @@ Read, don't guess. Collect a draft of every field in `references/config-template
    and offer `specs_dir: <repo>/specs` inside the repo the team treats as home.
    Store the answer as `context.share`. A dedicated specs repo is shared by nature: set
    `context.share: all`.
+
+## How to ask
+
+- **Real choices** (layout, keep these repos, sharing, after-approval mode) can be a menu, but only
+  with **two or more** options. A menu with one option is rejected by the tool and the user never
+  sees the question. "Other" doesn't count as an option.
+- **Open questions** (what the product does, fragile spots, direction, unwritten rules, anything
+  else to add) are plain text in **one chat message**. The user answers in their own words or says
+  "skip". Never turn an open question into a menu.
 
 ## Step 2 — Confirm in one round
 
