@@ -108,9 +108,18 @@ Read, don't guess. Collect a draft of every field in `references/config-template
    steps (CI is often the most truthful source). Dev URL from the dev script, `.env.example`, or
    framework defaults.
 
-6. **Models per tier.** Write the `models:` block from the template. Ask which models the user
-   has for each tool they installed, only if they want to tune it: the Claude defaults (haiku /
-   sonnet / opus) work as-is, and `default` is safe for the rest.
+6. **Models per tier.** Write the `models:` block from the template; the defaults work as they are
+   (Claude haiku / sonnet / opus, Cursor `fast` / `inherit`). Tools that offer several vendors'
+   models (Cursor, OpenCode, Copilot: Claude, GPT/Codex, Gemini…) can map each tier to a real model.
+   Offer it in one line ("Want light tasks on a cheaper model and deep ones on a stronger one?"),
+   and on a yes:
+   - **Read the choices, don't guess them.** Use the model values your subagent tool accepts (its
+     parameter's allowed list, e.g. Cursor's Task tool `model`), or ask the user to copy names from
+     the tool's model picker. Never write a model name from memory.
+   - Suggest one family for all tiers (cheapest for light, strongest for deep, e.g. a Haiku / Sonnet
+     / Opus or a Flash / Pro split), and say mixing vendors is fine.
+   - Write the exact names to `models.<tool>`. A name the tool later rejects falls back to the
+     session's model, and spec-implement says so.
 7. **After approval.** Ask whether an approved spec should stop after each stage (`stop`), or
    run implement → verify → review → checkpoint in one go (`run-through`), stopping at any failure and never
    pushing. Store it as `pipeline.after_approval`.

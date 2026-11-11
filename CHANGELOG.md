@@ -1,4 +1,7 @@
 # Changelog
+## 1.21.1 — 2026-11-11
+- **Cursor switches models out of the box.** New setups write `light: fast`, `standard: inherit`, `deep: inherit` for Cursor instead of `default`, which meant every task ran on the chat's model. Tried live in Cursor 3.24: the light task ran on `fast` and the deep task and reviews on the chat's model, through the Task tool's `model` argument, with no agent files needed. Existing configs keep their values; set `models.cursor.light: fast` to get the switch.
+- **Map tiers to any vendor's models.** Cursor (and OpenCode or Copilot) offer Claude, GPT/Codex and Gemini models. spec-setup now offers to put a cheaper one on light tasks and a stronger one on deep tasks, reading the names from the tool's own list of accepted models or its model picker, never from memory.
 ## 1.21.0 — 2026-11-11
 - **Build report: which models ran and how many tokens it took.** New `spec-driven-dev usage STP-123` reads Claude Code's own session files (including every subagent) and shows tokens per stage and model, how much came from cache, subagent count and time span. `--summary` gives three lines, `--json` the raw numbers. It works out which feature each reply belongs to from what you typed and the skill that was running, and counts a response only once.
 - spec-ship adds a **Built with spec-driven-dev** section to the PR, and the ticket comment carries it too: models per stage, tokens, verified N/M, review result, escalations. Totals only, never content. `usage.report: all | pr | ticket | local | off` (default `all`).

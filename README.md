@@ -118,10 +118,12 @@ contracts, unclear requirements). `spec-implement` then runs each task on the mo
   [Anthropic's model overview](https://platform.claude.com/docs/en/about-claude/models/overview),
   [Codex's config docs](https://developers.openai.com/codex/config-basic), and
   [Cursor's model list](https://cursor.com/help/models-and-usage/available-models). Claude Code
-  uses family aliases, which always point to the newest model. Cursor's models depend on your plan,
-  so it uses your current model until you fill in the models you can see in its picker.
-- **Tools that run one model per session** (Cursor, Codex) don't switch silently. Before a heavier
-  batch, they pause and tell you which model to switch to.
+  uses family aliases, which always point to the newest model. Cursor uses `fast` (its cheaper model)
+  for light tasks and your chat's model (`inherit`) for the rest; put a slug from its model picker
+  in `models.cursor.deep` to pin a stronger one.
+- **Per-task switching by tool:** Claude Code and Cursor switch per subagent (both tried live);
+  Codex CLI and OpenCode should too, and Antigravity only between Gemini tiers. A tool that can't
+  switch doesn't do it silently: before a heavier batch it pauses and tells you which model to use.
 - **Changing the models:** edit the `models:` section of `.spec-driven.yml`, for example to use a
   newer model for `deep`.
 
@@ -826,7 +828,7 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 314 | 3,509 | 6 |
+| `spec-setup` | 0 · configure | 323 | 3,631 | 6 |
 | `spec-investigate` | 1 · understand | 395 | 3,469 | 1 |
 | `spec-create` | 2 · plan | 198 | 1,806 | 6 |
 | `spec-implement` | 3 · build | 334 | 2,872 | 4 |
@@ -835,7 +837,7 @@ skips that step rather than failing.
 | `spec-checkpoint` | 6 · commit | 140 | 1,168 | 0 |
 | `spec-ship` | 7 · PR | 256 | 1,683 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **2,242** | **20,206** | **26** |
+| **Total** | | **2,251** | **20,328** | **26** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **5** tools supported natively (Claude Code, Codex CLI, Cursor, OpenCode, Antigravity), plus an MCP fallback

@@ -356,7 +356,7 @@ const EFFORTS = ["low", "medium", "high", "xhigh", "max", "default"];
 const MODEL_DEFAULTS = {
   claude: { light: "haiku", standard: "sonnet", deep: "opus", escalate: "fable" },
   codex: { light: "gpt-6-luna", standard: "gpt-6.1-sol", deep: "gpt-6.1-sol", escalate: "default" },
-  cursor: { light: "default", standard: "default", deep: "default", escalate: "default" },
+  cursor: { light: "fast", standard: "inherit", deep: "inherit", escalate: "default" }, // fast = Cursor's cheaper model; inherit = the chat's model
   antigravity: { light: "flash", standard: "pro", deep: "pro", escalate: "default" }, // subagents take a tier only: flash_lite | flash | pro
   opencode: { light: "default", standard: "default", deep: "default", escalate: "default" }, // provider/model, e.g. anthropic/claude-haiku-5-5; depends on your providers
 };

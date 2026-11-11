@@ -65,10 +65,10 @@ models:
     standard: gpt-6.1-sol
     deep: gpt-6.1-sol  # same model, higher reasoning effort (see effort:)
     escalate: default
-  cursor:            # depends on your Cursor plan; set models you can see in the model picker
-    light: default
-    standard: default
-    deep: default
+  cursor:            # fast = Cursor's cheaper model, inherit = the chat's model, or a model slug from your plan
+    light: fast
+    standard: inherit
+    deep: inherit
     escalate: default
   antigravity:                  # subagents take a Gemini tier only: flash_lite | flash | pro | inherit
     light: flash
