@@ -1,4 +1,6 @@
 # Changelog
+## 1.16.3 — 2026-11-11
+- **Project-memory pointer in every repo.** In a multi-repo workspace, spec-setup now offers the one-line `AGENTS.md`/`CLAUDE.md` pointer for every repo you have, in one question, and skips repos that already have it. The line names the specs repo instead of assuming it sits next door. Joining offers it for any of your repos that lack it. Setup still never commits: it lists one commit per repo in that repo's style, and warns when a repo is on a feature branch.
 ## 1.16.2 — 2026-11-11
 - **Tidier team setup.** `team.yml` and `.spec-driven.yml` leave out unset values instead of writing `""` (and drop a section left empty).
 - `team init --fresh` skips the backup when spec-setup wrote the config in the same run, so a first-time install no longer leaves a pointless `.spec-driven.yml.bak`. spec-setup now passes it.

@@ -51,7 +51,8 @@ names (a path, or a git URL to clone). If you find one, say so with what it is, 
 mark the ones not cloned here and offer their `git clone` command, cloning only on a yes), then run
 `spec-driven-dev setup --join=<specs repo> --repos=<chosen>` (or `npx -y @benjaminthomas/spec-driven-dev …`).
 Don't audit, don't ask about conventions, and never change the team's files: `CONTEXT.md`,
-`team.yml` and `team-repos.yml` are shared. Then run `doctor`, and finish with "You've joined. Say
+`team.yml` and `team-repos.yml` are shared. Then run `doctor`. If any of their repos lack the
+pointer line (Step 4, item 5), offer to add it there. Finish with "You've joined. Say
 *investigate STP-123* to start." Only `team-repos.yml` and no `team.yml` (an older setup): join
 anyway, and tell the user the team's rules aren't shared yet, so the person who set it up should
 run `spec-driven-dev team init`.
@@ -251,10 +252,18 @@ Skip if `{specs_dir}/CONTEXT.md` already exists (offer a refresh instead, see `r
    `npx -y @benjaminthomas/spec-driven-dev risk`) to write `{specs_dir}/context/risk.md`. It uses
    git only, no model, and adds `risk.md` to `.gitignore` because it's regenerated on every run. Skip it for a new project with no history. Mention the hotspot count in the
    report. Set `risk.enabled: off` only if the user doesn't want it.
-5. **Offer, don't do:** ask whether to add this one line to `CLAUDE.md` / `AGENTS.md` (whichever
-   the project uses), so hosts reload the pointer after compaction and in every new session:
-   `For spec work, read specs/CONTEXT.md first, then the "Resume here" block of any unfinished spec.`
-   Add it only on a yes.
+5. **Offer, don't do:** ask whether to add one pointer line to `CLAUDE.md` / `AGENTS.md` (whichever
+   each repo uses), so hosts reload the project memory after compaction and in every new session.
+   - Single repo or monorepo: `For spec work, read specs/CONTEXT.md first, then the "Resume here" block of any unfinished spec.`
+   - Multi-repo: offer it for **every repo in this person's workspace** in one question, not just
+     the current one. Name the specs repo rather than assuming a layout:
+     `For spec work, read CONTEXT.md in the <specs repo name> repo first (usually ../<specs repo name>/CONTEXT.md), then the "Resume here" block of any unfinished spec.`
+   - Skip repos that already have a line mentioning `CONTEXT.md`. It's committed with each repo, so
+     teammates get it when they pull, and nobody adds it twice.
+   Add it only on a yes, and never commit. Each repo is its own commit; list them in the report, in
+   that repo's commit style and onto its base branch (e.g. `git -C reverb-backend commit -m "STP-123:
+   point AI tools to the project memory" AGENTS.md`). If a repo is on a feature branch, say the edit
+   is there and suggest committing it on its own so it doesn't ride along in that PR.
 6. Re-run `npx -y @benjaminthomas/spec-driven-dev doctor` if available. It checks the size limits
    and flags context lines that point to files which no longer exist.
 
