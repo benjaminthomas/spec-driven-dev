@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.13.0 — 2026-11-11
+Changes from a first-time install on a real multi-repo project.
+- **Setup happens in your AI tool.** The installer now only installs the skills, then hands over with one next step: say "run spec-setup". If Claude Code or Codex is installed, it offers to open it with that already typed in. In the chat you can correct any answer as you go, which the terminal menus couldn't do. `spec-driven-dev setup` stays for scripts and CI (flags, no questions).
+- **Colour per step** in the installer and `doctor` (blue for installing, magenta for handing over, green ✓, yellow notes, red problems). Plain text when piped, in CI, or with `NO_COLOR`; `FORCE_COLOR=1` turns it on.
+- **A Shopify app is no longer read as a monorepo.** Workspaces that only cover `extensions/` next to `shopify.app.toml` are one app.
+- **Commit style per repo** in multi-repo workspaces: a repo that writes `STP-123: …` keeps that even when the others use `feat: …`.
+- **Teams on different subsets of repos:** spec-setup offers a dedicated specs repo everyone clones; `team-repos.yml` there lists every team repo with its git URL; `doctor` shows which aren't cloned (with the clone command); and spec-investigate stops and says so when a ticket needs a repo that isn't on this machine. A specs folder that is a whole repo is always shared, with only `risk.md` ignored.
+- FAQ: what npm's "Unknown project config" warnings mean (a pnpm-style `.npmrc` in an npm project) and how to clear them.
+
 ## 1.12.0 — 2026-11-11
 - **Setup asks whether to share specs with your team:** share everything (recommended), share project memory only, or keep everything local. It first says what your `.gitignore` does today, and with `--yes` it keeps that. It changes `.gitignore` only through one marked block, replacing only lines about the specs folder, and asks before replacing any. `risk.md` stays ignored either way. Saved as `context.share`.
 - **Multi-repo:** when the workspace folder isn't a git repo, setup explains that specs kept there can't be shared and offers a specs folder inside one of the repos (`--specs-dir=<repo>/specs`).

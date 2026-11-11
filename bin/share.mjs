@@ -12,13 +12,16 @@ const git = (cwd, args) => {
 const ignored = (top, rel) => !!git(top, ["check-ignore", "--no-index", rel]);
 
 // What git does today: is the project memory ignored, and is a feature's working folder ignored?
+const under = (specs, p) => (specs ? `${specs}/${p}` : p); // specs can be a whole repo (a dedicated specs repo)
+
 export function shareState(top, specs) {
-  const memory = !ignored(top, `${specs}/CONTEXT.md`) && !ignored(top, `${specs}/context/notes.md`);
-  const features = !ignored(top, `${specs}/some-feature/README.md`);
+  const memory = !ignored(top, under(specs, "CONTEXT.md")) && !ignored(top, under(specs, "context/notes.md"));
+  const features = !ignored(top, under(specs, "some-feature/README.md"));
   return features && memory ? "all" : memory ? "memory" : features ? "custom" : "none";
 }
 
 export function blockFor(specs, mode) {
+  if (!specs) return [BEGIN, "/context/risk.md", END]; // a specs repo exists to be shared: only the generated file is ignored
   const lines = mode === "none" ? [`${specs}/`]
     : mode === "memory" ? [`${specs}/*`, `!${specs}/CONTEXT.md`, `!${specs}/context/`, `${specs}/context/risk.md`]
     : [`${specs}/context/risk.md`];

@@ -17,7 +17,9 @@ license: MIT
 # spec-setup
 
 Learn this project's rules and context once, save them, and let every other `spec-*` skill reuse
-them. Team rules live in a config file the team can review and change — never in the skills
+them. This is **the** setup: the npm installer only copies the skills and then sends people here, so
+treat it as their first conversation with the workflow. Explain each question in a line, and let
+them change any earlier answer at any point ("actually it's Jira") before you write anything. Team rules live in a config file the team can review and change — never in the skills
 themselves. What the project *knows* (areas, conventions, decisions) lives in
 `{specs_dir}/CONTEXT.md`, kept small so loading it is cheap.
 
@@ -44,6 +46,11 @@ Read, don't guess. Collect a draft of every field in `references/config-template
      `package.json`, `turbo.json`, `nx.json`, `lerna.json`, `go.work`, `[workspace]` in
      `Cargo.toml`, several `apps/*`/`packages/*`/`services/*` with their own manifests) →
      `monorepo`; list the packages.
+   - **Not a monorepo:** a Shopify app (`shopify.app*.toml` at the root) whose workspaces only cover
+     `extensions/`. Those are parts of one app deployed together, so it's `single` (or one repo of a
+     multi-repo workspace). The same goes for any repo whose "packages" are plug-ins of one app.
+   - **Ask when one repo works with others.** Even inside a single repo, ask once: "Does this repo
+     change together with other repos (for example a backend)?" A yes means `multi-repo`.
    - Not inside a git repo, but sibling folders are git repos → candidate `multi-repo`. Group them
      by remote owner (`git remote get-url origin`) and show the groups — the user picks which repos
      belong together. Never assume every folder in the parent belongs. Always also ask whether
@@ -68,7 +75,9 @@ Read, don't guess. Collect a draft of every field in `references/config-template
    `gh repo view --json defaultBranchRef`); integration branches (`staging`, `develop`,
    `pre-prod`); which branch recent PRs targeted (`gh pr list --state merged --limit 20 --json
    baseRefName`); the pattern of the last ~20 remote branch names; the commit style from
-   `git log -30 --format=%s`.
+   `git log -30 --format=%s`. Judge commit style **per repo**: when one repo writes `STP-123: …` and
+   the others write `feat: …`, keep the majority at the top level and give that repo its own
+   `git.commit_style`.
 5. **Commands, per repo/package.** `package.json` scripts plus the lockfile's package manager,
    `Makefile`, `pyproject.toml`/`tox.ini`, `Cargo.toml`, `go.mod`, `composer.json`, CI workflow
    steps (CI is often the most truthful source). Dev URL from the dev script, `.env.example`, or
@@ -82,7 +91,22 @@ Read, don't guess. Collect a draft of every field in `references/config-template
    pushing. Store it as `pipeline.after_approval`.
 8. **New or existing project.** Detect it (commit and file counts) and confirm in one line. Store
    it as `context.project`. This decides what Step 4 does.
-9. **Sharing with the team.** Find out what git does with the specs folder today:
+9. **Where specs live (multi-repo).** One specs folder serves the whole workspace: each ticket gets
+   one folder there even when it changes several repos; code, branches and PRs stay in each repo.
+   Offer, in this order, with the reason for each:
+   - **A dedicated specs repo (recommended for teams where developers work on different subsets of
+     repos):** everyone clones it, whatever code repos they have. Use an existing one (path or git
+     URL; offer the `git clone` command) or create one: only after a yes, `mkdir` it next to the
+     repos and `git init`. Never create a remote repo; say how to push it (`gh repo create`).
+     Then set `specs_dir: <specs-repo>` (its root holds `CONTEXT.md`, `context/` and feature folders).
+   - **Inside one code repo** (`<repo>/specs`): fine when every developer has that repo.
+   - **The workspace folder:** on this machine only, since it isn't a git repo.
+10. **The team's repo list.** Keep `{specs_dir}/team-repos.yml` (see `references/config-template.yml`)
+   listing every repo the team works across with its git URL and a one-line role. Each developer's
+   own `.spec-driven.yml` lists only the repos they have. When the file exists, offer its repos
+   instead of making people remember them, and for any not cloned here show
+   `git clone <url> <workspace>/<name>`. When someone adds a repo, add it to the file too.
+11. **Sharing with the team.** Find out what git does with the specs folder today:
    `git check-ignore -v {specs_dir}/CONTEXT.md` and `git check-ignore -v {specs_dir}/x/README.md`.
    Then ask once, saying what's true now (e.g. "your .gitignore ignores `specs/`, so nothing is
    shared today"):
@@ -93,7 +117,8 @@ Read, don't guess. Collect a draft of every field in `references/config-template
 
    **Multi-repo:** if the config folder isn't a git repo, specs kept there can't be shared. Say so
    and offer `specs_dir: <repo>/specs` inside the repo the team treats as home.
-   Store the answer as `context.share`.
+   Store the answer as `context.share`. A dedicated specs repo is shared by nature: set
+   `context.share: all`.
 
 ## Step 2 — Confirm in one round
 
@@ -145,6 +170,11 @@ Skip if `{specs_dir}/CONTEXT.md` already exists (offer a refresh instead, see `r
 6. Re-run `npx -y @benjaminthomas/spec-driven-dev doctor` if available. It checks the size limits
    and flags context lines that point to files which no longer exist.
 
+## After setup
+
+Finish with **one** next step, not a list: "Setup's done. Say *investigate STP-123* to start your
+first ticket." If anything was left out (a tracker URL, a repo not cloned), name it in one line.
+
 ## Quick switches (plain words, no YAML)
 
 When the user asks to switch a feature on or off, change only that one line of `.spec-driven.yml`,
@@ -156,6 +186,7 @@ keep every other line and comment, and confirm in one sentence. Don't re-run dis
 | "turn GitRisk on", "use the risk scores" | `risk.enabled: on`, then run `spec-driven-dev risk` if `{specs_dir}/context/risk.md` doesn't exist yet |
 | "run straight through after I approve", "fewer stops" | `pipeline.after_approval: run-through` |
 | "stop after each stage" | `pipeline.after_approval: stop` |
+| "add reverb-react to the workspace", "I also work on X" | add it under `repos:` (clone first if needed, from `team-repos.yml`), and to `team-repos.yml` if it's new to the team |
 | "share the specs with the team", "keep specs local", "share only the project memory" | `context.share: all / none / memory`: show the `.gitignore` change, then run `spec-driven-dev settings --share=…` on a yes |
 
 Reply with what changed and what it means, for example: "GitRisk is now off. Investigations, plans

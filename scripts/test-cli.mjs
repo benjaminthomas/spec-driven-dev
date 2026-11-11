@@ -24,7 +24,9 @@ function repo(dir, scripts, subjects, branches = []) {
 // 1. single repo: tools installed, commands + conventions detected
 const single = path.join(tmp, "single");
 repo(single, { lint: "eslint .", test: "vitest", dev: "vite" }, ["STP-1: a", "STP-2: b", "STP-3: c"], ["STP-1", "STP-2", "staging"]);
-cli("--yes", "--tools=cursor,codex", `--dir=${single}`);
+const inst = cli("--yes", "--tools=cursor,codex", `--dir=${single}`);
+assert.ok(!fs.existsSync(path.join(single, ".spec-driven.yml")) && inst.includes('say "run spec-setup"') && inst.includes("set up single"), "install only installs, then hands over\n" + inst);
+cli("setup", "--yes", `--dir=${single}`);
 assert.ok(fs.existsSync(path.join(single, ".cursor/skills/spec-setup/SKILL.md")));
 assert.ok(fs.existsSync(path.join(single, ".agents/skills/spec-create/references/task-template.md")));
 let cfg = fs.readFileSync(path.join(single, ".spec-driven.yml"), "utf8");
@@ -124,8 +126,8 @@ assert.throws(() => cli("setup", "--yes", `--dir=${single}`, "--layout=mono"), /
 // 10a. no terminal and no answers given: refuse, change nothing
 const quiet = path.join(tmp, "quiet");
 repo(quiet, {}, ["x"]);
-assert.throws(() => cli("setup", `--dir=${quiet}`), /No interactive terminal/);
-assert.ok(!fs.existsSync(path.join(quiet, ".spec-driven.yml")), "wrote a config without a terminal or flags");
+assert.ok(cli("setup", `--dir=${quiet}`).includes('say "run spec-setup"'), "setup without flags points to the AI tool");
+assert.ok(!fs.existsSync(path.join(quiet, ".spec-driven.yml")), "wrote a config without answers");
 
 // 10b. models block: written by setup, parsed and validated by doctor
 cfg = fs.readFileSync(path.join(quiet, "..", "ws", ".spec-driven.yml"), "utf8");
@@ -307,7 +309,7 @@ const ho = cli(`--dir=${hand}`);
 assert.ok(fs.existsSync(path.join(hand, ".cursor/skills/spec-setup/SKILL.md")), "skills should be installed for detected tools");
 assert.ok(!fs.existsSync(path.join(hand, ".spec-driven.yml")), "no config without answers");
 assert.ok(ho.includes('say "run spec-setup"') && !ho.includes("Nothing was changed") && !ho.includes('"investigate <ticket>"'), ho);
-assert.throws(() => cli("setup", `--dir=${hand}`), /run spec-setup/);  // setup still refuses, and points at the AI tool
+assert.ok(cli("setup", `--dir=${hand}`).includes("For scripts and CI") && !fs.existsSync(path.join(hand, ".spec-driven.yml")));
 
 // 19. sharing: detect the current state, never change it under --yes, switch modes cleanly, and handle multi-repo
 const sh2 = path.join(tmp, "share");
@@ -356,6 +358,40 @@ fs.mkdirSync(path.join(ws3, "shop/app"), { recursive: true });
 fs.writeFileSync(path.join(ws3, "shop/specs/CONTEXT.md"), "- routes in `shop/app/` and `app/`; gone: `shop/old/`\n");
 d = doctor(ws3);
 assert.ok(!d.out.includes("`shop/app/`, which") && !d.out.includes("`app/`, which") && d.out.includes("`shop/old/`, which no longer exists"), d.out);
+
+// 20. a Shopify app's extensions/ workspaces are one app, not a monorepo
+const shop = path.join(tmp, "shopapp");
+repo(shop, { dev: "shopify app dev" }, ["STP-1: a"]);
+fs.writeFileSync(path.join(shop, "package.json"), JSON.stringify({ workspaces: ["extensions/*"] }));
+fs.writeFileSync(path.join(shop, "shopify.app.toml"), "name = 'x'\n");
+for (const e of ["checkout-widget", "web-pixel"]) { fs.mkdirSync(path.join(shop, "extensions", e), { recursive: true }); fs.writeFileSync(path.join(shop, "extensions", e, "package.json"), "{}"); }
+cli("setup", "--yes", `--dir=${shop}`);
+assert.ok(fs.readFileSync(path.join(shop, ".spec-driven.yml"), "utf8").includes("layout: single"), "Shopify app read as a monorepo");
+
+// 21. multi-repo: a repo whose commit style differs from the workspace keeps its own
+const ws4 = path.join(tmp, "ws4");
+repo(path.join(ws4, "a"), {}, ["feat: 1", "fix: 2", "feat: 3", "chore: 4", "feat: 5", "fix: 6"]);
+repo(path.join(ws4, "b"), {}, ["feat: 1", "fix: 2", "feat: 3", "chore: 4", "feat: 5", "fix: 6"]);
+repo(path.join(ws4, "c"), {}, ["STP-1: a", "STP-2: b", "STP-3: c", "STP-4: d", "STP-5: e"]);
+cli("setup", "--yes", `--dir=${ws4}`);
+const y4 = fs.readFileSync(path.join(ws4, ".spec-driven.yml"), "utf8");
+assert.ok(/commit_style: "conventional"/.test(y4) && /path: "c"[\s\S]*?commit_style: "ticket"/.test(y4) && !/path: "a"[\s\S]*?commit_style[\s\S]*?path: "b"/.test(y4), y4);
+assert.equal(doctor(ws4).code, 0, doctor(ws4).out);
+
+// 22. a dedicated specs repo: specs at its root are shared, only risk.md is ignored; team-repos.yml drives doctor notes
+const ws5 = path.join(tmp, "ws5");
+repo(path.join(ws5, "shop"), {}, ["x"]);
+repo(path.join(ws5, "api"), {}, ["x"]);
+repo(path.join(ws5, "team-specs"), {}, ["docs: start"]);
+repo(path.join(ws5, "dash"), {}, ["x"]);          // cloned, but this developer doesn't list it
+let o5 = cli("setup", "--yes", `--dir=${ws5}`, "--repos=shop,api", "--layout=multi-repo", `--workspace=${ws5}`, "--specs-dir=team-specs", "--share=memory");
+assert.ok(o5.includes("is a repo of its own, so everything in it is shared") && fs.readFileSync(path.join(ws5, ".spec-driven.yml"), "utf8").includes("share: all"), o5);
+assert.ok(fs.readFileSync(path.join(ws5, "team-specs", ".gitignore"), "utf8").includes("/context/risk.md"));
+const ign5 = (rel) => { try { execFileSync("git", ["check-ignore", "--no-index", rel], { cwd: path.join(ws5, "team-specs"), stdio: "pipe" }); return true; } catch { return false; } };
+assert.ok(!ign5("CONTEXT.md") && !ign5("stp-1/README.md") && ign5("context/risk.md"));
+fs.writeFileSync(path.join(ws5, "team-specs", "team-repos.yml"), "repos:\n  - name: shop\n    url: git@x:t/shop.git\n  - name: dash\n    url: git@x:t/dash.git\n  - name: zoe\n    url: git@x:t/zoe.git\n");
+d = doctor(ws5);
+assert.ok(d.code === 0 && d.out.includes('dash is cloned at') && d.out.includes('add dash to the workspace') && d.out.includes("team repo zoe isn't on this machine") && d.out.includes("git clone git@x:t/zoe.git") && !d.out.includes("team repo shop"), d.out);
 
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);

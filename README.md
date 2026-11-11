@@ -63,26 +63,21 @@ start a new session and continue where you left off.
 npx @benjaminthomas/spec-driven-dev@latest
 ```
 
-This one command downloads the tool, installs the skills, and sets up the project. In a terminal
-window it asks its setup questions there. Run it with `!` inside Claude Code (or any other place
-without a terminal to answer in) and it installs the skills for the AI tools it finds, then tells
-you to say **"run spec-setup"**, which asks the same questions in the chat. It never writes the
-settings file from guesses.
+It installs the skills into the AI tools you pick (Claude Code, Cursor, Codex CLI, Antigravity),
+for this project or all your projects. Each step has its own colour so it's easy to follow. It also
+works with `!` inside Claude Code: it then installs for the tools it finds.
 
-> **Why not `npm install -g`?** npm doesn't let a package ask questions while it installs, and an
-> install doesn't know which project it's for. That's why setup is a separate step you run inside
-> the project. If you'll use the `doctor`/`status` commands often, you can also install it
-> globally: `npm install -g @benjaminthomas/spec-driven-dev`, then run `spec-driven-dev` in place of
-> the `npx …` command.
+> **Why not `npm install -g`?** You can: `npm install -g @benjaminthomas/spec-driven-dev`, then run
+> `spec-driven-dev` in place of the `npx …` command. Handy if you use `doctor`/`status` often.
 
-It:
-1. **Finds your AI tools** (Claude Code, Cursor, Codex CLI, Antigravity) and installs the skills
-   into each one you choose, for this project or for all projects.
-2. **Sets up your project** by detecting its layout, issue tracker, branch conventions, and
-   commands, then asking you to confirm. The answers go into `.spec-driven.yml`
-   ([details below](#project-setup-your-teams-rules)).
+**2. Say "run spec-setup" in your AI tool.** Setup is a conversation, so the agent can read the code
+and you can change any answer as you go. It asks how the project is organised (one repo, a monorepo,
+or several repos that change together), your tracker, branches and commit style, where specs live
+and whether your team shares them, then looks through the code and saves the project memory
+([details below](#project-setup-your-teams-rules)). If Claude Code or Codex is installed, the
+installer offers to open it with "run spec-setup" already typed in.
 
-**3. In your AI tool, run each stage in order.** You can type the slash command or just say the
+**3. Then run each stage in order.** You can type the slash command or just say the
 words in quotes.
 
 ```
@@ -145,36 +140,24 @@ others `fix/STP-123-short-name`. Some have one repo, others have six. None of th
 skills. Each project describes its own rules in **`.spec-driven.yml`**, and every skill reads that
 file before doing anything.
 
-**How the file gets created:** `spec-driven-dev` (or `spec-driven-dev setup` to run only this
-step) detects the answers from your repos and asks you to confirm them. In your AI tool you can also
-say **"run spec-setup"**: that does a deeper version that also reads `CLAUDE.md`/`AGENTS.md`, CI
-config, and recent PRs, and fills in what the installer can't (such as each repo's role, or commands
-for stacks other than Node). If a skill finds no config, it runs this setup first.
+**How the file gets created:** in your AI tool, say **"run spec-setup"**. It detects what it can
+(layout, tracker, branches, commit style per repo, commands, written rules in `CLAUDE.md`/`AGENTS.md`,
+CI config, recent PR targets), shows you a draft marked *detected* or *guess*, and asks only about
+the guesses, in one round. You can correct anything in plain words ("actually it's Jira, key STP")
+before it writes the file. If any skill finds no config, it runs this setup first.
 
-**What `spec-driven-dev` asks, in order.** Each question is a menu: move with **↑/↓**, tick with
-**Space**, and confirm with **Enter**. What it detected is pre-selected and marked *(detected)*, so you
-can usually just press Enter. Repo paths are added one at a time: paste a path (quotes, `~`, and
-Windows paths like `C:\work\api` all work). A path that doesn't exist or isn't a git repo is flagged
-straight away, so you can fix it before moving on. Press Enter on an empty line when you're done.
-**Ctrl+C** cancels without changing anything.
-
-| Question | Detected from | Example answer |
+| What it asks | Detected from | Example answer |
 |---|---|---|
-| Which AI tools get the skills | tool folders in your home directory and commands on your `PATH` | Claude Code, Cursor |
-| This project only, or all projects | (you choose) | `project` |
-| Project layout | git repos and workspace files (`pnpm-workspace.yaml`, `turbo.json`, `nx.json`, `go.work`, …) | `single`, `monorepo`, or `multi-repo` |
-| *multi-repo:* which repos nearby belong | git repos up to two folders down, grouped by GitHub owner | `frontend` |
-| *multi-repo:* repos in other places | (you type paths: absolute, `~/…`, or relative) | `~/Work/backend, /srv/database` |
-| *multi-repo:* where the config lives | the repos' shared parent folder, or `~/.spec-driven/<name>/` | `~/Projects` |
-| *monorepo:* package folders | the workspaces your `package.json`/`pnpm-workspace.yaml` declares, or `apps/*`, `packages/*` | `apps/web, packages/ui` |
+| How the project is organised | git repos and workspace files (`pnpm-workspace.yaml`, `turbo.json`, `nx.json`, `go.work`, …). A Shopify app's `extensions/` count as one app | `single`, `monorepo`, or `multi-repo` |
+| *multi-repo:* which repos you work on | git repos nearby, grouped by GitHub owner, plus the team's `team-repos.yml` | `soreto-shopify, reverb-backend` |
+| *multi-repo:* where specs live | (you choose) | a dedicated specs repo, a code repo, or this machine only |
 | Issue tracker | ticket keys in branch names and commits | Jira, key `STP` |
-| Base branch / PR target | default branch, `staging`/`develop` branches | `staging` |
+| Base branch / PR target | default branch, `staging`/`develop`, recent PR targets | `staging` |
 | Branch name pattern | your recent branch names | `{ticket}` → `STP-123` |
-| Commit style | your recent commit messages | `conventional` (`feat: …`) or `ticket` (`STP-123: …`) |
-| Lint / typecheck / test / build / dev commands | `package.json` scripts and lockfile (per repo or package) | `pnpm run lint` |
-| Where specs go | (you choose) | `specs/` |
+| Commit style | recent commit messages, judged per repo | `ticket` (`STP-123: …`), with one repo on `conventional` |
+| Commands | `package.json` scripts, lockfile, Makefile, CI | `npm run lint` |
+| Share specs with the team | your `.gitignore` today | everything / project memory only / local |
 | After you approve a spec | (you choose) | `stop` (wait at each stage) or `run-through` |
-| Model and effort per task tier | written with the defaults above | edit `models:` / `effort:` later |
 
 **Where the file lives, by layout:**
 
@@ -184,34 +167,23 @@ straight away, so you can fix it before moving on. Press Enter on an empty line 
 | **monorepo** | one repo, many apps/packages | the repo root (commit it) | tasks name their package, and checks run per package |
 | **multi-repo** | several repos that change together, in any folders | their shared parent folder, or `~/.spec-driven/<name>/` (personal to your machine) | investigation searches every listed repo, tasks stay inside one repo each, and `spec-ship` opens one PR per repo, each linking the others |
 
-**Repos in different places.** A multi-repo workspace doesn't need its repos in one folder. For
-example, from inside `/Projects/frontend`:
+**Repos in different places.** A multi-repo workspace doesn't need its repos in one folder
+(`/Projects/frontend`, `~/Work/backend`, `/srv/database`). The config goes in their shared parent
+folder, or `~/.spec-driven/<name>/` when that would be your home folder, and is recorded in
+`~/.spec-driven/workspaces.json` so every repo finds it.
 
-```
-✔ How is this project organised? › Multiple repos
-✔ Which of these repos (found under /Projects) belong to this workspace? › frontend
-? Add a repo from another folder — paste its path, or press Enter to finish (1 selected) › ~/Work/nope
-  › Folder not found: /Users/you/Work/nope
-? Add a repo from another folder — paste its path, or press Enter to finish (1 selected) › ~/Work/backend
-  ✓ added /Users/you/Work/backend
-? Add a repo from another folder — paste its path, or press Enter to finish (2 selected) › /srv/database
-  ✓ added /srv/database
-? Add a repo from another folder — paste its path, or press Enter to finish (3 selected) ›
-✔ Folder for this workspace's settings file (.spec-driven.yml) › ~/.spec-driven/frontend-workspace
-```
+**Teams where people work on different repos.** One developer has the Shopify app and the backend,
+another the dashboard and the backend. Each person's workspace lists only the repos they have, and
+specs go in a place everyone has: a small dedicated specs repo is best. Its `team-repos.yml` lists
+every team repo with its git URL, so setup offers them, `doctor` shows which aren't cloned yet (with
+the clone command), and an investigation stops and says so when a ticket needs a repo that isn't on
+this machine.
 
-- **Where the config goes:** the repos' shared parent folder, or `~/.spec-driven/<name>/` when that
-  parent would be your home folder or `/`.
-- **How every repo finds it:** setup records the workspace in `~/.spec-driven/workspaces.json`, so
-  `/Work/backend` finds its config even though the config isn't above it. The skills, `doctor`,
-  and `status` all look there.
-- **Paths are checked:** ones that don't exist or aren't git repos are skipped with a message, and
-  setup stops if a workspace would end up with no repos.
-
-Every question also has a flag, for scripts and CI:
-`--layout=multi-repo --repos=~/Projects/frontend,~/Work/backend --workspace=~/Projects`,
-`--layout=monorepo --packages=apps/web,packages/ui`, `--after-approval=run-through`,
-`--project=new|existing`, `--share=all|memory|none`, `--specs-dir=<path>`, `--tools=cursor,codex`, `--global`, `--yes` (accept everything detected), and `--version`.
+**For scripts and CI** there's `spec-driven-dev setup` with flags (it asks nothing):
+`--yes`, `--layout=multi-repo --repos=~/Projects/frontend,~/Work/backend --workspace=~/Projects`,
+`--layout=monorepo --packages=apps/web,packages/ui`, `--specs-dir=<path>`, `--share=all|memory|none`,
+`--after-approval=run-through`, `--project=new|existing`. Installer flags: `--tools=cursor,codex`,
+`--global`, `--no-setup`, `--version`.
 
 To change the rules later, edit the file or run setup again, then run `spec-driven-dev doctor`
 to confirm the file still matches your repos. Setup never overwrites the file without
@@ -601,19 +573,19 @@ run one after another, stopping at the first failure or review blocker. Two step
 spec, and pushing or opening the PR. You don't need slash commands either. Saying "investigate
 STP-123" or "ship it" picks the right skill.
 
-**Setup didn't ask me anything.**
-Update to 1.5.1 or later (`npx @benjaminthomas/spec-driven-dev@latest --version`). Earlier versions
-crashed on Node 14 or 16, which nvm often switches to inside older projects, and wrote a config
-silently when there was no terminal. Now it runs on Node 14+. With no terminal to answer in (a `!`
-command in Claude Code, an editor task, piped input), it installs the skills and hands the questions
-to your AI tool: say "run spec-setup" there. `spec-driven-dev setup` on its own still needs a
-terminal, or flags such as `--layout=multi-repo --repos=…`.
+**The installer didn't ask me about my project.**
+That's expected from 1.13.0: the installer only installs the skills. Project setup happens in your
+AI tool: say "run spec-setup". It runs on Node 14+, and works from `!` inside Claude Code too.
 
-**Setup didn't ask me about repos.**
-It only asks about repos for a multi-repo or monorepo layout. If it detected `single`, type
-`multi-repo` at the layout question, then add your other repos by path. If it asked nothing at all,
-there was no terminal to type answers into (it prints a note saying so), so run it directly in a
-terminal. Check which version ran with `npx @benjaminthomas/spec-driven-dev@latest --version`.
+**npm prints "Unknown project config" warnings.**
+They come from your project's `.npmrc`, not from this package: settings such as `auto-install-peers`
+or `shamefully-hoist` are for pnpm, and npm warns about them on every `npm`/`npx` command in that
+folder. If the project uses npm (it has a `package-lock.json`), delete those lines. If it uses pnpm,
+run `pnpm dlx @benjaminthomas/spec-driven-dev` instead.
+
+**Setup thought my repo was a monorepo (or a single repo).**
+Tell it in the chat: "this is one repo that works with reverb-backend". A Shopify app's
+`extensions/` folder is treated as part of one app from 1.13.0.
 
 **Can I skip stages?**
 Yes. Every skill works on its own. `spec-verify` even works without a spec: it asks what to check.
@@ -663,7 +635,7 @@ Then, in a project:
 
 ```bash
 spec-driven-dev                                   # detect tools, install skills, set up the project
-spec-driven-dev setup                             # only (re)run project setup
+spec-driven-dev setup --yes                       # only (re)run project setup
 spec-driven-dev --global                          # install skills for all projects, not just this one
 spec-driven-dev --tools=cursor,codex              # pick tools without being asked
 spec-driven-dev --skills=spec-create,spec-ship    # install only some skills
@@ -679,7 +651,7 @@ spec-driven-dev --help                            # show all of the above
 ```
 
 **Without installing:** replace `spec-driven-dev` with `npx @benjaminthomas/spec-driven-dev`, for
-example `npx @benjaminthomas/spec-driven-dev setup`. That downloads and runs the latest version once,
+example `npx @benjaminthomas/spec-driven-dev doctor`. That downloads and runs the latest version once,
 which is handy in CI or on a machine you won't use again.
 
 `doctor` checks that every branch, folder, and `npm run` script named in the config exists, and
@@ -713,8 +685,8 @@ install `ticket-to-pr@spec-driven-dev`; the old name no longer gets updates.
 
 To see unfinished specs and their next step at any time, run `spec-driven-dev status`
 (for example, `specs/stp-123: 3/5 tasks done → next: spec-implement`). If
-you use the plugin, `spec-driven-dev` skips Claude Code so you don't get every skill twice. Run
-`spec-driven-dev setup` for the project config.
+you use the plugin, `spec-driven-dev` skips Claude Code so you don't get every skill twice. Then say
+"run spec-setup" in Claude Code for the project config.
 
 ### By hand
 
@@ -768,8 +740,8 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 179 | 1,747 | 3 |
-| `spec-investigate` | 1 · understand | 373 | 3,211 | 1 |
+| `spec-setup` | 0 · configure | 210 | 2,201 | 3 |
+| `spec-investigate` | 1 · understand | 385 | 3,325 | 1 |
 | `spec-create` | 2 · plan | 198 | 1,782 | 6 |
 | `spec-implement` | 3 · build | 327 | 2,753 | 3 |
 | `spec-verify` | 4 · prove | 163 | 1,557 | 1 |
@@ -777,7 +749,7 @@ skips that step rather than failing.
 | `spec-checkpoint` | 6 · commit | 140 | 1,144 | 0 |
 | `spec-ship` | 7 · PR | 230 | 1,388 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **2,002** | **17,085** | **22** |
+| **Total** | | **2,045** | **17,653** | **22** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback
@@ -830,7 +802,7 @@ plugin/evals/                 `claude plugin eval` cases
   1. Increase `version` in both `package.json` and `plugin/.claude-plugin/plugin.json` (the check fails if
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
-  3. Tag the release and push the tag: `git tag v1.12.0 && git push origin v1.12.0`.
+  3. Tag the release and push the tag: `git tag v1.13.0 && git push origin v1.13.0`.
   4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
      npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 

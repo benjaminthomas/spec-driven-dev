@@ -2,8 +2,8 @@
 // spec-driven-dev installer (npm i -g @benjaminthomas/spec-driven-dev): detects your AI coding tools, copies the skills into each one, and
 // runs project discovery (layout, tracker, branches, commands) to write .spec-driven.yml.
 //
-//   spec-driven-dev                 install + project setup (interactive)
-//   spec-driven-dev setup           project setup only
+//   spec-driven-dev                 install the skills, then hand over to your AI tool ("run spec-setup")
+//   spec-driven-dev setup           scripted setup for CI: needs --yes or answer flags (people: say "run spec-setup")
 //   spec-driven-dev doctor          check .spec-driven.yml against the real repos (exit 1 on problems)
 //   spec-driven-dev status          list specs with unfinished work and each one's "Resume here" next step
 //   spec-driven-dev context         print specs/CONTEXT.md; --areas=billing,api prints only those area files
@@ -39,8 +39,23 @@ const args = process.argv.slice(2);
 const flag = (n) => args.includes(`--${n}`);
 const opt = (n) => args.find((a) => a.startsWith(`--${n}=`))?.split("=")[1];
 const command = args.find((a) => !a.startsWith("-")) || "install";
-const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status", "context", "risk", "risk-eval"].includes(command);
+const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status", "context", "risk", "risk-eval", "setup"].includes(command);
 const DIR = path.resolve(opt("dir") || process.cwd());
+
+// Colour only for a person at a terminal; pipes, CI and NO_COLOR get plain text (and the tests stay plain).
+const COLOR = (process.stdout.isTTY || !!process.env.FORCE_COLOR) && !process.env.NO_COLOR && process.env.TERM !== "dumb";
+const paint = (code) => (t) => (COLOR ? `\x1b[${code}m${t}\x1b[0m` : t);
+const ink = { green: paint("32"), yellow: paint("33"), red: paint("31"), cyan: paint("36"), magenta: paint("35"), blue: paint("34"), bold: paint("1"), dim: paint("2") };
+// Each stage gets its own colour so the steps are easy to tell apart while scrolling.
+const step = (n, title, color) => console.log(`\n${color(ink.bold(`━━ ${n} · ${title} `))}${color("━".repeat(Math.max(4, 44 - title.length)))}`);
+if (COLOR) {
+  const plain = console.log.bind(console);
+  console.log = (...a) => {
+    const t = a.join(" ");
+    plain(t.replace(/^(\s*)(✓)/gm, (_, s, g) => s + ink.green(g)).replace(/^(\s*)(✗.*)$/gm, (_, s, g) => s + ink.red(g))
+      .replace(/^(\s*)(•)/gm, (_, s, g) => s + ink.yellow(g)).replace(/^(Next:.*)$/gm, (_, g) => ink.cyan(ink.bold(g))));
+  };
+}
 
 if (flag("version") || flag("v")) {
   console.log(JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version);
@@ -53,18 +68,17 @@ const NO_TTY = !process.stdin.isTTY && !args.some((a) => ANSWER_FLAGS.some((f) =
 // Installing the skills needs no answers, so the default command still does that without a terminal
 // (e.g. `!` in Claude Code) and hands the questions to the spec-setup skill, which asks them in the chat.
 const HANDOFF = command === "install" && NO_TTY;
-if (["setup", "settings"].includes(command) && NO_TTY) {
+// Setup is a conversation in the AI tool now; the setup command stays for scripts and CI (flags only).
+const SETUP_IN_AGENT = command === "setup" && !args.some((a) => ANSWER_FLAGS.some((f) => a === `--${f}` || a.startsWith(`--${f}=`)));
+if (command === "settings" && NO_TTY) {
   console.log(`✗ No interactive terminal, so ${command === "settings" ? "the settings menu can't open" : "setup can't ask its questions"}. Nothing was changed.
 
   This happens when it runs through another program: a "!" command in Claude Code, an editor task,
   or piped input. Either:
     • run it yourself in a terminal window (Terminal, iTerm, or your editor's terminal panel):
-        npx @benjaminthomas/spec-driven-dev@latest ${command}${command === "setup" ? `
-    • or, in your AI tool (Claude Code, Cursor, Codex), say "run spec-setup": it asks the same
-      questions in the chat` : ""}
-    • or give the answers as flags, for example:
-        npx @benjaminthomas/spec-driven-dev@latest ${command === "settings" ? "settings --risk=off" : "setup --layout=multi-repo --repos=~/Projects/frontend,~/Projects/backend"}
-      (add --yes to accept everything it detects)`);
+        npx @benjaminthomas/spec-driven-dev@latest settings
+    • or give the answer as a flag, for example:
+        npx @benjaminthomas/spec-driven-dev@latest settings --risk=off`);
   process.exit(1);
 }
 
@@ -113,6 +127,7 @@ function copyDir(from, to) {
 
 // ---------- install ----------
 async function install() {
+  step(1, "Install the skills", ink.blue);
   const detected = Object.keys(TOOLS).filter((t) => fs.existsSync(path.join(HOME, TOOLS[t].home)) || onPath(TOOLS[t].bin));
   let tools = opt("tools")?.split(",");
   if (!tools) tools = await askMulti("Which AI coding tools should get the skills?",
@@ -145,7 +160,26 @@ async function install() {
     console.log(`✓ ${skills.length} skills → ${dest}`);
   }
   if (!dests.length) console.log(HANDOFF ? "• No AI coding tools found (Claude Code, Cursor, Codex or Antigravity). Install one, or pass --tools=claude,cursor." : "• No tools selected — nothing installed.");
-  return dests.length;
+  return dests.length ? tools : [];
+}
+
+// The setup questions (layout, repos, tracker, branches, sharing) and the audit need a model, so they
+// happen in the AI tool. Claude Code and Codex can be opened with the request already typed in.
+const LAUNCHERS = [["claude", "Claude Code"], ["codex", "Codex"]];
+async function handOver(tools, onlySetup) {
+  const name = path.basename(gitTop(DIR));
+  step(onlySetup ? 1 : 2, `Set up ${name} in your AI tool`, ink.magenta);
+  console.log(`
+${onlySetup ? "Setup happens in your AI tool now, so it can read the code and you can change any answer as you go." : "Skills installed."}
+Next: set up ${name}. In your AI tool, say "run spec-setup". It asks how the project is organised
+(single repo, monorepo, or several repos), your tracker, branches and whether to share specs,
+then looks through the code. Start a new session if your tool doesn't recognise it yet.${onlySetup ? `
+For scripts and CI: spec-driven-dev setup --yes [--layout=… --repos=… --share=…]` : ""}`);
+  const launcher = LAUNCHERS.find(([bin]) => (onlySetup || tools.includes(bin)) && onPath(bin));
+  if (!launcher || !process.stdin.isTTY || YES || onlySetup) return;
+  if (!(await askConfirm(`Open ${launcher[1]} here now and start it? (takes a few minutes, uses your ${launcher[1]} plan)`, true))) return;
+  const { spawnSync } = await import("node:child_process");
+  spawnSync(launcher[0], ["run spec-setup"], { cwd: DIR, stdio: "inherit" });
 }
 
 // ---------- discovery ----------
@@ -186,7 +220,9 @@ function detectLayout(dir) {
       const base = g.replace(/\/\*\*?$/, "");
       return base === g ? [g.replace(/\/$/, "")] : subdirs(path.join(top, base)).map((n) => `${base}/${n}`);
     }))].filter(hasManifest);
-    const mono = MARKERS.some((m) => fs.existsSync(path.join(top, m))) || pkg?.workspaces || cargo || packages.length > 1;
+    // A Shopify app keeps its app extensions in npm workspaces under extensions/: one app, not a monorepo.
+    const shopifyApp = fs.readdirSync(top).some((f) => /^shopify\.app.*\.toml$/.test(f)) && declared.length > 0 && declared.every((g) => g.startsWith("extensions/"));
+    const mono = !shopifyApp && (MARKERS.some((m) => fs.existsSync(path.join(top, m))) || pkg?.workspaces || cargo || packages.length > 1);
     return { layout: mono ? "monorepo" : "single", root: top, repos: mono ? packages : [] };
   }
   const repos = findRepos(dir);
@@ -237,11 +273,12 @@ function infer(facts) {
 const y = (v) => JSON.stringify(v ?? ""); // JSON strings are valid YAML scalars
 function toYaml(c) {
   const cmds = (o, pad) => Object.entries(o).map(([k, v]) => `${pad}${k}: ${y(v)}`).join("\n");
-  let out = `# .spec-driven.yml — written by spec-driven-dev setup. Edit freely, or re-run setup.\n# Every spec-* skill reads this first. Field reference: skills/spec-setup/references/config-template.yml\nversion: 1\nlayout: ${c.layout}\n`;
+  let out = `# .spec-driven.yml — written by spec-driven-dev. Edit freely, or say \"run spec-setup\" in your AI tool to review it.\n# Every spec-* skill reads this first. Field reference: skills/spec-setup/references/config-template.yml\nversion: 1\nlayout: ${c.layout}\n`;
   if (c.repos.length) {
     out += "repos:\n" + c.repos.map((r) => {
       let e = `  - path: ${y(r.path)}\n    role: ${y(r.role)}\n`;
-      if (r.base && r.base !== c.git.base_branch) e += `    git:\n      base_branch: ${y(r.base)}\n      pr_target: ${y(r.base)}\n`;
+      const g = [r.base && r.base !== c.git.base_branch ? `      base_branch: ${y(r.base)}\n      pr_target: ${y(r.base)}\n` : "", r.commitStyle ? `      commit_style: ${y(r.commitStyle)}\n` : ""].join("");
+      if (g) e += `    git:\n${g}`;
       if (r.commands && Object.values(r.commands).some(Boolean)) e += `    commands:\n${cmds(r.commands, "      ")}\n`;
       return e;
     }).join("");
@@ -481,7 +518,9 @@ async function setup() {
     repos: repos.map((r) => {
       const f = layout === "multi-repo" ? gitFacts(path.resolve(root, r)) : null;
       // a repo without an integration branch must say so, or it inherits the top-level base (e.g. staging) it doesn't have
-      return { path: r, role: "", base: f ? f.integration || "default" : "", commands: commandsFor(path.resolve(root, r)) };
+      // each repo keeps its own commit style when it differs from the workspace's (one repo uses STP-123:, another feat:)
+      const own = f && f.subjects.length >= 5 ? infer([f]).commitStyle : "";
+      return { path: r, role: "", base: f ? f.integration || "default" : "", commitStyle: own && own !== commitStyle ? own : "", commands: commandsFor(path.resolve(root, r)) };
     }),
   };
   fs.writeFileSync(file, toYaml(config));
@@ -555,8 +594,9 @@ function findConfig(dir) {
 }
 
 function doctor() {
+  if (COLOR) step("✓", "Check the settings", ink.cyan);
   const file = findConfig(DIR);
-  if (!file) throw new Error(`No .spec-driven.yml in ${DIR} or above. Run: spec-driven-dev setup  (or npx @benjaminthomas/spec-driven-dev setup)`);
+  if (!file) throw new Error(`No .spec-driven.yml in ${DIR} or above. In your AI tool, say "run spec-setup".`);
   const root = path.dirname(file);
   let c;
   try { c = parseYaml(fs.readFileSync(file, "utf8")); } catch (e) { throw new Error(`${file} could not be read: ${e.message}`); }
@@ -604,6 +644,17 @@ function doctor() {
   // Multi-repo context names paths from the workspace folder (soreto-shopify/app/) or from inside a repo (app/).
   const repoRoots = c.layout === "multi-repo" ? [root, ...(c.repos || []).map((r) => path.resolve(root, expandHome(r.path)))] : [root];
   checkContext(specs, c.specs_dir || "specs", repoRoots, problems, notes);
+  // The team's repo list (in the specs location) vs the repos on this machine.
+  const team = parseYaml(fs.existsSync(path.join(specs, "team-repos.yml")) ? fs.readFileSync(path.join(specs, "team-repos.yml"), "utf8") : "").repos;
+  if (Array.isArray(team)) {
+    const mine = new Set((c.repos || []).map((r) => path.basename(String(r.path || "").replace(/\/+$/, ""))));
+    for (const t of team) {
+      if (!t.name || mine.has(t.name)) continue;
+      const here = path.join(root, t.name);
+      notes.push(isRepo(here) ? `${t.name} is cloned at ${here} but isn't in this workspace — say "add ${t.name} to the workspace" if you work on it`
+        : `team repo ${t.name} isn't on this machine (fine if you don't work on it)${t.url ? `: git clone ${t.url} ${here}` : ""}`);
+    }
+  }
   if (c.context?.share) {
     if (!SHARE_MODES.includes(c.context.share)) problems.push(`context.share "${c.context.share}" must be all, memory or none`);
     const g = specsInGit(root, c.specs_dir || "specs");
@@ -687,6 +738,7 @@ async function chooseShare(root, specsDir) {
   const g = specsInGit(root, specsDir);
   if (opt("share") && !SHARE_MODES.includes(opt("share"))) throw new Error("--share must be all, memory or none");
   if (!g) { if (opt("share") && opt("share") !== "none") console.log(`  • ${specsDir} isn't inside a git repo, so it can't be shared. Choose a folder inside a repo (--specs-dir) to share it.`); return null; }
+  if (!g.rel) { console.log(`  • ${specsDir} is a repo of its own, so everything in it is shared.`); return "all"; }
   const now = shareState(g.top, g.rel);
   if (now !== "all") console.log(`  • Your .gitignore currently makes ${g.rel}: ${shareTitle[now].toLowerCase()}.`);
   return opt("share") || askSelect("Share specs and project memory with your team?", [
@@ -699,6 +751,7 @@ async function chooseShare(root, specsDir) {
 async function applyShare(root, specsDir, mode, { quietIfSame } = {}) {
   const g = specsInGit(root, specsDir);
   if (!g) { console.log(`  • ${specsDir} isn't inside a git repo, so there's nothing to share or ignore.`); return; }
+  if (!g.rel) mode = "all"; // a dedicated specs repo is shared by definition
   if (quietIfSame && shareState(g.top, g.rel) === mode && mode !== "all") return;
   const gi = path.join(g.top, ".gitignore");
   const before = fs.existsSync(gi) ? fs.readFileSync(gi, "utf8") : "";
@@ -804,7 +857,7 @@ const SETTINGS = [
 
 async function settings() {
   const file = findConfig(DIR);
-  if (!file) throw new Error(`No .spec-driven.yml in ${DIR} or above. Run: spec-driven-dev setup`);
+  if (!file) throw new Error(`No .spec-driven.yml in ${DIR} or above. In your AI tool, say "run spec-setup" first.`);
   let text = fs.readFileSync(file, "utf8");
   const label = (s, v) => s.options.find((o) => o.value === v)?.title || v;
   const save = async (s, v) => {
@@ -864,20 +917,14 @@ try {
   else if (command === "risk") risk();
   else if (command === "settings") await settings();
   else if (command === "risk-eval") await riskEvalCmd();
-  else if (command === "install" && HANDOFF) {
-    console.log("No interactive terminal (for example a \"!\" command in Claude Code), so this installs the skills\nwith the detected defaults and leaves the setup questions to your AI tool.\n");
-    const n = await install();
-    if (n) console.log(`
-Next: in your AI tool, say "run spec-setup". It asks the setup questions in the chat
-(single repo, monorepo or multi-repo, tracker, branches) and writes .spec-driven.yml.
-If your AI tool doesn't recognise it yet, start a new session so it loads the new skills.
-To answer in a terminal instead, open Terminal or iTerm and run: npx @benjaminthomas/spec-driven-dev setup`);
-  } else if (command === "install") {
-    await install();
-    if (!flag("no-setup") && (await askConfirm("Set up this project now?", true))) await setup();
-  } else if (command === "setup") await setup();
+  else if (command === "install") {
+    if (HANDOFF) console.log("No interactive terminal (for example a \"!\" command in Claude Code), so the skills go to the AI tools it finds, for this project.\n");
+    const tools = await install();
+    if (tools.length && !flag("no-setup")) await handOver(tools);
+  } else if (SETUP_IN_AGENT) handOver([], true);
+  else if (command === "setup") await setup();
   else throw new Error(`Unknown command "${command}" — use install (default), setup, settings, doctor, status, context, risk, or risk-eval`);
-  if (["install", "setup"].includes(command) && !HANDOFF) console.log('\nNext: in your AI tool, say "investigate <ticket>" or "create a spec".');
+  if (command === "setup" && !SETUP_IN_AGENT) console.log('\nNext: in your AI tool, say "investigate <ticket>" or "create a spec".');
 } catch (e) {
   console.error(`✗ ${e.message}`);
   process.exitCode = 1;

@@ -65,6 +65,18 @@ Cheap sources first, code second:
 
 No CONTEXT.md? Investigate as usual, and suggest running `spec-setup` afterwards to create one.
 
+## Repos this machine doesn't have (multi-repo)
+
+The workspace config lists only the repos cloned here. If the ticket or the evidence points at a
+repo that isn't listed (its name in the ticket, an API or package it owns, a `team-repos.yml` role
+that matches), **stop before concluding** and say so plainly:
+
+> This ticket also touches **reverb-react** (the merchant dashboard), which isn't on this machine.
+> Clone it: `git clone <url from team-repos.yml> <workspace>/reverb-react`, then say "add
+> reverb-react to the workspace" and investigate again. Or I can carry on and mark that part UNKNOWN.
+
+Never present a cross-repo change as complete when part of it lives in a repo you couldn't read.
+
 ## Risk signal (GitRisk)
 
 Use it only when `.spec-driven.yml` has `risk.enabled: on`, or has no `risk:` block, **and**

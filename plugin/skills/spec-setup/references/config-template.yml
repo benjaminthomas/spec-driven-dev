@@ -101,4 +101,15 @@ context:
                                 # CONTEXT.md + context/ | none = ignore the specs folder. risk.md is always ignored.
                                 # Change with: spec-driven-dev settings --share=…
 
-specs_dir: specs                # where specs/<feature>/ folders go (relative to this file)
+specs_dir: specs                # where specs/<feature>/ folders go (relative to this file).
+                                # Multi-repo teams: a dedicated specs repo (e.g. soreto-specs) everyone clones.
+
+# {specs_dir}/team-repos.yml — every repo the team works across, shared with the specs. Each developer's
+# .spec-driven.yml lists only the repos they have; setup offers the rest with their clone commands.
+# repos:
+#   - name: reverb-backend
+#     url: git@github.com:acme/reverb-backend.git
+#     role: REST API and workers
+#   - name: reverb-react
+#     url: git@github.com:acme/reverb-react.git
+#     role: merchant dashboard
