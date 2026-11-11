@@ -7,15 +7,19 @@
 //   spec-driven-dev doctor          check .spec-driven.yml against the real repos (exit 1 on problems)
 //   spec-driven-dev status          list specs with unfinished work and each one's "Resume here" next step
 //   spec-driven-dev context         print specs/CONTEXT.md; --areas=billing,api prints only those area files
+//   spec-driven-dev risk            GitRisk: score files from git history into specs/context/risk.md (--files=a,b  --json  --top=N  --since=…)
+//   spec-driven-dev settings        switch features on or off from a menu (GitRisk, run-through); or --risk=on|off --after-approval=…
+//   spec-driven-dev risk-eval       U8 experiment: run tickets with risk on vs off and compare agent behaviour (--tickets=<file> --runs=N --model=… --arms=on,off --timeout=20)
 //   flags: --yes  --global  --tools=claude,cursor  --skills=spec-create,...  --no-setup  --dir=<path>
 //          --layout=single|monorepo|multi-repo  --repos=~/Projects/frontend,/srv/backend  --workspace=<config dir>
-//          --packages=apps/web,packages/ui  --after-approval=stop|run-through  --project=new|existing  --version
+//          --packages=apps/web,packages/ui  --after-approval=stop|run-through  --project=new|existing  --risk=on|off  --version
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import prompts from "prompts";  // arrow-key menus that work in PowerShell, cmd, macOS and Linux terminals
 import { fileURLToPath } from "node:url";
+import { scoreRepo, riskMarkdown, normWeights, weightProblems, setConfigValue } from "./risk.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SKILLS_DIR = path.join(ROOT, "plugin", "skills");
@@ -34,7 +38,7 @@ const args = process.argv.slice(2);
 const flag = (n) => args.includes(`--${n}`);
 const opt = (n) => args.find((a) => a.startsWith(`--${n}=`))?.split("=")[1];
 const command = args.find((a) => !a.startsWith("-")) || "install";
-const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status", "context"].includes(command);
+const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status", "context", "risk", "risk-eval"].includes(command);
 const DIR = path.resolve(opt("dir") || process.cwd());
 
 if (flag("version") || flag("v")) {
@@ -43,22 +47,23 @@ if (flag("version") || flag("v")) {
 }
 // No terminal to answer in (e.g. `!` in Claude Code, an IDE task, a pipe) and nothing passed explicitly:
 // stop rather than write a config from guesses.
-const ANSWER_FLAGS = ["yes", "y", "layout", "repos", "packages", "tools", "workspace", "after-approval", "skills", "global", "no-setup", "project"];
-if (["install", "setup"].includes(command) && !process.stdin.isTTY && !args.some((a) => ANSWER_FLAGS.some((f) => a === `--${f}` || a.startsWith(`--${f}=`)))) {
-  console.log(`✗ No interactive terminal, so setup can't ask its questions. Nothing was changed.
+const ANSWER_FLAGS = ["risk", "yes", "y", "layout", "repos", "packages", "tools", "workspace", "after-approval", "skills", "global", "no-setup", "project"];
+if (["install", "setup", "settings"].includes(command) && !process.stdin.isTTY && !args.some((a) => ANSWER_FLAGS.some((f) => a === `--${f}` || a.startsWith(`--${f}=`)))) {
+  console.log(`✗ No interactive terminal, so ${command === "settings" ? "the settings menu can't open" : "setup can't ask its questions"}. Nothing was changed.
 
   This happens when it runs through another program: a "!" command in Claude Code, an editor task,
   or piped input. Either:
     • run it yourself in a terminal window (Terminal, iTerm, or your editor's terminal panel):
-        npx @benjaminthomas/spec-driven-dev@latest ${command === "setup" ? "setup" : ""}
+        npx @benjaminthomas/spec-driven-dev@latest ${command === "install" ? "" : command}
     • or give the answers as flags, for example:
-        npx @benjaminthomas/spec-driven-dev@latest setup --layout=multi-repo --repos=~/Projects/frontend,~/Projects/backend
+        npx @benjaminthomas/spec-driven-dev@latest ${command === "settings" ? "settings --risk=off" : "setup --layout=multi-repo --repos=~/Projects/frontend,~/Projects/backend"}
       (add --yes to accept everything it detects)`);
   process.exit(1);
 }
 
 if (flag("help") || flag("h")) {
-  console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 11).join("\n").replace(/^\/\/ ?/gm, ""));
+  const lines = fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1);
+  console.log(lines.slice(0, lines.findIndex((l) => !l.startsWith("//"))).join("\n").replace(/^\/\/ ?/gm, "")); // the whole header comment
   process.exit(0);
 }
 
@@ -241,6 +246,7 @@ function toYaml(c) {
   out += "effort:   # effort / reasoning level per tier (Claude Code, Codex): low | medium | high | xhigh | max | default\n"
     + MODEL_KEYS.map((t) => `  ${t}: ${EFFORT_DEFAULTS[t]}\n`).join("");
   out += `context:   # project memory: {specs_dir}/CONTEXT.md (index) + context/<area>.md\n  project: ${c.project || "existing"}   # existing | new\n  graph: auto   # auto = use graphify if installed | off\n`;
+  out += "risk:   # GitRisk: historical risk per file from git (spec-driven-dev risk). Weights are a hypothesis to calibrate\n  enabled: on   # on | off (off = skills ignore risk; risk-eval compares the two)\n  since: \"2 years ago\"\n  weights:\n    churn: 0.30\n    bug_density: 0.35\n    fan_out: 0.20\n    security: 0.15\n";
   out += `pipeline:\n  after_approval: ${c.afterApproval || "stop"}   # stop | run-through (implement → verify → review → checkpoint; ship always asks)\n`;
   return out + `specs_dir: ${y(c.specsDir)}\n`;
 }
@@ -515,10 +521,20 @@ function parseYaml(text) {
   return root;
 }
 
+// A multi-repo config applies only in its own folder and inside the repos it lists, so a repo that
+// merely sits under that folder (e.g. ~/Projects/other-project) doesn't pick up the workspace's rules.
+function configApplies(f, dir) {
+  let c;
+  try { c = parseYaml(fs.readFileSync(f, "utf8")); } catch { return true; }
+  if (c.layout !== "multi-repo" || !Array.isArray(c.repos)) return true;
+  const here = real(dir), base = path.dirname(f);
+  return here === real(base) || c.repos.some((r) => { const p = real(path.resolve(base, expandHome(String(r.path || "")))); return here === p || here.startsWith(p + path.sep); });
+}
+
 function findConfig(dir) {
   for (let d = dir; ; d = path.dirname(d)) {
     const f = path.join(d, ".spec-driven.yml");
-    if (fs.existsSync(f)) return f;
+    if (fs.existsSync(f) && configApplies(f, dir)) return f;
     if (d === path.dirname(d) || d === HOME) break;
   }
   // Not above us: a multi-repo workspace elsewhere may list this repo.
@@ -577,6 +593,11 @@ function doctor() {
   if (c.context?.graph && !["auto", "off"].includes(c.context.graph)) problems.push(`context.graph "${c.context.graph}" must be auto or off`);
   const repoRoots = c.layout === "multi-repo" ? (c.repos || []).map((r) => path.resolve(root, expandHome(r.path))) : [root];
   checkContext(specs, c.specs_dir || "specs", repoRoots, problems, notes);
+  if (c.risk) {
+    if (c.risk.enabled && !["on", "off"].includes(c.risk.enabled)) problems.push(`risk.enabled "${c.risk.enabled}" must be on or off`);
+    problems.push(...weightProblems(c.risk.weights));
+    if (c.risk.enabled !== "off" && !fs.existsSync(path.join(specs, "context", "risk.md"))) notes.push(`risk is on but ${c.specs_dir || "specs"}/context/risk.md doesn't exist — run: spec-driven-dev risk`);
+  }
   console.log(`Checked ${file}`);
   for (const n of notes) console.log(`  • ${n}`);
   for (const p of problems) console.log(`  ✗ ${p}`);
@@ -620,6 +641,103 @@ function context() {
   }
 }
 
+function loadConfig() {
+  const file = findConfig(DIR);
+  return { file, root: file ? path.dirname(file) : gitTop(DIR), c: file ? parseYaml(fs.readFileSync(file, "utf8")) : {} };
+}
+
+function risk() {
+  const { root, c } = loadConfig();
+  const bad = weightProblems(c.risk?.weights);
+  if (bad.length) throw new Error(bad.join("; "));
+  const weights = normWeights(c.risk?.weights), since = opt("since") || c.risk?.since || "2 years ago";
+  const repoDirs = c.layout === "multi-repo" ? (c.repos || []).map((r) => ({ dir: path.resolve(root, expandHome(r.path)), name: r.path })) : [{ dir: root, name: path.basename(root) }];
+  const scored = repoDirs.filter((r) => isRepo(r.dir)).map((r) => ({ ...r, ...scoreRepo(r.dir, { since, weights, prefix: c.layout === "multi-repo" ? r.name : "" }) }));
+  if (!scored.length) throw new Error(`No git repo found at ${root}`);
+  const rows = scored.flatMap((s) => s.rows).sort((a, b) => b.score - a.score || b.commits - a.commits);
+  const wanted = splitList(opt("files"));
+  if (wanted.length) {
+    const norm = (f) => f.replace(/\\/g, "/").replace(/^\.\//, "");
+    const hits = wanted.map((f) => rows.find((r) => r.file === norm(f) || r.file.endsWith("/" + norm(f))) || { file: norm(f), score: null, tier: "no history" });
+    if (flag("json")) console.log(JSON.stringify(hits, null, 2));
+    else for (const h of hits) console.log(h.score === null ? `${h.file}: no history (new, untracked or not code)` : `${h.file}: ${h.score} ${h.tier} (churn ${h.factors.churn}, bug density ${h.factors.bug_density}, fan-out ${h.factors.fan_out}, security ${h.factors.security})`);
+    return;
+  }
+  if (flag("json")) { console.log(JSON.stringify({ weights, since, rows }, null, 2)); return; }
+  const specs = path.join(root, c.specs_dir || "specs");
+  fs.mkdirSync(path.join(specs, "context"), { recursive: true });
+  const out = path.join(specs, "context", "risk.md");
+  fs.writeFileSync(out, riskMarkdown({ rows, repos: scored, weights, since, top: Number(opt("top")) || 40 }));
+  const count = (t) => rows.filter((r) => r.tier === t).length;
+  console.log(`✓ Scored ${rows.length} files from ${scored.reduce((t, s) => t + s.commits, 0)} commits → ${path.relative(DIR, out) || out}`);
+  console.log(`  ${count("critical")} critical · ${count("high")} high · ${count("medium")} medium. Top 5:`);
+  for (const r of rows.slice(0, 5)) console.log(`  ${String(r.score).padStart(5)}  ${r.tier.padEnd(8)} ${r.file}`);
+  if (c.risk?.enabled === "off") console.log("  Note: risk.enabled is off in .spec-driven.yml, so the skills won't use this until you turn it on.");
+}
+
+async function riskEvalCmd() {
+  const { file, root, c } = loadConfig();
+  const repo = gitTop(DIR);
+  if (c.layout === "multi-repo" && real(repo) === real(root)) throw new Error("risk-eval runs on one repo: run it inside one of the workspace's repos");
+  const ticketsFile = opt("tickets");
+  if (!ticketsFile) throw new Error("Pass --tickets=<file> with one ticket per line");
+  const tickets = fs.readFileSync(path.resolve(DIR, ticketsFile), "utf8").split("\n").map((l) => l.replace(/^\s*[-*]\s+/, "").trim()).filter((l) => l && !l.startsWith("#"));
+  const claude = opt("claude") || "claude";
+  if (!opt("claude") && !onPath("claude")) throw new Error("risk-eval drives Claude Code headlessly; install it first (https://code.claude.com)");
+  const { riskEval } = await import("./risk-eval.mjs");
+  const runs = Number(opt("runs")) || 1, stages = splitList(opt("stages") || "investigate,create");
+  console.log(`GitRisk U8 experiment: ${tickets.length} ticket(s) × ${runs} run(s) × 2 arms (risk on / off) on ${root}`);
+  // A workspace config's repo paths don't resolve inside a lone clone, so a multi-repo member gets a single-repo config.
+  const configText = c.layout === "multi-repo" ? "version: 1\nlayout: single\n" : file ? fs.readFileSync(file, "utf8") : "";
+  const arms = splitList(opt("arms") || "on,off");
+  if (!arms.length || arms.some((a) => !["on", "off"].includes(a))) throw new Error("--arms must be on, off, or on,off");
+  const { dir } = await riskEval({ repo, tickets, arms, timeoutMin: Number(opt("timeout")) || 20, runs, model: opt("model") || "sonnet", stages, claude, out: path.resolve(DIR, opt("out") || "experiments"),
+    pluginDir: path.join(ROOT, "plugin"), since: c.risk?.since || "2 years ago", weights: c.risk?.weights, configText });
+  console.log(`✓ Report: ${path.join(dir, "report.md")}`);
+}
+
+// Plain-language switches, so anyone can change them without editing YAML.
+const SETTINGS = [
+  { block: "risk", key: "enabled", flag: "risk", name: "GitRisk", about: "extra care on files with a history of bugs",
+    get: (c) => c.risk?.enabled || "on", options: [
+      { value: "on", title: "On", description: "investigations, plans and reviews look harder at historically risky files" },
+      { value: "off", title: "Off", description: "the skills ignore risk completely" }] },
+  { block: "pipeline", key: "after_approval", flag: "after-approval", name: "After you approve a spec", about: "how far it goes on its own",
+    get: (c) => c.pipeline?.after_approval || "stop", options: [
+      { value: "stop", title: "Stop after each stage", description: "you start implement, verify, review and commit yourself" },
+      { value: "run-through", title: "Run straight through", description: "implement → verify → review → commit; stops at any failure, never pushes" }] },
+];
+
+async function settings() {
+  const file = findConfig(DIR);
+  if (!file) throw new Error(`No .spec-driven.yml in ${DIR} or above. Run: spec-driven-dev setup`);
+  let text = fs.readFileSync(file, "utf8");
+  const label = (s, v) => s.options.find((o) => o.value === v)?.title || v;
+  const save = (s, v) => {
+    if (!s.options.some((o) => o.value === v)) throw new Error(`--${s.flag} must be ${s.options.map((o) => o.value).join(" or ")}`);
+    text = setConfigValue(text, s.block, s.key, v);
+    fs.writeFileSync(file, text);
+    console.log(`✓ ${s.name}: ${label(s, v)}  (saved in ${file})`);
+  };
+  const given = SETTINGS.filter((s) => opt(s.flag));
+  if (given.length) given.forEach((s) => save(s, opt(s.flag)));
+  else for (;;) {
+    const c = parseYaml(text);
+    const pick = await askSelect("Settings: pick one to change", [
+      ...SETTINGS.map((s) => ({ title: `${s.name}: ${label(s, s.get(c))}`, description: s.about, value: s })),
+      { title: "Done", value: null }], null);
+    if (!pick) break;
+    const v = await askSelect(`${pick.name}`, pick.options, pick.get(c));
+    if (v !== pick.get(c)) save(pick, v);
+  }
+  const c = parseYaml(text);
+  if (c.risk?.enabled !== "off" && !fs.existsSync(path.join(path.dirname(file), c.specs_dir || "specs", "context", "risk.md"))) {
+    if (given.length || !(await askConfirm("GitRisk is on but files haven't been scored yet. Score them now? (uses git only, takes seconds)", true)))
+      console.log("  GitRisk is on, but nothing is scored yet. Run: spec-driven-dev risk");
+    else risk();
+  }
+}
+
 // Silent unless something is unfinished, so it's cheap to run at the start of a session.
 function status() {
   const file = findConfig(DIR);
@@ -648,11 +766,14 @@ try {
   if (command === "doctor") doctor();
   else if (command === "status") status();
   else if (command === "context") context();
+  else if (command === "risk") risk();
+  else if (command === "settings") await settings();
+  else if (command === "risk-eval") await riskEvalCmd();
   else if (command === "install") {
     await install();
     if (!flag("no-setup") && (await askConfirm("Set up this project now?", true))) await setup();
   } else if (command === "setup") await setup();
-  else throw new Error(`Unknown command "${command}" — use install (default), setup, doctor, status, or context`);
+  else throw new Error(`Unknown command "${command}" — use install (default), setup, settings, doctor, status, context, risk, or risk-eval`);
   if (["install", "setup"].includes(command)) console.log('\nNext: in your AI tool, say "investigate <ticket>" or "create a spec".');
 } catch (e) {
   console.error(`✗ ${e.message}`);

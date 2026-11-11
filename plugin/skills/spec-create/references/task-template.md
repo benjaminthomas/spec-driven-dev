@@ -35,6 +35,12 @@ pending
 
 **Context from dependencies:** {Prose summary of what the dependency tasks produce that this task needs. For example: "task-01-setup-database.md creates the PostgreSQL schema with users and sessions tables. This task builds the API routes that query those tables." This is what makes each file self-contained — the agent does not need to read other task files to understand its inputs.}
 
+## Risk
+
+{Only when the task touches a high/critical file and risk.enabled is on; otherwise write "None".}
+
+- `path/to/file.ts`: {score} {tier}. Past failures: {what the fix commits show keeps breaking}. Test: {the test in Tests aimed at it}
+
 ## Project Context
 
 {Only the 3–5 lines from the project context (CONTEXT.md / context/<area>.md, via the investigation's Relevant Context) that apply to THIS task: conventions, pitfalls, off-limits areas. The coder never reads the context files itself. Write "None" if nothing applies.}

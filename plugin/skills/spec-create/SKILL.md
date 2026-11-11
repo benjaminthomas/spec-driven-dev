@@ -45,6 +45,18 @@ the answers to `.spec-driven.yml` (keys: `layout`, `repos`, `tracker`, `git`, `c
 - **Start the memory.** Create or extend `log.md` (`references/log-template.md`) and fill the
   README's **Resume here** block.
 
+## Risk signal (GitRisk)
+
+Same rule as `spec-investigate`: use it only when `risk.enabled` is on (or absent) and
+`{specs_dir}/context/risk.md` exists, and ignore risk completely when it's `off`. For each task that
+creates or modifies a **high** or **critical** file (from the investigation's **Risk Hotspots**, or
+`spec-driven-dev risk --files=…`):
+
+- **Raise its tier by one** (light → standard → deep), and say why in Complexity's Signals.
+- Fill the task's **Risk** section: the file, its score, and the past failure pattern.
+- Its **Tests** must include at least one test aimed at that past failure pattern, not just the new
+  behaviour.
+
 ## When to Use
 
 - After a planning conversation where requirements and technical details have been discussed

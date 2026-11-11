@@ -67,7 +67,9 @@ Skip this step unless the changes belong to a spec (`{specs_dir}/{feature}/` exi
      references/context-template.md inside the installed `spec-setup` skill folder (not this repo): dated, with a source, added at the end, within the size
      limits, superseded lines moved to `context/archive.md`.
    - Show the context changes in the report so the user can correct them.
-3. No CONTEXT.md? Skip the distilling and suggest running `spec-setup` to create one.
+3. If `risk.enabled` is on and the CLI is available, re-run `spec-driven-dev risk` so the scores
+   include this work. It's git-only, so it costs no tokens.
+4. No CONTEXT.md? Skip the distilling and suggest running `spec-setup` to create one.
 
 ### Step 3: Stage Everything
 

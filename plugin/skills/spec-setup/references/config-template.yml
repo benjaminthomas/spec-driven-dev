@@ -75,6 +75,18 @@ effort:
   deep: high
   escalate: xhigh
 
+# GitRisk: historical risk per file from git alone (`spec-driven-dev risk` writes {specs_dir}/context/risk.md).
+# Risk = churn × 0.30 + bug_density × 0.35 + fan_out × 0.20 + security × 0.15 (each factor 0–100).
+# The weights are a starting hypothesis; calibrate them against your own past bugs.
+risk:
+  enabled: on                   # on | off — off makes every skill ignore risk (used by risk-eval's A/B)
+  since: "2 years ago"          # how much history to score
+  weights:
+    churn: 0.30                 # how often the file changes, vs the repo's 90th percentile
+    bug_density: 0.35           # share of its commits that were bug fixes
+    fan_out: 0.20               # how many other files import it, vs the repo's 90th percentile
+    security: 0.15              # share of its commits that were security fixes
+
 pipeline:
   # stop        — every stage waits for you (default)
   # run-through — after you approve a spec: implement → verify → review → checkpoint in one go,

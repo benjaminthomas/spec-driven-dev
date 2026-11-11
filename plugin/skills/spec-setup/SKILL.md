@@ -8,7 +8,7 @@ description: >
   plus one round of questions, for a new one the intended stack and conventions, saved to a small
   specs/CONTEXT.md that later skills load cheaply. Use when the user says "set up spec-driven",
   "configure the pipeline", "spec-setup", "audit this repo", "refresh the project context",
-  "change our branch rules", or when any other spec-* skill finds no .spec-driven.yml or no
+  "change our branch rules", "turn GitRisk on/off", "turn on run-through", or when any other spec-* skill finds no .spec-driven.yml or no
   CONTEXT.md. Detects everything it can first and only asks about what is ambiguous. Writes config
   and context files only — never changes code, branches, or commits.
 license: MIT
@@ -118,12 +118,32 @@ Skip if `{specs_dir}/CONTEXT.md` already exists (offer a refresh instead, see `r
    intended stack and conventions for a new one. One round of questions, no more.
 2. Write `{specs_dir}/CONTEXT.md` (and any area files) using `references/context-template.md`.
    Keep the index to 60 lines and area files to 150.
-3. **Offer, don't do:** ask whether to add this one line to `CLAUDE.md` / `AGENTS.md` (whichever
+3. **Risk scores.** For an existing project, run `spec-driven-dev risk` (or
+   `npx -y @benjaminthomas/spec-driven-dev risk`) to write `{specs_dir}/context/risk.md`. It uses
+   git only, no model. Skip it for a new project with no history. Mention the hotspot count in the
+   report. Set `risk.enabled: off` only if the user doesn't want it.
+4. **Offer, don't do:** ask whether to add this one line to `CLAUDE.md` / `AGENTS.md` (whichever
    the project uses), so hosts reload the pointer after compaction and in every new session:
    `For spec work, read specs/CONTEXT.md first, then the "Resume here" block of any unfinished spec.`
    Add it only on a yes.
-4. Re-run `npx -y @benjaminthomas/spec-driven-dev doctor` if available. It checks the size limits
+5. Re-run `npx -y @benjaminthomas/spec-driven-dev doctor` if available. It checks the size limits
    and flags context lines that point to files which no longer exist.
+
+## Quick switches (plain words, no YAML)
+
+When the user asks to switch a feature on or off, change only that one line of `.spec-driven.yml`,
+keep every other line and comment, and confirm in one sentence. Don't re-run discovery.
+
+| They say | Set |
+|---|---|
+| "turn GitRisk off", "stop using risk scores", "ignore risky files" | `risk.enabled: off` |
+| "turn GitRisk on", "use the risk scores" | `risk.enabled: on`, then run `spec-driven-dev risk` if `{specs_dir}/context/risk.md` doesn't exist yet |
+| "run straight through after I approve", "fewer stops" | `pipeline.after_approval: run-through` |
+| "stop after each stage" | `pipeline.after_approval: stop` |
+
+Reply with what changed and what it means, for example: "GitRisk is now off. Investigations, plans
+and reviews will ignore risk scores until you turn it back on." People who prefer a menu can run
+`spec-driven-dev settings` in a terminal.
 
 ## Updating
 

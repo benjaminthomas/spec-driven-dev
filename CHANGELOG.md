@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.0 — 2026-11-10
+- **GitRisk: historical risk per file.** `spec-driven-dev risk` scores tracked files from git alone (no model): `Risk = 0.30 × Churn + 0.35 × Bug Density + 0.20 × Fan-out + 0.15 × Security`. Security is the share of a file's commits that were security fixes. Writes `specs/context/risk.md`. `--files=` looks up chosen files, `--json` prints everything, and weights can be overridden under `risk.weights`. `doctor` checks them.
+- With `risk.enabled: on`, the skills use the scores: investigate reports **Risk Hotspots**, create raises tiers and requires tests aimed at past failures, and the batch reviewer and `spec-review` check them. With `off`, every skill ignores risk completely.
+- **`spec-driven-dev risk-eval`** (needs Claude Code) runs the same tickets with risk on and off in fresh clones and compares agent behaviour: risky files read, planned and tested, tiers, and cost. Writes a report plus an append-only `experiments/LOG.md`.
+- **Switch features without editing YAML:** say "turn GitRisk off/on" (or "run straight through after I approve") in your AI tool, or run `spec-driven-dev settings` for an arrow-key menu (`--risk=on|off`, `--after-approval=stop|run-through` for scripts). Only that line changes; comments are kept.
+- `risk-eval` options: `--runs`, `--arms=on|off` (rerun one side), `--timeout` (minutes, default 20), `--model`. Failed runs record where they stopped.
+- MCP server: reports the real package version (was always `1.0.0`) and labels YAML and JSON supporting files with their own types instead of Markdown.
+- Fix: `--help` cut off after ten lines, hiding the newest commands and flags.
+- Fix: a multi-repo config now applies only in its own folder and the repos it lists. Before, any repo under that folder picked it up.
+- The npm package now includes `plugin/.claude-plugin`, so `risk-eval` can load the plugin.
+
 ## 1.10.0 — 2026-11-10
 - **Project memory, so context survives new sessions, compaction and new features.**
   - Setup asks whether the project is new or existing (`--project=new|existing`), detected from commit and file counts and saved as `context.project`.

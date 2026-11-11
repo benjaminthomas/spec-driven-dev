@@ -22,6 +22,11 @@ Copy this structure into `specs/{feature-slug}/investigation.md`.
 - Conventions / decisions / pitfalls that apply: (one line each, with the source)
 - Context corrections: (where the code contradicts CONTEXT.md, with evidence; or "none")
 
+## Risk Hotspots
+<!-- Only when risk.enabled is on. One row per high/critical file in the change surface; else "none" or omit. -->
+| File | Score / tier | What has broken here before (from fix commits) | What to watch in this change |
+|---|---|---|---|
+
 ## Business Context
 ## Problem Statement
 ## Expected Behaviour

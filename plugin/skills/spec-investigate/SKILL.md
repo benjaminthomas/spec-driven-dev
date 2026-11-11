@@ -65,6 +65,22 @@ Cheap sources first, code second:
 
 No CONTEXT.md? Investigate as usual, and suggest running `spec-setup` afterwards to create one.
 
+## Risk signal (GitRisk)
+
+Use it only when `.spec-driven.yml` has `risk.enabled: on`, or has no `risk:` block, **and**
+`{specs_dir}/context/risk.md` exists. If `risk.enabled: off`, ignore risk entirely: don't read the
+file, compute scores, or mention risk. That keeps on/off comparisons (`spec-driven-dev risk-eval`)
+clean.
+
+1. Once you know the change surface, look up its files: `spec-driven-dev risk --files=a,b` (or
+   `npx -y @benjaminthomas/spec-driven-dev risk --files=…`), or find them in `risk.md`. Without the
+   CLI, approximate a file's history with `git log --since="2 years ago" --format=%s -- <file>`.
+2. For each **high** or **critical** file in the surface, look harder: read its last ~10 commit
+   subjects and the diffs of its last 1–2 fix commits, and check its dependents. Write what keeps
+   breaking there in the report's **Risk Hotspots** section.
+3. A score is a reason to look harder, never evidence. Hotspot findings still need their
+   VERIFIED / INFERRED labels.
+
 ## Invocation
 
 ```

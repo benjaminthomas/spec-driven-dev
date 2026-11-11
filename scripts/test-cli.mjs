@@ -178,6 +178,92 @@ assert.ok(cli("status", `--dir=${big}`).includes("open blockers"));
 fs.writeFileSync(path.join(big, "specs/feat/review.md"), "### 1. [blocker] x\n- **Status:** fixed in abc123\n### 2. [nit] y\n- **Status:** open\n");
 assert.equal(cli("status", `--dir=${big}`), "", "a fixed blocker and an open nit shouldn't count as unfinished");
 
+// 13. a repo under a multi-repo workspace folder, but not listed in it, doesn't inherit its config
+const stray = path.join(ws, "unrelated");
+repo(stray, {}, ["x"]);
+assert.ok(doctor(stray).out.includes("No .spec-driven.yml") || doctor(stray).code === 1, "unlisted repo picked up the workspace config");
+assert.equal(doctor(path.join(ws, "api")).code, 0, "listed repo should still find the workspace config");
+
+// 14. GitRisk: weighted score from churn, bug density, fan-out, security; weights from config; --files; A/B harness
+const rk = path.join(tmp, "risky");
+fs.mkdirSync(rk, { recursive: true });
+sh(rk, "init", "-q", "-b", "main");
+const commitFile = (f, body, msg) => { fs.writeFileSync(path.join(rk, f), body); sh(rk, "add", "-A"); sh(rk, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", msg); };
+commitFile("a.ts", "export const a = 1;\n", "feat: add a");
+commitFile("b.ts", "import { a } from './a';\n", "feat: add b");
+commitFile("c.ts", "import { a } from \"./a\";\n", "feat: add c");
+["fix: off by one", "fix: null crash", "fix: sanitize input to stop xss", "chore: tidy"].forEach((m, i) => commitFile("a.ts", `export const a = ${i + 2};\n`, m));
+commitFile("README.md", "docs", "docs: readme");
+let rj = JSON.parse(cli("risk", `--dir=${rk}`, "--json"));
+const A = rj.rows.find((r) => r.file === "a.ts"), B = rj.rows.find((r) => r.file === "b.ts");
+assert.equal(rj.rows[0].file, "a.ts", "most-fixed, most-imported file should rank first");
+assert.ok(!rj.rows.some((r) => r.file === "README.md"), "docs aren't scored");
+assert.deepEqual(rj.weights, { churn: 0.3, bug_density: 0.35, fan_out: 0.2, security: 0.15 });
+assert.equal(A.commits, 5); assert.equal(A.bug_fixes, 3); assert.equal(A.security_fixes, 1); assert.equal(A.dependents, 2);
+assert.equal(A.factors.churn, 100); assert.equal(A.factors.fan_out, 100); assert.equal(A.factors.bug_density, 60); assert.equal(A.factors.security, 20);
+assert.equal(A.score, Math.round((0.3 * 100 + 0.35 * 60 + 0.2 * 100 + 0.15 * 20) * 10) / 10);  // 74 → high
+assert.equal(A.tier, "high"); assert.equal(B.factors.bug_density, 0);
+fs.writeFileSync(path.join(rk, ".spec-driven.yml"), "layout: single\nrisk:\n  enabled: on\n  weights:\n    churn: 0\n    bug_density: 1\n    fan_out: 0\n    security: 0\n");
+assert.equal(JSON.parse(cli("risk", `--dir=${rk}`, "--json")).rows[0].score, 60, "config weights should override the defaults");
+fs.writeFileSync(path.join(rk, ".spec-driven.yml"), "layout: single\nrisk:\n  enabled: maybe\n  weights:\n    churn: 0.5\n    speed: 0.1\n");
+d = doctor(rk);
+assert.ok(d.code === 1 && d.out.includes('risk.enabled "maybe"') && d.out.includes("risk.weights.speed: unknown factor") && d.out.includes("add up to"), d.out);
+assert.throws(() => cli("risk", `--dir=${rk}`), /add up to/);
+fs.writeFileSync(path.join(rk, ".spec-driven.yml"), "layout: single\n");
+assert.ok(cli("risk", `--dir=${rk}`).includes("Scored 3 files"));
+const riskMd = fs.readFileSync(path.join(rk, "specs/context/risk.md"), "utf8");
+assert.ok(riskMd.includes("Risk = 0.3 × Churn + 0.35 × Bug Density + 0.2 × Fan-out + 0.15 × Security") && riskMd.includes("| `a.ts` | 74 | high |"), riskMd);
+assert.ok(cli("risk", `--dir=${rk}`, "--files=./a.ts,new.ts").includes("a.ts: 74 high") && cli("risk", `--dir=${rk}`, "--files=new.ts").includes("no history"));
+assert.ok(doctor(rk).code === 0, doctor(rk).out);
+fs.rmSync(path.join(rk, "specs"), { recursive: true });
+
+// A/B harness, with a fake `claude` that behaves differently when it can see the risk signal
+const fake = path.join(tmp, "fake-claude.mjs");
+fs.writeFileSync(fake, `#!/usr/bin/env node
+import fs from "node:fs";
+const on = fs.existsSync("specs/context/risk.md") && /enabled: on/.test(fs.readFileSync(".spec-driven.yml", "utf8"));
+fs.readFileSync(0, "utf8");
+fs.mkdirSync("specs/t/tasks", { recursive: true });
+fs.writeFileSync("specs/t/investigation.md", on ? "## Risk Hotspots\\n| \\\`a.ts\\\` | 74 high |\\n" : "nothing\\n");
+fs.writeFileSync("specs/t/tasks/task-01-x.md", "## Complexity\\n**Tier:** " + (on ? "deep" : "standard") + "\\n## Files to Modify\\n- \\\`a.ts\\\` — x\\n## Tests\\n" + (on ? "- a.test.ts — past xss\\n" : "None — trivial\\n"));
+const ev = (o) => console.log(JSON.stringify(o));
+ev({ type: "assistant", message: { content: [{ type: "tool_use", name: "Read", input: { file_path: on ? "a.ts" : "b.ts" } }] } });
+ev({ type: "result", total_cost_usd: on ? 0.02 : 0.01, num_turns: 3, usage: { input_tokens: 100, output_tokens: on ? 60 : 40 } });
+`);
+fs.chmodSync(fake, 0o755);
+fs.writeFileSync(path.join(rk, "tickets.md"), "# tickets\n- Fix the a() rounding bug\n");
+const evalOut = cli("risk-eval", `--dir=${rk}`, "--tickets=tickets.md", `--claude=${fake}`, `--out=${path.join(tmp, "exp")}`);
+assert.ok(evalOut.includes("t1-on-r1: read 1 risky / 1 files, 1 risky in plan") && evalOut.includes("t1-off-r1: read 0 risky"), evalOut);
+const expDir = fs.readdirSync(path.join(tmp, "exp")).find((f) => f.startsWith("risk-eval-"));
+const rep = fs.readFileSync(path.join(tmp, "exp", expDir, "report.md"), "utf8");
+assert.ok(rep.includes("| 1. Fix the a() rounding bug | Risky files looked at | 0 | 1 | 1 |"), rep);
+assert.ok(rep.includes("…of those, with tests planned | 0 | 1 | 1 |") && rep.includes("Avg tier of tasks on risky files (1–3) | 2 | 3 | 1 |"), rep);
+assert.ok(fs.readFileSync(path.join(tmp, "exp", "LOG.md"), "utf8").includes("1 ticket(s) × 1 run(s) × 2 arms") , "experiment log not appended");
+assert.equal(JSON.parse(fs.readFileSync(path.join(tmp, "exp", expDir, "results.json"), "utf8")).results.length, 2);
+assert.ok(!fs.existsSync(path.join(rk, "specs")), "risk-eval must not write into the repo under test");
+
+// 15. settings: switch features by flag, keeping comments; refuses without a terminal or flags
+const st2 = path.join(tmp, "settings");
+repo(st2, {}, ["x"]);
+fs.writeFileSync(path.join(st2, ".spec-driven.yml"), "layout: single\n# keep me\nrisk:   # GitRisk\n  enabled: on   # on | off\n  since: \"2 years ago\"\npipeline:\n  after_approval: stop\n");
+let so = cli("settings", `--dir=${st2}`, "--risk=off", "--after-approval=run-through");
+let y2 = fs.readFileSync(path.join(st2, ".spec-driven.yml"), "utf8");
+assert.ok(so.includes("GitRisk: Off") && so.includes("Run straight through"), so);
+assert.ok(y2.includes("  enabled: off   # on | off") && y2.includes("# keep me") && y2.includes("after_approval: run-through") && y2.includes('since: "2 years ago"'), y2);
+so = cli("settings", `--dir=${st2}`, "--risk=on");
+assert.ok(fs.readFileSync(path.join(st2, ".spec-driven.yml"), "utf8").includes("  enabled: on") && so.includes("nothing is scored yet"), so);
+fs.writeFileSync(path.join(st2, ".spec-driven.yml"), "layout: single\n");
+cli("settings", `--dir=${st2}`, "--risk=off");
+assert.ok(fs.readFileSync(path.join(st2, ".spec-driven.yml"), "utf8").endsWith("risk:\n  enabled: off\n"), "risk block should be added when missing");
+assert.equal(doctor(st2).code, 0, doctor(st2).out);
+assert.throws(() => cli("settings", `--dir=${st2}`, "--risk=maybe"), /--risk must be on or off/);
+assert.throws(() => cli("settings", `--dir=${st2}`), /settings menu can't open/);
+assert.throws(() => cli("settings", `--dir=${quiet}`, "--risk=off"), /No .spec-driven.yml/);
+
+// 16. --help shows the whole command list, including the last commands and flags
+const help = execFileSync("node", [CLI, "--help", "--yes"]).toString();
+assert.ok(help.includes("risk-eval") && help.includes("settings") && help.includes("--risk=on|off"), help);
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 

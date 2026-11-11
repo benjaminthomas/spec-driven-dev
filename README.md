@@ -46,6 +46,7 @@ Asking an AI agent to "just build it" tends to fail in predictable ways:
 | One agent working alone is slow | **`spec-implement`** runs several coder agents in parallel, each in its own copy of the repo |
 | "It compiles" gets treated as "it works" | **`spec-verify`** drives the real running app and checks every acceptance criterion, with evidence |
 | Problems slip through because nobody reviews the whole change | **`spec-review`** checks the finished branch against the spec, your conventions, and the code, and blocks shipping on real problems |
+| The agent treats a file that broke five times like any other | **GitRisk** scores files from git history (churn, bug fixes, dependents, security fixes), so risky files get a deeper look, a higher tier and targeted tests. Switch it on or off any time |
 | A new session forgets what was decided last time | **Project memory**: a small `specs/CONTEXT.md`, plus a "Resume here" block and a log in every spec, kept short so reloading them is cheap |
 | Broken code gets committed, or a PR is pushed by accident | **`spec-checkpoint`** commits only once lint, types, tests, and build all pass. **`spec-ship`** asks before it pushes |
 
@@ -246,6 +247,54 @@ lines that point to files that no longer exist. If you install
 [graphify](https://github.com/Graphify-Labs/graphify), the skills use it for cheaper code
 navigation. It's optional (`context.graph: off` turns it off), and nothing is installed for you.
 
+### GitRisk: which files have a history of breaking
+
+`spec-driven-dev risk` scores every tracked code file from git history alone, with no model and no
+tokens, and writes the top files to `specs/context/risk.md`:
+
+```
+Risk = 0.30 × Churn + 0.35 × Bug Density + 0.20 × Fan-out + 0.15 × Security      (each factor 0–100)
+```
+
+| Factor | Weight | What it measures |
+|---|---|---|
+| Churn | 30% | how often the file changes, against the repo's 90th percentile |
+| Bug Density | 35% | share of its commits that were bug fixes (`fix:` type or fix-like wording) |
+| Fan-out | 20% | how many other files import it, against the repo's 90th percentile |
+| Security | 15% | share of its commits that were security fixes (security, CVE, XSS, injection…) |
+
+Tiers: critical ≥ 75, high ≥ 50, medium ≥ 25. When `risk.enabled` is on, the skills use it:
+- `spec-investigate` digs into high and critical files in the change surface (past fix commits,
+  dependents) and lists them as **Risk Hotspots**;
+- `spec-create` raises those tasks one tier and requires a test aimed at each file's past failure
+  pattern;
+- `spec-implement`'s reviewer and `spec-review` check those tests and read the risky files line
+  by line.
+
+**Turning it on or off, no YAML needed:**
+- **In your AI tool:** say "turn GitRisk off" or "turn GitRisk on". `spec-setup` changes just that
+  setting and tells you what it means.
+- **In a terminal:** run `spec-driven-dev settings` and pick with the arrow keys. It also switches
+  run-through mode. For scripts, use `spec-driven-dev settings --risk=off`.
+- **By hand:** set `risk.enabled: on` or `off` in `.spec-driven.yml`.
+
+Off means every skill ignores risk completely.
+
+`spec-driven-dev risk --files=a.ts,b.ts` prints scores for chosen files. The weights are a starting
+hypothesis: change them under `risk.weights` in `.spec-driven.yml` once you've backtested them
+against your own past bugs.
+
+**Does it change what the agent does?** `spec-driven-dev risk-eval --tickets=tickets.md` runs each
+ticket twice, in fresh clones with risk on and off, through investigate and create on the same
+model. It then compares what the agent did:
+- risky files read and named in the investigation;
+- risky files in the plan, and whether tests were planned for them;
+- task tiers;
+- cost.
+
+Results go to `experiments/` with the transcripts, and every run, including failures, is appended to
+`experiments/LOG.md`. It needs Claude Code.
+
 ## How the workflow fits together
 
 ```
@@ -314,6 +363,9 @@ It starts from the project memory (`specs/CONTEXT.md` and only the area files th
 treats it as a lead rather than evidence, and notes where the code contradicts it. If graphify is
 installed, it uses it to map the code more cheaply.
 
+With GitRisk on, it also looks harder at high-risk files in the change surface (their past fix
+commits and dependents) and lists them as **Risk Hotspots**.
+
 **You get:** `specs/<feature>/investigation.md`, with every finding labelled **VERIFIED**,
 **INFERRED**, **ASSUMPTION**, or **UNKNOWN**, a short **Relevant Context** digest for the next
 stages, and requirements numbered R1, R2… so they can be traced through to verification and review.
@@ -334,6 +386,9 @@ Each task file is complete on its own: description, files to change, implementat
 to write**, acceptance criteria, the requirements it **covers**, and the few **project conventions**
 that apply to it. Every requirement must map to a task, and the spec isn't finished until it does.
 It also starts the spec's `log.md` and **Resume here** block.
+
+With GitRisk on, a task that touches a high-risk file goes up one tier and must include a test
+aimed at that file's past failures.
 
 **Then:** read it, edit anything you disagree with, and only then run `spec-implement`.
 
@@ -379,6 +434,8 @@ checks that instead.
 nothing out of scope), the project's recorded conventions, and the code itself: correctness,
 security, error handling, tests, and hot-path performance. It checks each finding against the code
 before reporting it, and reads the diff rather than the whole repo.
+
+With GitRisk on, high-risk files get a line-by-line read of their error paths and callers.
 
 **You get:** `specs/<feature>/review.md`, with findings ranked blocker, should-fix, nit, or question,
 each with `file:line` and a suggested fix. Blockers stop `spec-ship` and run-through. It then asks
@@ -443,6 +500,8 @@ specs/
     └── review.md                 ← spec-review: ranked findings; open blockers stop spec-ship
 specs/CONTEXT.md                  ← spec-setup / spec-checkpoint: project memory index (≤60 lines)
 specs/context/<area>.md           ← details per area, loaded only when needed (≤150 lines)
+specs/context/risk.md             ← spec-driven-dev risk: GitRisk scores (regenerate; don't edit)
+experiments/                      ← spec-driven-dev risk-eval: on/off reports, transcripts, LOG.md
 ```
 
 These are plain Markdown files, so you can review them in a PR, edit them, or hand them to a
@@ -474,6 +533,11 @@ Built into the skills, not left to the agent's judgment:
 ---
 
 ## FAQ
+
+**How do I turn GitRisk off (or on)?**
+Say "turn GitRisk off" in your AI tool, or run `spec-driven-dev settings` and pick from the menu.
+Off means every skill ignores risk scores. Turning it on again offers to score the files if that
+hasn't been done yet.
 
 **Do I need Jira?**
 No. Use GitHub Issues, Linear, a transcript, a document, or a sentence of plain text. Jira is just
@@ -565,6 +629,10 @@ spec-driven-dev --yes                             # accept every detected defaul
 spec-driven-dev doctor                            # check .spec-driven.yml against the real repos
 spec-driven-dev status                            # list unfinished specs and each one's next step
 spec-driven-dev context --areas=billing           # print the project memory (index, or chosen areas)
+spec-driven-dev settings                          # switch GitRisk and run-through on/off from a menu
+spec-driven-dev risk                              # GitRisk: score files from git history → specs/context/risk.md
+spec-driven-dev risk-eval --tickets=tickets.md    # compare agent behaviour with the risk signal on vs off
+                                                  #   (--runs=3 --arms=on --timeout=20 --model=sonnet)
 spec-driven-dev --help                            # show all of the above
 ```
 
@@ -658,16 +726,16 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 142 | 1,334 | 3 |
-| `spec-investigate` | 1 · understand | 354 | 3,007 | 1 |
-| `spec-create` | 2 · plan | 183 | 1,646 | 6 |
+| `spec-setup` | 0 · configure | 162 | 1,534 | 3 |
+| `spec-investigate` | 1 · understand | 370 | 3,152 | 1 |
+| `spec-create` | 2 · plan | 195 | 1,746 | 6 |
 | `spec-implement` | 3 · build | 322 | 2,683 | 3 |
 | `spec-verify` | 4 · prove | 163 | 1,557 | 1 |
-| `spec-review` | 5 · review | 131 | 1,209 | 1 |
-| `spec-checkpoint` | 6 · commit | 131 | 1,020 | 0 |
+| `spec-review` | 5 · review | 135 | 1,270 | 1 |
+| `spec-checkpoint` | 6 · commit | 133 | 1,046 | 0 |
 | `spec-ship` | 7 · PR | 230 | 1,388 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **1,911** | **16,053** | **22** |
+| **Total** | | **1,965** | **16,585** | **22** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback
@@ -688,7 +756,9 @@ plugin/skills/<name>/references/ templates and prompts the skill loads when need
 plugin/                       the Claude Code plugin (manifest + skills only, no scripts or hooks)
 .agents/skills/               symlinks so Codex/Antigravity pick the skills up inside this repo
 bin/spec-driven-dev.cjs       launcher (runs on any Node, explains if it's too old)
-bin/cli.mjs                   the `spec-driven-dev` CLI: installer, setup menus, doctor, status, context
+bin/cli.mjs                   the `spec-driven-dev` CLI: installer, setup menus, doctor, status, context, risk
+bin/risk.mjs                  GitRisk scoring (churn, bug density, fan-out, security)
+bin/risk-eval.mjs             risk on/off experiment harness
 package.json                  npm package (ships bin/ and plugin/skills/)
 mcp-server/                   MCP fallback server
 CHANGELOG.md                  what changed in each version
@@ -717,7 +787,7 @@ plugin/evals/                 `claude plugin eval` cases
   1. Increase `version` in both `package.json` and `plugin/.claude-plugin/plugin.json` (the check fails if
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
-  3. Tag the release and push the tag: `git tag v1.10.0 && git push origin v1.10.0`.
+  3. Tag the release and push the tag: `git tag v1.11.0 && git push origin v1.11.0`.
   4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
      npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 

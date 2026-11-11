@@ -22,6 +22,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = join(__dirname, "..", "plugin", "skills");
+const VERSION = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf8")).version;
+const MIME = { md: "text/markdown", yml: "application/yaml", yaml: "application/yaml", json: "application/json", png: "image/png" };
+const mimeOf = (f) => MIME[f.split(".").pop().toLowerCase()] || "text/plain";
 
 function readFrontmatterDescription(skillMdPath) {
   const text = readFileSync(skillMdPath, "utf8");
@@ -65,7 +68,7 @@ if (skillNames.length === 0) {
 
 const server = new McpServer({
   name: "spec-driven-dev-skills",
-  version: "1.0.0",
+  version: VERSION,
 });
 
 for (const skillName of skillNames) {
@@ -101,13 +104,13 @@ for (const skillName of skillNames) {
       uri,
       {
         description: `Supporting file for the ${skillName} skill`,
-        mimeType: "text/markdown",
+        mimeType: mimeOf(relPath),
       },
       async (uriObj) => ({
         contents: [
           {
             uri: uriObj.toString(),
-            mimeType: "text/markdown",
+            mimeType: mimeOf(relPath),
             text: readFileSync(join(skillDir, relPath), "utf8"),
           },
         ],
