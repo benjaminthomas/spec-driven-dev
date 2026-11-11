@@ -75,7 +75,8 @@ and you can change any answer as you go. It asks how the project is organised (o
 or several repos that change together), your tracker, branches and commit style, where specs live
 and whether your team shares them, then looks through the code and saves the project memory
 ([details below](#project-setup-your-teams-rules)). If Claude Code or Codex is installed, the
-installer offers to open it with "run spec-setup" already typed in.
+installer asks "Open Claude Code in soreto-shopify to set up your project?" (with your folder's name)
+and opens it with "run spec-setup" already typed in.
 
 **3. Then run each stage in order.** You can type the slash command or just say the
 words in quotes.
@@ -272,8 +273,9 @@ a build output. Committing it would cause merge conflicts between branches. `doc
 it's committed.
 
 When `risk.enabled` is on, the skills use it:
-- `spec-investigate` digs into high and critical files in the change surface (past fix commits,
-  dependents) and lists them as **Risk Hotspots**;
+- `spec-investigate` always looks up the files in the change surface, digs into high and critical
+  ones (past fix commits, dependents), and lists them as **Risk Hotspots**, or says it checked and
+  found none;
 - `spec-create` raises those tasks one tier and requires a test aimed at each file's past failure
   pattern;
 - `spec-implement`'s reviewer and `spec-review` check those tests and read the risky files line
