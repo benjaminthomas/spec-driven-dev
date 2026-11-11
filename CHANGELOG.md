@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.1 — 2026-11-11
+- Clearer hand-over after installing: "Open Claude Code in soreto-shopify to set up your project? It first asks how your project is organised…". The folder says where it opens; "project" says what gets set up, since that can span several repos. The step is now "Set up your project in your AI tool", and the explanation is shown once, in the question.
+- `spec-investigate` must look up GitRisk for the files it touches when risk is on, and say so in **Risk Hotspots** even when none are high (a live run had skipped it).
+
 ## 1.13.0 — 2026-11-11
 Changes from a first-time install on a real multi-repo project.
 - **Setup happens in your AI tool.** The installer now only installs the skills, then hands over with one next step: say "run spec-setup". If Claude Code or Codex is installed, it offers to open it with that already typed in. In the chat you can correct any answer as you go, which the terminal menus couldn't do. `spec-driven-dev setup` stays for scripts and CI (flags, no questions).

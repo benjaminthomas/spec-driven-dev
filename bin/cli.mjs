@@ -167,17 +167,24 @@ async function install() {
 // happen in the AI tool. Claude Code and Codex can be opened with the request already typed in.
 const LAUNCHERS = [["claude", "Claude Code"], ["codex", "Codex"]];
 async function handOver(tools, onlySetup) {
+  // The folder says where the AI tool opens; "project" says what gets set up (it can span several repos).
   const name = path.basename(gitTop(DIR));
-  step(onlySetup ? 1 : 2, `Set up ${name} in your AI tool`, ink.magenta);
-  console.log(`
-${onlySetup ? "Setup happens in your AI tool now, so it can read the code and you can change any answer as you go." : "Skills installed."}
-Next: set up ${name}. In your AI tool, say "run spec-setup". It asks how the project is organised
-(single repo, monorepo, or several repos), your tracker, branches and whether to share specs,
-then looks through the code. Start a new session if your tool doesn't recognise it yet.${onlySetup ? `
-For scripts and CI: spec-driven-dev setup --yes [--layout=… --repos=… --share=…]` : ""}`);
-  const launcher = LAUNCHERS.find(([bin]) => (onlySetup || tools.includes(bin)) && onPath(bin));
-  if (!launcher || !process.stdin.isTTY || YES || onlySetup) return;
-  if (!(await askConfirm(`Open ${launcher[1]} here now and start it? (takes a few minutes, uses your ${launcher[1]} plan)`, true))) return;
+  const what = "It first asks how your project is organised: one repo, a monorepo, or several repos that change together.";
+  const next = `Next: in ${name}, open your AI tool and say "run spec-setup".\n${what}
+Then it asks about your tracker, branches and sharing, and looks through the code.
+Start a new session if your tool doesn't recognise it yet.`;
+  step(onlySetup ? 1 : 2, "Set up your project in your AI tool", ink.magenta);
+  if (onlySetup) {
+    console.log(`Setup happens in your AI tool now, so it can read the code and you can change any answer as you go.\n${next}\nFor scripts and CI: spec-driven-dev setup --yes [--layout=… --repos=… --share=…]`);
+    return;
+  }
+  const launcher = LAUNCHERS.find(([bin]) => tools.includes(bin) && onPath(bin));
+  if (!launcher || !process.stdin.isTTY || YES) { console.log(`Skills installed.\n${next}`); return; }
+  // The question carries the explanation, so there's no paragraph to read twice.
+  if (!(await askConfirm(`Open ${launcher[1]} in ${name} to set up your project? ${what} (A few minutes, on your ${launcher[1]} plan.)`, true))) {
+    console.log(next);
+    return;
+  }
   const { spawnSync } = await import("node:child_process");
   spawnSync(launcher[0], ["run spec-setup"], { cwd: DIR, stdio: "inherit" });
 }

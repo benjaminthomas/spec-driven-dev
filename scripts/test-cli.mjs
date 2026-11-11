@@ -25,7 +25,7 @@ function repo(dir, scripts, subjects, branches = []) {
 const single = path.join(tmp, "single");
 repo(single, { lint: "eslint .", test: "vitest", dev: "vite" }, ["STP-1: a", "STP-2: b", "STP-3: c"], ["STP-1", "STP-2", "staging"]);
 const inst = cli("--yes", "--tools=cursor,codex", `--dir=${single}`);
-assert.ok(!fs.existsSync(path.join(single, ".spec-driven.yml")) && inst.includes('say "run spec-setup"') && inst.includes("set up single"), "install only installs, then hands over\n" + inst);
+assert.ok(!fs.existsSync(path.join(single, ".spec-driven.yml")) && inst.includes('say "run spec-setup"') && inst.includes("in single, open your AI tool") && inst.includes("Set up your project in your AI tool") && inst.includes("several repos that change together"), "install only installs, then hands over\n" + inst);
 cli("setup", "--yes", `--dir=${single}`);
 assert.ok(fs.existsSync(path.join(single, ".cursor/skills/spec-setup/SKILL.md")));
 assert.ok(fs.existsSync(path.join(single, ".agents/skills/spec-create/references/task-template.md")));

@@ -84,12 +84,14 @@ Use it only when `.spec-driven.yml` has `risk.enabled: on`, or has no `risk:` bl
 file, compute scores, or mention risk. That keeps on/off comparisons (`spec-driven-dev risk-eval`)
 clean.
 
-1. Once you know the change surface, look up its files: `spec-driven-dev risk --files=a,b` (or
+1. **Required, not optional:** once you know the change surface, and before writing the report, look up its files: `spec-driven-dev risk --files=a,b` (or
    `npx -y @benjaminthomas/spec-driven-dev risk --files=…`), or find them in `risk.md`. Without the
    CLI, approximate a file's history with `git log --since="2 years ago" --format=%s -- <file>`.
 2. For each **high** or **critical** file in the surface, look harder: read its last ~10 commit
    subjects and the diffs of its last 1–2 fix commits, and check its dependents. Write what keeps
    breaking there in the report's **Risk Hotspots** section.
+   The report's **Risk Hotspots** section must exist when risk is on: list the high/critical files,
+   or write "none of the touched files are high or critical (checked)" so a reader knows it was done.
 3. A score is a reason to look harder, never evidence. Hotspot findings still need their
    VERIFIED / INFERRED labels.
 4. **New files** (added in the last 90 days with fewer than 3 commits, or not committed yet) show as tier `new`: too little
