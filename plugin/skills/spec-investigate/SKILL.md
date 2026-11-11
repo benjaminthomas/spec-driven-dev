@@ -2,7 +2,8 @@
 name: spec-investigate
 description: >
   Deep, evidence-based technical investigation of a piece of work BEFORE any specification or
-  implementation begins — starting from a ticket (Jira, GitHub Issues, Linear), a meeting/call
+  implementation begins — starting from a ticket (Jira, GitHub, GitLab, Linear, Azure Boards, ClickUp or
+  any tracker), a meeting/call
   transcript, a plain-text description, a doc/PRD file, a Slack/email thread, or an error log.
   Use when the user says "investigate STP-123", "spec-investigate", "look into this before we
   plan it", or hands over any of those inputs and wants the
@@ -147,6 +148,8 @@ trivial ticket, and don't shortcut a genuinely risky one.
    - `#482`, `owner/repo#482`, or a `github.com/.../issues/482` URL → GitHub Issues
      (`gh issue view 482 --comments --json title,body,labels,comments,...`).
    - `linear.app/.../issue/ENG-91` → Linear (Linear MCP tool or API).
+   - Any other tracker (`AB#4512` Azure Boards, `CU-86a1…` ClickUp, a GitLab, Asana, YouTrack,
+     Shortcut, Monday or Trello link): see `trackers.md` in the installed `spec-setup` skill's references folder for how to recognise and read it.
    - A bare `KEY-123` → use `tracker` from `.spec-driven.yml`; without one, the tracker the project already uses (CLAUDE.md/AGENTS.md, branch
      names, PR links in `git log`); if that's ambiguous, try the trackers this host can reach and
      ask if none resolves. If you can't reach the tracker at all, ask the user to paste the ticket

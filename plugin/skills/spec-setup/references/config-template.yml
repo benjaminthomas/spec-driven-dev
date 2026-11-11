@@ -23,7 +23,7 @@ layout: single
 #     role: React frontend
 
 tracker:
-  type: jira                    # jira | github | linear | none
+  type: jira                    # jira | github | gitlab | linear | azure-boards | clickup | asana | youtrack | … | none (any tracker your AI tool can reach)
   key: STP                      # ticket key prefix (jira/linear); omit for github/none
   url: https://example.atlassian.net   # site/org/repo URL, if any
   updates: ask                  # move the ticket and post stage comments when a tracker tool is connected: ask | on | off

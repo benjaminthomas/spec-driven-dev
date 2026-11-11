@@ -196,8 +196,8 @@ choose which to act on. The changes then go through the stages again (implement 
 checkpoint → ship) onto the same PR, never as a quick push. A comment that changes the requirements
 updates the spec and waits for your approval first. Replies go on each thread once you've seen them.
 
-**The ticket keeps up with the work.** When your AI tool can reach the tracker (a Jira/Atlassian,
-GitHub or Linear MCP server, or `gh`/`acli`), the pipeline updates the ticket: investigate comments
+**The ticket keeps up with the work.** When your AI tool can reach the tracker (any MCP server or CLI
+for it: Jira, GitHub, GitLab, Linear, Azure Boards, ClickUp, Asana and others), the pipeline updates the ticket: investigate comments
 with the summary, implement moves it to *In Progress*, verify comments with each acceptance criterion
 and its pass/fail, review with the blocker count, and ship moves it to *In Review* with the PR link.
 Status names come from your project's real workflow (asked once, saved in `team.yml`); it never closes
@@ -588,7 +588,7 @@ Off means every skill ignores risk scores. Turning it on again offers to score t
 hasn't been done yet.
 
 **Do I need Jira?**
-No. Use GitHub Issues, Linear, a transcript, a document, or a sentence of plain text. Jira is just
+No. Use GitHub or GitLab Issues, Linear, Azure Boards, ClickUp, Asana or any tracker your AI tool can reach, a transcript, a document, or a sentence of plain text. Jira is just
 one of the options.
 
 **How does it choose the base branch and branch name?**
@@ -801,8 +801,8 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 311 | 3,468 | 5 |
-| `spec-investigate` | 1 · understand | 392 | 3,429 | 1 |
+| `spec-setup` | 0 · configure | 314 | 3,509 | 6 |
+| `spec-investigate` | 1 · understand | 395 | 3,469 | 1 |
 | `spec-create` | 2 · plan | 198 | 1,806 | 6 |
 | `spec-implement` | 3 · build | 330 | 2,813 | 3 |
 | `spec-verify` | 4 · prove | 166 | 1,610 | 1 |
@@ -810,7 +810,7 @@ skips that step rather than failing.
 | `spec-checkpoint` | 6 · commit | 140 | 1,168 | 0 |
 | `spec-ship` | 7 · PR | 238 | 1,494 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **2,209** | **19,814** | **24** |
+| **Total** | | **2,215** | **19,895** | **25** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback

@@ -91,9 +91,11 @@ Read, don't guess. Collect a draft of every field in `references/config-template
    - Otherwise → `single`.
 2. **Existing written rules.** `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, PR templates,
    `.github/workflows`. Anything stated there is a strong default — quote it back to the user.
-3. **Tracker.** Ticket keys in recent branch names and commit subjects (`STP-123`, `#45`,
-   `ENG-91`), Jira/Linear links in PR templates or docs, whether GitHub Issues are enabled
-   (`gh repo view --json hasIssuesEnabled`).
+3. **Tracker.** Ticket IDs in recent branch names and commit subjects (`STP-123`, `#45`,
+   `ENG-91`, `AB#4512`, `CU-86a1b2c3d`, `sc-1234`), tracker links in PR templates or docs, the
+   remote's host (GitLab, Azure DevOps), whether GitHub Issues are enabled
+   (`gh repo view --json hasIssuesEnabled`), and which tracker MCP servers this host has. Any
+   tracker is fine; `references/trackers.md` lists the common ID shapes and tools.
 4. **Git, per repo.** Default branch (`git symbolic-ref refs/remotes/origin/HEAD` or
    `gh repo view --json defaultBranchRef`); integration branches (`staging`, `develop`,
    `pre-prod`); which branch recent PRs targeted (`gh pr list --state merged --limit 20 --json
@@ -201,7 +203,8 @@ evidence in the description, then the common alternatives:
   name any repo that uses a different style.
 
 **Call 4: tracker, team and pipeline.** The tracker, confirmed like the git conventions (e.g.
-`Jira, key STP (Recommended)`: "STP-123 in recent branches", `GitHub Issues`, `Linear`, `None`), then
+`Jira, key STP (Recommended)`: "STP-123 in recent branches", then the other likely ones, `None`; any
+tracker can be typed under *Type something*, see `references/trackers.md`), then
 sharing (if specs are inside a repo), after approval (stop / run straight through), and any command
 that's a guess (e.g. typecheck). At most 4; a guessed command that doesn't fit goes in the summary as
 "I'll use X, say if that's wrong". Don't ask about tracker updates: they default to `ask`, so the

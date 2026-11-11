@@ -515,6 +515,24 @@ assert.ok(execFileSync("node", [CLI, "doctor", `--dir=${tB}`], { env: { ...proce
 const so3 = bcli("settings", `--dir=${tB}`, "--risk=off");
 assert.ok(so3.includes("shared with the team") && fs.readFileSync(path.join(tB, "team-specs/team.yml"), "utf8").includes("enabled: off"), so3);
 
+// 27. any tracker: detected from its ID shape, named with --tracker, and accepted by doctor
+const tz = path.join(tmp, "azure");
+repo(tz, {}, ["Fix login AB#4512", "Add export AB#4520", "Tidy AB#4521"]);
+cli("setup", "--yes", `--dir=${tz}`);
+assert.ok(fs.readFileSync(path.join(tz, ".spec-driven.yml"), "utf8").includes("type: azure-boards"), "AB#123 means Azure Boards");
+const tc = path.join(tmp, "clickup");
+repo(tc, {}, ["CU-86a1b2c3d fix cart", "CU-86a1b2c9x add badge"]);
+cli("setup", "--yes", `--dir=${tc}`);
+assert.ok(fs.readFileSync(path.join(tc, ".spec-driven.yml"), "utf8").includes("type: clickup"), "CU-… means ClickUp");
+const ta = path.join(tmp, "asana");
+repo(ta, {}, ["start"]);
+cli("setup", "--yes", `--dir=${ta}`, "--tracker=Asana");
+assert.ok(fs.readFileSync(path.join(ta, ".spec-driven.yml"), "utf8").includes("type: asana"));
+assert.equal(doctor(ta).code, 0, doctor(ta).out);
+fs.writeFileSync(path.join(ta, ".spec-driven.yml"), fs.readFileSync(path.join(ta, ".spec-driven.yml"), "utf8").replace("type: asana", 'type: "Bad Name!"'));
+assert.ok(doctor(ta).out.includes("must be a tracker name"), doctor(ta).out);
+assert.throws(() => cli("setup", "--yes", `--dir=${path.join(tmp, "x")}`, "--tracker=9 bad!"), /tracker name/);
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 

@@ -16,7 +16,7 @@
 //   spec-driven-dev risk-eval       U8 experiment: run tickets with risk on vs off and compare agent behaviour (--tickets=<file> --runs=N --model=… --arms=on,off --timeout=20)
 //   flags: --yes  --global  --tools=claude,cursor  --skills=spec-create,...  --no-setup  --dir=<path>
 //          --layout=single|monorepo|multi-repo  --repos=~/Projects/frontend,/srv/backend  --workspace=<config dir>
-//          --packages=apps/web,packages/ui  --after-approval=stop|run-through  --project=new|existing  --risk=on|off  --share=all|memory|none  --specs-dir=<path>  --version
+//          --packages=apps/web,packages/ui  --after-approval=stop|run-through  --project=new|existing  --tracker=jira|github|gitlab|linear|azure-boards|clickup|<any>|none  --risk=on|off  --share=all|memory|none  --specs-dir=<path>  --version
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -257,9 +257,15 @@ function gitFacts(dir) {
   const def = run("git", ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], dir).replace(/^origin\//, "") || run("git", ["branch", "--show-current"], dir);
   const branches = run("git", ["for-each-ref", "--sort=-committerdate", "--count=40", "--format=%(refname:short)", "refs/remotes", "refs/heads"], dir).split("\n").filter(Boolean).map((b) => b.replace(/^origin\//, ""));
   const subjects = run("git", ["log", "-40", "--format=%s"], dir).split("\n").filter(Boolean);
-  const owner = (run("git", ["remote", "get-url", "origin"], dir).match(/[:/]([^/:]+)\/[^/]+?(\.git)?$/) || [])[1] || "";
-  return { def, branches, subjects, owner, integration: ["staging", "develop", "development"].find((b) => branches.includes(b)) || "" };
+  const remote = run("git", ["remote", "get-url", "origin"], dir);
+  const owner = (remote.match(/[:/]([^/:]+)\/[^/]+?(\.git)?$/) || [])[1] || "";
+  return { def, branches, subjects, owner, remote, integration: ["staging", "develop", "development"].find((b) => branches.includes(b)) || "" };
 }
+
+// Any tracker the AI tool can reach works; these names are just the common spellings.
+const TRACKER_NAME = /^[a-z][a-z0-9-]{1,29}$/;
+const KEYED_TRACKERS = ["jira", "linear", "youtrack"]; // ticket IDs look like KEY-123
+const trackerName = (v) => String(v || "").trim().toLowerCase().replace(/\s+/g, "-").replace(/^azure(-devops)?$/, "azure-boards");
 
 function infer(facts) {
   const branches = facts.flatMap((f) => f.branches);
@@ -267,14 +273,20 @@ function infer(facts) {
   const keys = {};
   for (const s of [...branches, ...subjects]) for (const m of s.matchAll(/\b([A-Z][A-Z0-9]{1,9})-\d+\b/g)) keys[m[1]] = (keys[m[1]] || 0) + 1;
   const key = Object.entries(keys).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
-  const ghRefs = subjects.filter((s) => /#\d+/.test(s)).length;
+  const all = [...branches, ...subjects];
+  const has = (re) => all.some((s) => re.test(s));
+  const remotes = facts.map((f) => f.remote || "").join(" ");
+  const ghRefs = subjects.filter((s) => /(^|[^A-Za-z])#\d+/.test(s)).length;
+  // Trackers with their own ID shape win over the generic KEY-123 (which Jira, Linear and YouTrack share).
+  const special = has(/\bAB#\d+/) || /dev\.azure\.com|visualstudio\.com/.test(remotes) ? "azure-boards"
+    : has(/\bCU-[a-z0-9]{5,}\b/i) ? "clickup" : has(/\bsc-\d+\b/) ? "shortcut" : "";
   const bare = branches.filter((b) => /^[A-Z][A-Z0-9]+-\d+$/.test(b)).length;
   const work = branches.filter((b) => !["main", "master", "HEAD", "staging", "develop", "development", "pre-prod", "origin"].includes(b)).length || 1;
   const conv = subjects.filter((s) => /^(feat|fix|chore|docs|refactor|test|perf|build|ci|style)(\(.+\))?!?:/.test(s)).length;
   const tick = subjects.filter((s) => /^\[?[A-Z][A-Z0-9]+-\d+/.test(s)).length;
   const n = subjects.length || 1;
   return {
-    trackerType: key ? "jira" : ghRefs ? "github" : "none",
+    trackerType: special || (key ? "jira" : ghRefs ? (/gitlab/.test(remotes) ? "gitlab" : "github") : "none"),
     key,
     branchName: key && bare / work >= 0.3 ? "{ticket}" : key ? "{type}/{ticket}-{slug}" : "{type}/{slug}",
     commitStyle: conv / n >= 0.5 ? "conventional" : tick / n >= 0.5 ? "ticket" : "freeform",
@@ -478,13 +490,20 @@ async function setup() {
   if (facts.length) console.log(`Detected: tracker ${g.trackerType}${g.key ? ` (${g.key}-…)` : ""}, base ${g.base}, branches "${g.branchName}", commits ${g.commitStyle}`);
 
   const det = (v, d) => (v === d ? "  (detected)" : "");
-  const trackerType = await askSelect("Where do your tickets live?", [
+  if (opt("tracker") && !TRACKER_NAME.test(trackerName(opt("tracker")))) throw new Error(`--tracker=${opt("tracker")}: use a tracker name such as jira, github, gitlab, linear, azure-boards, clickup, asana, or none`);
+  const picked = opt("tracker") ? trackerName(opt("tracker")) : await askSelect("Where do your tickets live?", [
     { title: `Jira${det("jira", g.trackerType)}`, value: "jira" },
     { title: `GitHub Issues${det("github", g.trackerType)}`, value: "github" },
     { title: `Linear${det("linear", g.trackerType)}`, value: "linear" },
+    { title: `GitLab Issues${det("gitlab", g.trackerType)}`, value: "gitlab" },
+    { title: `Azure Boards${det("azure-boards", g.trackerType)}`, value: "azure-boards" },
+    { title: `ClickUp${det("clickup", g.trackerType)}`, value: "clickup" },
+    ...(["jira", "github", "linear", "gitlab", "azure-boards", "clickup", "none"].includes(g.trackerType) ? [] : [{ title: `${g.trackerType}  (detected)`, value: g.trackerType }]),
+    { title: "Another tracker…", value: "__other", description: "Asana, YouTrack, Shortcut, Monday, Trello… anything your AI tool can reach" },
     { title: `No tracker${det("none", g.trackerType)}`, value: "none", description: "work from transcripts, docs, or plain descriptions" },
   ], g.trackerType);
-  const key = trackerType === "jira" || trackerType === "linear" ? (await askText("Ticket key prefix (the STP in STP-123)", g.key)).toUpperCase() : "";
+  const trackerType = picked === "__other" ? trackerName(await askText("Tracker name (e.g. asana, youtrack, shortcut)", "", (v) => TRACKER_NAME.test(trackerName(v)) || "letters, digits and dashes")) : picked;
+  const key = KEYED_TRACKERS.includes(trackerType) || (trackerType !== "none" && g.key) ? (await askText("Ticket key prefix (the STP in STP-123; Enter to skip)", g.key)).toUpperCase() : "";
   const url = trackerType === "none" ? "" : await askText("Tracker URL (optional, press Enter to skip)", "");
   const branchChoices = (initial) => [
     { title: "Each repo's default branch", value: "default", description: "e.g. main or master" },
@@ -641,7 +660,7 @@ function doctor() {
     for (const o of overrides(c._personal, c._team)) notes.push(`your ${o.key} (${JSON.stringify(o.yours)}) overrides the team's (${JSON.stringify(o.team)}) for you only`);
   }
   if (!["single", "monorepo", "multi-repo"].includes(c.layout)) problems.push(`layout "${c.layout}" must be single, monorepo, or multi-repo`);
-  if (c.tracker && !["jira", "github", "linear", "none"].includes(c.tracker.type)) problems.push(`tracker.type "${c.tracker.type}" must be jira, github, linear, or none`);
+  if (c.tracker && !TRACKER_NAME.test(String(c.tracker.type || ""))) problems.push(`tracker.type "${c.tracker.type}" must be a tracker name in lower case, e.g. jira, github, gitlab, linear, azure-boards, clickup, asana, or none`);
   if (c.git?.commit_style && !["conventional", "ticket", "freeform"].includes(c.git.commit_style)) problems.push(`git.commit_style "${c.git.commit_style}" must be conventional, ticket, or freeform`);
   for (const [tool, m] of Object.entries(c.models || {})) {
     if (typeof m !== "object") { problems.push(`models.${tool} must list light / standard / deep`); continue; }

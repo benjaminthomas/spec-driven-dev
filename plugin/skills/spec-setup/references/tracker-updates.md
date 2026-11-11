@@ -1,7 +1,7 @@
 # Tracker updates (status and comments)
 
-When a tracker tool is connected (a Jira/Atlassian, GitHub or Linear MCP server, or the `gh`, `acli`
-or `jira` CLI), the pipeline keeps the ticket in step with the work, so the team can see in the
+When a tracker tool is connected (an MCP server such as Atlassian, GitHub, GitLab, Linear, Azure
+DevOps or ClickUp, or a CLI such as `gh`, `glab`, `az`, `acli`; see `trackers.md`), the pipeline keeps the ticket in step with the work, so the team can see in the
 tracker that it was investigated, verified and reviewed. Every pipeline skill follows these rules.
 
 ## Settings (`tracker.updates` in team.yml or .spec-driven.yml)
@@ -22,8 +22,10 @@ tracker:
 ## Statuses: read, never guess
 
 Workflows differ in every team. The first time a move is needed and `tracker.statuses` is unset,
-read the ticket's real transitions (Jira: `getTransitionsForJiraIssue`; Linear: the team's states;
-GitHub: labels or a Projects status field, if the team uses one), propose a mapping for `start`
+read the ticket's real states (Jira: `getTransitionsForJiraIssue`; Linear, Shortcut: workflow
+states; Azure Boards, YouTrack: the State field; ClickUp: the list's statuses; GitHub, GitLab:
+labels or a board/Projects status field, if the team uses one; Asana, Monday, Trello: the section,
+status column or list), propose a mapping for `start`
 and `review`, and save it to `team.yml` (shared) on a yes. Move a ticket only along a transition
 it offers right now. Never move it backwards, never close it or mark it Done (that's for
 people, after merge), and never move a ticket assigned to someone else without asking.
