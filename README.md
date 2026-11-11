@@ -294,6 +294,20 @@ Off means every skill ignores risk completely.
 hypothesis: change them under `risk.weights` in `.spec-driven.yml` once you've backtested them
 against your own past bugs.
 
+**Keep the hotspots current on every merge (GitHub Actions).** With a dedicated specs repo on GitHub:
+
+```bash
+spec-driven-dev ci --notify
+```
+
+This writes `.github/workflows/gitrisk.yml` into the specs repo, plus, with `--notify`, a small
+`gitrisk-notify.yml` into each code repo on your machine. When something lands on a repo's base
+branch, it pings the specs repo, which checks out every repo in `team-repos.yml` with full history,
+runs `risk`, and commits the **Risk hotspots** in `CONTEXT.md` only when they changed. A date-only
+change isn't committed. It also runs nightly, and on demand from the Actions tab. You add one secret,
+`GITRISK_TOKEN` (read access to the code repos, write access to the specs repo), and commit the
+workflow files yourself. The command prints the exact steps.
+
 **Does it change what the agent does?** `spec-driven-dev risk-eval --tickets=tickets.md` runs each
 ticket twice, in fresh clones with risk on and off, through investigate and create on the same
 model. It then compares what the agent did:
@@ -646,6 +660,7 @@ spec-driven-dev doctor                            # check .spec-driven.yml again
 spec-driven-dev status                            # list unfinished specs and each one's next step
 spec-driven-dev context --areas=billing           # print the project memory (index, or chosen areas)
 spec-driven-dev settings                          # switch GitRisk, run-through and sharing from a menu
+spec-driven-dev ci --notify                       # GitHub Actions: refresh GitRisk hotspots on every merge
 spec-driven-dev uninstall                         # remove the skills, plugin and cache (--all: settings too)
 spec-driven-dev risk                              # GitRisk: score files from git history → specs/context/risk.md
 spec-driven-dev risk-eval --tickets=tickets.md    # compare agent behaviour with the risk signal on vs off
@@ -822,7 +837,7 @@ plugin/evals/                 `claude plugin eval` cases
   1. Increase `version` in both `package.json` and `plugin/.claude-plugin/plugin.json` (the check fails if
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
-  3. Tag the release and push the tag: `git tag v1.14.2 && git push origin v1.14.2`.
+  3. Tag the release and push the tag: `git tag v1.15.0 && git push origin v1.15.0`.
   4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
      npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 

@@ -431,6 +431,41 @@ ctxText = fs.readFileSync(path.join(rh, "specs/CONTEXT.md"), "utf8");
 assert.equal((ctxText.match(/## Risk hotspots/g) || []).length, 1, "block must be replaced, not appended again");
 assert.ok(!fs.readFileSync(path.join(rh, ".gitignore"), "utf8").includes("CONTEXT.md"), "CONTEXT.md stays shared");
 
+// 25. ci: writes the specs-repo workflow (+ per-repo triggers with --notify); risk runs from a CI checkout; date-only changes aren't committed
+const cw = path.join(tmp, "ciws");
+for (const [n, msgs] of [["shop", ["feat: a", "fix: b", "fix: c"]], ["api", ["feat: x"]], ["team-specs", ["docs: start"]]]) repo(path.join(cw, n), {}, msgs);
+sh(path.join(cw, "shop"), "remote", "add", "origin", "git@github.com:acme/shop.git");
+sh(path.join(cw, "api"), "remote", "add", "origin", "https://github.com/acme/api.git");
+fs.writeFileSync(path.join(cw, "team-specs", "team-repos.yml"), "repos:\n  - name: shop\n    url: git@github.com:acme/shop.git\n  - name: api\n    url: https://github.com/acme/api.git\n");
+cli("setup", "--yes", `--dir=${cw}`, "--layout=multi-repo", "--repos=shop,api", `--workspace=${cw}`, "--specs-dir=team-specs");
+assert.throws(() => cli("ci", `--dir=${cw}`), /no GitHub remote yet/);
+sh(path.join(cw, "team-specs"), "remote", "add", "origin", "https://github.com/acme/team-specs.git");
+let co = cli("ci", `--dir=${cw}`, "--notify");
+const wf = fs.readFileSync(path.join(cw, "team-specs/.github/workflows/gitrisk.yml"), "utf8");
+assert.ok(wf.includes("repository: acme/shop") && wf.includes("repository: acme/api") && !wf.includes("repository: acme/team-specs") && wf.includes("--repos=shop,api --specs-dir=specs") && wf.includes("fetch-depth: 0") && wf.includes("types: [code-merged]"), wf);
+const nf = fs.readFileSync(path.join(cw, "shop/.github/workflows/gitrisk-notify.yml"), "utf8");
+assert.ok(nf.includes("repos/acme/team-specs/dispatches") && /branches: \[main\]/.test(nf) && fs.existsSync(path.join(cw, "api/.github/workflows/gitrisk-notify.yml")), nf);
+assert.ok(co.includes("GITRISK_TOKEN") && co.includes("Nothing was committed"), co);
+for (const f of [path.join(cw, "team-specs/.github/workflows/gitrisk.yml"), path.join(cw, "shop/.github/workflows/gitrisk-notify.yml")])
+  execFileSync("python3", ["-c", "import sys,yaml; d=yaml.safe_load(open(sys.argv[1])); assert d['jobs']", f]);
+// simulate the workflow's steps in a CI-shaped checkout: ./specs + ./shop + ./api, no personal config
+const run2 = path.join(tmp, "cirun");
+fs.mkdirSync(run2);
+for (const n of ["shop", "api"]) execFileSync("git", ["clone", "-q", path.join(cw, n), path.join(run2, n)]);
+execFileSync("git", ["clone", "-q", path.join(cw, "team-specs"), path.join(run2, "specs")]);
+fs.writeFileSync(path.join(run2, "specs/CONTEXT.md"), "# Project context\n");
+sh(path.join(run2, "specs"), "add", "-A"); sh(path.join(run2, "specs"), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "ctx");
+const ci1 = execFileSync("node", [CLI, "risk", `--dir=${run2}`, "--repos=shop,api", "--specs-dir=specs"], { env: { ...process.env, SPEC_DRIVEN_HOME: home } }).toString();
+assert.ok(ci1.includes("Scored") && fs.readFileSync(path.join(run2, "specs/CONTEXT.md"), "utf8").includes("## Risk hotspots"), ci1);
+const changed = () => { execFileSync("git", ["add", "CONTEXT.md", ".gitignore"], { cwd: path.join(run2, "specs") }); try { execFileSync("git", ["diff", "--cached", "--quiet", "-I", "^Updated [0-9-]+$"], { cwd: path.join(run2, "specs") }); return false; } catch { return true; } };
+assert.ok(changed(), "first run adds the block, so it commits");
+sh(path.join(run2, "specs"), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "hotspots");
+const ctxp = path.join(run2, "specs/CONTEXT.md");
+fs.writeFileSync(ctxp, fs.readFileSync(ctxp, "utf8").replace(/^Updated .*$/m, "Updated 2099-01-01"));
+assert.ok(!changed(), "a date-only change must not be committed");
+fs.writeFileSync(ctxp, fs.readFileSync(ctxp, "utf8").replace(/^- .*$/m, "- `shop/other.ts` 99 critical"));
+assert.ok(changed(), "a hotspot change must be committed");
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 

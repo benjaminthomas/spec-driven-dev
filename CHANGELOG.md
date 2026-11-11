@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.15.0 — 2026-11-11
+- **`spec-driven-dev ci`: GitRisk hotspots refresh on every merge.** It writes a GitHub Actions workflow into the specs repo that checks out every repo in `team-repos.yml` (full history), runs `risk`, and commits `CONTEXT.md`'s Risk hotspots only when they changed, not for a date-only change. It runs when a code repo pings it, nightly, and on demand. `--notify` also writes the small trigger workflow into each code repo, on its base branch. It needs one secret, `GITRISK_TOKEN`, and commits nothing for you.
+- `risk --repos=a,b --specs-dir=…` scores a checkout without a personal settings file, as used in CI.
+- The Risk hotspots block puts its date on its own line, so a date-only change is easy to ignore.
+
 ## 1.14.2 — 2026-11-11
 - **Adding repos the menu can't show.** The repo question names the other repos it found and says how to add them, or a repo from another folder, under *Type something*, since the menu only fits 4.
 - **GitRisk is part of the shared project memory.** `spec-driven-dev risk` now keeps a short "Risk hotspots" block in `CONTEXT.md` (the top 5 files, the counts per tier, the date), replaced in place on every run. `CONTEXT.md` is shared, so teammates see the hotspots even though the full `context/risk.md` stays gitignored.

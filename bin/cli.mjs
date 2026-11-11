@@ -4,6 +4,7 @@
 //
 //   spec-driven-dev                 install the skills, then hand over to your AI tool ("run spec-setup")
 //   spec-driven-dev setup           scripted setup for CI: needs --yes or answer flags (people: say "run spec-setup")
+//   spec-driven-dev ci              write GitHub Actions that refresh GitRisk hotspots on every merge (--notify also writes the per-repo trigger)
 //   spec-driven-dev uninstall       remove the skills (all tools), the Claude Code plugin and the download cache; --all also removes the settings file
 //   spec-driven-dev doctor          check .spec-driven.yml against the real repos (exit 1 on problems)
 //   spec-driven-dev status          list specs with unfinished work and each one's "Resume here" next step
@@ -40,7 +41,7 @@ const args = process.argv.slice(2);
 const flag = (n) => args.includes(`--${n}`);
 const opt = (n) => args.find((a) => a.startsWith(`--${n}=`))?.split("=")[1];
 const command = args.find((a) => !a.startsWith("-")) || "install";
-const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status", "context", "risk", "risk-eval", "setup"].includes(command) || (command === "uninstall" && flag("yes"));
+const YES = flag("yes") || flag("y") || !process.stdin.isTTY || ["doctor", "status", "context", "risk", "risk-eval", "setup", "ci"].includes(command) || (command === "uninstall" && flag("yes"));
 const DIR = path.resolve(opt("dir") || process.cwd());
 
 // Colour only for a person at a terminal; pipes, CI and NO_COLOR get plain text (and the tests stay plain).
@@ -794,7 +795,10 @@ function loadConfig() {
 }
 
 function risk() {
-  const { root, c } = loadConfig();
+  const loaded = loadConfig();
+  const { root } = loaded;
+  // CI has no personal .spec-driven.yml: --repos and --specs-dir describe the checkout instead.
+  const c = opt("repos") ? { ...loaded.c, layout: "multi-repo", repos: splitList(opt("repos")).map((p) => ({ path: p })), specs_dir: opt("specs-dir") || loaded.c.specs_dir } : loaded.c;
   const bad = weightProblems(c.risk?.weights);
   if (bad.length) throw new Error(bad.join("; "));
   const weights = normWeights(c.risk?.weights), since = opt("since") || c.risk?.since || "2 years ago";
@@ -938,6 +942,112 @@ async function uninstall() {
   console.log("Done. Reinstall any time with: npx @benjaminthomas/spec-driven-dev@latest");
 }
 
+// ---------- CI: refresh GitRisk hotspots on merge ----------
+function ghSlug(url) { return (String(url || "").match(/github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?\/?$/) || [])[1] || ""; }
+
+function ciFiles({ specsSlug, repos, version }) {
+  const checkouts = repos.map((r) => `      - uses: actions/checkout@v4
+        with:
+          repository: ${r.slug}
+          path: ${r.name}
+          fetch-depth: 0          # full history: GitRisk reads git log
+          token: \${{ secrets.GITRISK_TOKEN }}`).join("\n");
+  const specs = `# Refreshes the "Risk hotspots" block in CONTEXT.md from every team repo's git history.
+# Written by \`spec-driven-dev ci\`. Re-run that command after adding a repo to team-repos.yml.
+# Needs a repository secret GITRISK_TOKEN: a token that can read the code repos and write to this repo.
+name: GitRisk
+on:
+  repository_dispatch:
+    types: [code-merged]      # sent by each code repo's gitrisk-notify workflow
+  schedule:
+    - cron: "0 3 * * *"       # nightly safety net
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: gitrisk
+  cancel-in-progress: true
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: specs
+          token: \${{ secrets.GITRISK_TOKEN }}
+${checkouts}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Score files from git history
+        run: npx -y @benjaminthomas/spec-driven-dev@${version} risk --dir=. --repos=${repos.map((r) => r.name).join(",")} --specs-dir=specs
+      - name: Commit when the hotspots changed (not for a date-only change)
+        working-directory: specs
+        run: |
+          git add CONTEXT.md .gitignore
+          if git diff --cached --quiet -I '^Updated [0-9-]+$'; then echo "Hotspots unchanged"; exit 0; fi
+          git -c user.name="gitrisk[bot]" -c user.email="gitrisk@users.noreply.github.com" commit -m "chore: refresh GitRisk hotspots"
+          git push
+`;
+  const notify = (branch) => `# Tells the specs repo to refresh GitRisk hotspots when work lands here.
+# Written by \`spec-driven-dev ci --notify\`. Needs the same GITRISK_TOKEN secret in this repo.
+name: GitRisk notify
+on:
+  push:
+    branches: [${branch}]
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh api repos/${specsSlug}/dispatches -f event_type=code-merged
+        env:
+          GH_TOKEN: \${{ secrets.GITRISK_TOKEN }}
+`;
+  return { specs, notify };
+}
+
+function ci() {
+  const { root, c } = loadConfig();
+  if (!c.layout) throw new Error('No .spec-driven.yml found. Say "run spec-setup" in your AI tool first.');
+  const specs = path.resolve(root, c.specs_dir || "specs");
+  const g = specsInGit(root, c.specs_dir || "specs");
+  if (!g) throw new Error(`${specs} isn't inside a git repo, so there's nowhere to run CI. Keep specs in a repo (a dedicated specs repo is best).`);
+  const specsSlug = ghSlug(run("git", ["remote", "get-url", "origin"], g.top));
+  if (!specsSlug) throw new Error(`The specs repo at ${g.top} has no GitHub remote yet. Push it first, e.g.: gh repo create <org>/<name> --private --source ${g.top} --push`);
+  const team = parseYaml(fs.existsSync(path.join(specs, "team-repos.yml")) ? fs.readFileSync(path.join(specs, "team-repos.yml"), "utf8") : "").repos;
+  const list = (Array.isArray(team) && team.length ? team : (c.repos || []).map((r) => ({ name: path.basename(String(r.path)), url: run("git", ["remote", "get-url", "origin"], path.resolve(root, expandHome(String(r.path)))) })))
+    .map((r) => ({ name: r.name, slug: ghSlug(r.url) })).filter((r) => r.name && r.name !== path.basename(g.top));
+  const missing = list.filter((r) => !r.slug);
+  if (missing.length) throw new Error(`No GitHub URL for ${missing.map((r) => r.name).join(", ")}. Add a "url:" for each in team-repos.yml.`);
+  if (!list.length) throw new Error("No code repos to score. List them in team-repos.yml or your workspace.");
+  const version = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
+  const { specs: specsYml, notify } = ciFiles({ specsSlug, repos: list, version });
+  if (g.rel) throw new Error(`Specs live inside ${g.top}, a code repo. The CI step needs a dedicated specs repo, so its commits don't land in a code repo. Move specs with spec-setup, or use: spec-driven-dev risk after merges.`);
+  const wf = path.join(g.top, ".github", "workflows", "gitrisk.yml");
+  fs.mkdirSync(path.dirname(wf), { recursive: true });
+  fs.writeFileSync(wf, specsYml);
+  step(1, "GitRisk on every merge", ink.cyan);
+  console.log(`✓ Wrote ${wf}\n  Scores ${list.map((r) => r.name).join(", ")} nightly, on demand, and whenever a code repo pings it.`);
+  const wrote = [];
+  for (const r of (c.repos || [])) {
+    const dir = path.resolve(root, expandHome(String(r.path)));
+    if (!flag("notify") || !isRepo(dir) || real(dir) === real(g.top)) continue;
+    const branch = r.git?.base_branch && r.git.base_branch !== "default" ? r.git.base_branch : c.git?.base_branch && c.git.base_branch !== "default" ? c.git.base_branch : run("git", ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], dir).replace(/^origin\//, "") || "main";
+    const f = path.join(dir, ".github", "workflows", "gitrisk-notify.yml");
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, notify(branch));
+    wrote.push(`${path.basename(dir)} (on ${branch})`);
+  }
+  if (wrote.length) console.log(`✓ Wrote .github/workflows/gitrisk-notify.yml in: ${wrote.join(", ")}`);
+  else console.log("• Add --notify to also write the small trigger workflow into each code repo on this machine, so a merge refreshes the hotspots straight away.");
+  console.log(`
+Next:
+  1. Create a GitHub token (fine-grained): read access to ${list.map((r) => r.name).join(", ")}; contents: read & write on ${specsSlug}.
+  2. Add it as a secret named GITRISK_TOKEN in ${specsSlug}${wrote.length ? " and in each code repo" : ""}:  gh secret set GITRISK_TOKEN -R ${specsSlug}
+  3. Commit and push the workflow file(s). Nothing was committed for you.
+  4. Try it: gh workflow run GitRisk -R ${specsSlug}`);
+}
+
 // Silent unless something is unfinished, so it's cheap to run at the start of a session.
 function status() {
   const file = findConfig(DIR);
@@ -969,6 +1079,7 @@ try {
   else if (command === "risk") risk();
   else if (command === "settings") await settings();
   else if (command === "uninstall") await uninstall();
+  else if (command === "ci") ci();
   else if (command === "risk-eval") await riskEvalCmd();
   else if (command === "install") {
     if (HANDOFF) console.log("No interactive terminal (for example a \"!\" command in Claude Code), so the skills go to the AI tools it finds, for this project.\n");
@@ -976,7 +1087,7 @@ try {
     if (tools.length && !flag("no-setup")) await handOver(tools);
   } else if (SETUP_IN_AGENT) handOver([], true);
   else if (command === "setup") await setup();
-  else throw new Error(`Unknown command "${command}" — use install (default), setup, settings, uninstall, doctor, status, context, risk, or risk-eval`);
+  else throw new Error(`Unknown command "${command}" — use install (default), setup, settings, ci, uninstall, doctor, status, context, risk, or risk-eval`);
   if (command === "setup" && !SETUP_IN_AGENT) console.log('\nNext: in your AI tool, say "investigate <ticket>" or "create a spec".');
 } catch (e) {
   console.error(`✗ ${e.message}`);
