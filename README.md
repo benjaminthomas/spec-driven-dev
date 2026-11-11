@@ -849,7 +849,7 @@ plugin/evals/                 `claude plugin eval` cases
   1. Increase `version` in both `package.json` and `plugin/.claude-plugin/plugin.json` (the check fails if
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
-  3. Tag the release and push the tag: `git tag v1.16.0 && git push origin v1.16.0`.
+  3. Tag the release and push the tag: `git tag v1.16.1 && git push origin v1.16.1`.
   4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
      npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 

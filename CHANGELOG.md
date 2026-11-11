@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.16.1 — 2026-11-11
+- **Fix: backups never overwrite an older backup.** `team init` (and `setup --join --force`) used to copy the current settings to `.spec-driven.yml.bak`, replacing any backup already there. If `.bak` exists, the new backup now gets a dated name (`.spec-driven.yml.bak-20261111-1622`). Found when a user's original config backup was lost.
+
 ## 1.16.0 — 2026-11-11
 - **Join a team that's already set up.** A team's shared rules (tracker, git conventions, per-repo commands, models, GitRisk, sharing) now live in `team.yml` in the specs repo, committed with the specs. Each person's `.spec-driven.yml` keeps only local paths and personal preferences, and overrides the team for them only (`doctor` lists any overrides).
   - `spec-setup` looks for an existing team setup first and offers **Join**, which asks only which of the team's repos you have. No audit, no convention questions, and the shared files aren't changed.

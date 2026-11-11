@@ -592,6 +592,14 @@ function configApplies(f, dir) {
   return here === real(base) || c.repos.some((r) => { const p = real(path.resolve(base, expandHome(String(r.path || "")))); return here === p || here.startsWith(p + path.sep); });
 }
 
+// Back up a file without ever overwriting an older backup (that would lose the user's original).
+function backup(file) {
+  let b = `${file}.bak`;
+  if (fs.existsSync(b)) b = `${file}.bak-${new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15)}`;
+  fs.copyFileSync(file, b);
+  return b;
+}
+
 // The effective config: the team's rules (team.yml in the specs repo) with the personal file on top.
 function readConfig(file) {
   const personal = parseYaml(fs.readFileSync(file, "utf8"));
@@ -979,11 +987,11 @@ function teamInit() {
   const { team, personal: mine } = splitConfig(personal);
   fs.mkdirSync(path.dirname(tf), { recursive: true });
   fs.writeFileSync(tf, TEAM_HEADER + dumpYaml(team));
-  fs.copyFileSync(file, `${file}.bak`);
+  const saved = backup(file);
   fs.writeFileSync(file, PERSONAL_HEADER(path.relative(path.dirname(file), tf)) + dumpYaml(mine));
   step(1, "Team rules shared", ink.cyan);
   console.log(`✓ Wrote ${tf} (tracker, git conventions, commands, models, GitRisk, sharing)
-✓ ${file} now keeps only your local settings (the old file is ${path.basename(file)}.bak)
+✓ ${file} now keeps only your local settings (the old file is saved as ${path.basename(saved)})
 Next: commit team.yml in the specs repo. Colleagues who clone it run: spec-driven-dev setup --join=<path to the specs repo>
 or say "run spec-setup" in their AI tool, which finds it and offers to join.`);
 }
@@ -1007,7 +1015,7 @@ function join() {
   if (!have.length) throw new Error(`None of the team's repos (${known.map((r) => r.name).join(", ")}) are cloned in ${workspace}. Clone the ones you work on, then join again (or pass --workspace=<folder>).`);
   const file = path.join(workspace, ".spec-driven.yml");
   if (fs.existsSync(file) && !flag("force")) throw new Error(`${file} already exists. Add --force to replace it with the team's setup (it's backed up first).`);
-  if (fs.existsSync(file)) fs.copyFileSync(file, `${file}.bak`);
+  if (fs.existsSync(file)) console.log(`  Backed up your old settings to ${path.basename(backup(file))}`);
   const mine = { version: 1, layout: have.length > 1 ? "multi-repo" : "single", repos: have.map((n) => ({ path: n })), specs_dir: path.relative(workspace, specsDir) || ".", pipeline: { after_approval: opt("after-approval") || "stop" } };
   if (mine.layout === "single") { delete mine.repos; }
   fs.writeFileSync(file, PERSONAL_HEADER(path.relative(workspace, path.join(specsDir, "team.yml"))) + dumpYaml(mine));
