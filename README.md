@@ -190,6 +190,20 @@ changes. From a terminal: `spec-driven-dev setup --join=../soreto-specs`. Changi
 edit to `team.yml` and a commit, and anything set in your own file overrides it for you only (`doctor`
 lists those overrides). An existing setup can be converted with `spec-driven-dev team init`.
 
+**After the PR is reviewed.** When reviewers leave comments, say "address the PR comments". Each
+comment is checked against the code and sorted (fix, scope change, question, disagree, nit), and you
+choose which to act on. The changes then go through the stages again (implement → verify → review →
+checkpoint → ship) onto the same PR, never as a quick push. A comment that changes the requirements
+updates the spec and waits for your approval first. Replies go on each thread once you've seen them.
+
+**The ticket keeps up with the work.** When your AI tool can reach the tracker (a Jira/Atlassian,
+GitHub or Linear MCP server, or `gh`/`acli`), the pipeline updates the ticket: investigate comments
+with the summary, implement moves it to *In Progress*, verify comments with each acceptance criterion
+and its pass/fail, review with the blocker count, and ship moves it to *In Review* with the PR link.
+Status names come from your project's real workflow (asked once, saved in `team.yml`); it never closes
+a ticket. It asks before the first update on each ticket; say "update Jira without asking" or "stop
+updating Jira" to change that (`tracker.updates: on | ask | off`).
+
 **For scripts and CI** there's `spec-driven-dev setup` with flags (it asks nothing):
 `--yes`, `--layout=multi-repo --repos=~/Projects/frontend,~/Work/backend --workspace=~/Projects`,
 `--layout=monorepo --packages=apps/web,packages/ui`, `--specs-dir=<path>`, `--share=all|memory|none`,
@@ -787,16 +801,16 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 308 | 3,393 | 4 |
-| `spec-investigate` | 1 · understand | 387 | 3,391 | 1 |
+| `spec-setup` | 0 · configure | 311 | 3,468 | 5 |
+| `spec-investigate` | 1 · understand | 392 | 3,429 | 1 |
 | `spec-create` | 2 · plan | 198 | 1,806 | 6 |
-| `spec-implement` | 3 · build | 327 | 2,777 | 3 |
-| `spec-verify` | 4 · prove | 163 | 1,581 | 1 |
-| `spec-review` | 5 · review | 137 | 1,318 | 1 |
+| `spec-implement` | 3 · build | 330 | 2,813 | 3 |
+| `spec-verify` | 4 · prove | 166 | 1,610 | 1 |
+| `spec-review` | 5 · review | 179 | 1,817 | 1 |
 | `spec-checkpoint` | 6 · commit | 140 | 1,168 | 0 |
-| `spec-ship` | 7 · PR | 230 | 1,412 | 0 |
+| `spec-ship` | 7 · PR | 238 | 1,494 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **2,145** | **19,055** | **23** |
+| **Total** | | **2,209** | **19,814** | **24** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback

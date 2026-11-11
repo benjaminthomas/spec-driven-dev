@@ -8,7 +8,10 @@ description: >
   blockers. Use after spec-verify, when the user says "review this", "code review", "review the
   branch", "review PR #42", "is this ready to merge", or "/spec-review". Also works with no spec
   folder, on any branch, diff, or pull request, including a teammate's. Reports findings and offers
-  fixes; it changes code only after the user says yes, through spec-implement's fix loop.
+  fixes; it changes code only after the user says yes, through spec-implement's fix loop. Also
+  handles the reviewers' comments once the PR is open ("address the PR comments", "the PR got
+  review feedback", "changes requested on PR #42"): triages them, then runs the changes back
+  through implement → verify → review → checkpoint → ship on the same PR.
 license: MIT
 ---
 
@@ -99,6 +102,9 @@ Write `{specs_dir}/{feature}/review.md` using `references/report-template.md`. W
 | **nit** | small and optional | listed once, never blocks |
 | **question** | needs the author's intent to judge | asked, never blocks |
 
+**Tracker update.** If the work came from a ticket and `tracker.updates` isn't `off`,
+follow `tracker-updates.md` in the installed `spec-setup` skill's references folder: post the severity counts and each blocker as a comment.
+
 Then append one line to `log.md` (counts per severity) and overwrite the README's **Resume here**:
 `Stage: reviewed (B blockers, S should-fix)`, `Next: fix blockers` or `Next: spec-checkpoint`.
 
@@ -118,6 +124,42 @@ Fix the blockers and should-fix items now? (y / pick numbers / n)
   fixed or the user explicitly accepts each one, which is recorded in review.md.
 - **Someone else's PR:** never push to their branch. Offer to post the findings as PR review
   comments (`gh pr review`), and do it only after the user says yes and has seen the text.
+
+## PR feedback (after the PR is open)
+
+When reviewers comment on the PR ("address the PR comments", "changes requested on #42"), the
+changes go through the pipeline again, on the same branch and the same PR. Never push a quick fix
+straight to the PR.
+
+1. **Collect.** `gh pr view <n> --json number,url,reviewDecision,reviews,comments` plus the inline
+   threads (`gh api graphql` for `reviewThreads` with `isResolved`, `path`, `line`, `comments`).
+   Keep only unresolved threads and review bodies after the last push.
+2. **Triage each one, checked against the code** (same rule as the passes above):
+   - **fix**: a real problem in what was built. Becomes a fix item.
+   - **scope change**: asks for something the spec didn't cover, or changes a requirement.
+     Add it to `requirements.md` as a new R-id marked `(from PR review, <reviewer>)`, update the
+     affected task files, and **stop for the user's approval of the spec**, as after spec-create.
+   - **question**: answer it from the code and the spec; no change.
+   - **disagree**: you think the current code is right. Say why with evidence; the user decides.
+   - **nit**: small and optional.
+   Show the list numbered, with the reviewer and `path:line`, and ask which to act on. Never
+   dismiss a reviewer's comment silently.
+3. **Run the stages again** for the chosen items:
+   `spec-implement` (fix loop, one round, grouped by task) → `spec-verify` (the criteria the
+   changes touch, plus lint, typecheck and tests) → this skill on the changed lines only →
+   `spec-checkpoint` → `spec-ship`, which pushes to the existing PR instead of opening a new one.
+   In stop mode, pause after each stage as usual. A blocker found on the way stops it.
+4. **Reply on the PR** after the push, only on a yes and after the user has seen the text: one
+   reply per thread saying what changed and the commit (`fixed in abc1234: …`), or the answer.
+   Don't resolve threads; that's the reviewer's call. Then ask the reviewers again
+   (`gh pr edit <n> --add-reviewer …`) if the user wants.
+5. **Record.** Add a `## PR feedback, round N` section to `review.md` (each comment, its triage,
+   the outcome). Append one line to `log.md`, and overwrite **Resume here**:
+   `Stage: PR feedback round N (F fixes, S scope changes)`, `Next: <the stage it's at>`.
+6. **Tracker update** (`tracker.updates` not `off`): follow `tracker-updates.md` in the installed
+   `spec-setup` skill's references folder. Comment "review feedback round N addressed: …"
+   with the counts and the commit. If people moved the ticket back (e.g. to *In Progress*),
+   spec-ship moves it to `review` again when it pushes.
 
 ## Run-through
 

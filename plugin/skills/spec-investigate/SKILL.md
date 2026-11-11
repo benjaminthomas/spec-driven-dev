@@ -355,6 +355,11 @@ evidence points to — reusing existing patterns the investigation actually foun
 architecture invented on the spot. It is not permission to start building; flag any business
 decision it depends on.
 
+## Step 9b — Tracker update
+
+If the work came from a ticket and `tracker.updates` isn't `off`, follow `tracker-updates.md` in the installed `spec-setup` skill's references folder: post the
+investigation summary as a comment. Don't change the status here.
+
 ## Step 10 — Stop, hand off, don't bleed into the next stage
 
 Report completion plainly:

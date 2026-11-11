@@ -147,6 +147,9 @@ exact structure (a summary line, then a table of criterion → source → verdic
 Update `specs/{feature}/README.md` with a short **Verification** section linking to the report
 and stating the overall status (all pass / N of M pass).
 
+**Tracker update.** If the spec came from a ticket and `tracker.updates` isn't `off`,
+follow `tracker-updates.md` in the installed `spec-setup` skill's references folder: post the per-criterion result as a comment.
+
 Then tell the user directly:
 
 ```

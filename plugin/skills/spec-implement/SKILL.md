@@ -86,6 +86,9 @@ This structure is produced by the `spec-create` skill. If the user doesn't have 
 4. Determine the **current batch**: the first batch that has any incomplete tasks
 5. If all tasks in all batches are complete, report "All tasks complete!" and stop
 
+6. **Tracker update** (first batch only, when it came from a ticket and `tracker.updates` isn't
+   `off`): follow `tracker-updates.md` in the installed `spec-setup` skill's references folder and move the ticket to its `start` status. No comment here.
+
 This makes the skill **resumable** — if invoked on a partially completed spec, it picks up exactly where it left off.
 
 ### Step 2: Process Each Batch

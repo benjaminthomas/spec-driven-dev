@@ -199,9 +199,17 @@ EOF
 )"
 ```
 
+After the report, tell the user the next step: when reviewers leave comments, say "address the PR
+comments", which runs them back through the pipeline (spec-review's **PR feedback**). A push for
+a feedback round goes to the existing PR (Step 6).
+
 If this branch belongs to a spec, overwrite its README's **Resume here** (`Stage: PR open`,
 `Next: review`, the PR URL) and append one line to `log.md`. Commit that only if the user
 agrees; otherwise leave it for the next checkpoint.
+
+**Tracker update.** If the branch came from a ticket and `tracker.updates` isn't `off`,
+follow `tracker-updates.md` in the installed `spec-setup` skill's references folder: move the ticket to its `review` status and comment with the PR link and the verify and
+review results.
 
 ### Step 8: Report
 

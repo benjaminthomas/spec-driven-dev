@@ -1,4 +1,9 @@
 # Changelog
+## 1.17.0 — 2026-11-11
+- **PR review feedback goes through the pipeline again.** Say "address the PR comments": spec-review collects the unresolved review threads, checks each against the code and sorts them into fix, scope change, question, disagree or nit, and you pick which to act on. Fixes run through implement → verify → review → checkpoint → ship onto the same PR. A scope change updates the requirements and waits for your approval first. After the push it replies on each thread (once you've seen the text), never resolves them for the reviewer, and records the round in `review.md`.
+- **The ticket keeps up with the work.** When a tracker tool is connected (Jira/Atlassian, GitHub or Linear MCP, or `gh`/`acli`), the pipeline moves the ticket and comments at each stage: investigate posts the summary, implement moves it to *In Progress*, verify posts each acceptance criterion with pass/fail, review posts the blocker counts, and ship moves it to *In Review* with the PR link. So the team can see in the tracker that it was verified.
+- Status names are read from the project's real workflow on first use and saved to `team.yml` (`tracker.statuses`), never guessed. It never closes a ticket or moves it backwards.
+- `tracker.updates: ask` (default) confirms the first update per ticket; `on` or `off` in plain words ("stop updating Jira"). No tracker connected: it prints the comment for you to paste.
 ## 1.16.4 — 2026-11-11
 - **"Add X to the workspace" checks first.** For each repo named, spec-setup now says whether it's already in the workspace (and changes nothing), in the team's list but not cloned here (and offers the clone), not found, or new. A new repo is audited on its own, gets its areas in `CONTEXT.md`, a fresh GitRisk score, the pointer offer and a `doctor` run. Before, it was only added to the repo list.
 ## 1.16.3 — 2026-11-11
