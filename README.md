@@ -10,7 +10,7 @@ in parallel with tests and review, then checks the real running app, and finally
 the PR.
 
 It's a set of nine [Agent Skills](https://agentskills.io), plain Markdown instruction files that
-AI coding tools load on demand. It works with Claude Code, Codex CLI, Cursor, and Google Antigravity,
+AI coding tools load on demand. It works with Claude Code, Codex CLI, Cursor, OpenCode, and Google Antigravity,
 in any language or framework, and in a single repo, a monorepo, or several repos that change
 together, even when those repos live in different folders. To set it up, run
 `npx @benjaminthomas/spec-driven-dev@latest` in your project.
@@ -63,7 +63,7 @@ start a new session and continue where you left off.
 npx @benjaminthomas/spec-driven-dev@latest
 ```
 
-It installs the skills into the AI tools you pick (Claude Code, Cursor, Codex CLI, Antigravity),
+It installs the skills into the AI tools you pick (Claude Code, Cursor, Codex CLI, OpenCode, Antigravity),
 for this project or all your projects. Each step has its own colour so it's easy to follow. It also
 works with `!` inside Claude Code: it then installs for the tools it finds.
 
@@ -745,8 +745,17 @@ skills:
 | Codex CLI | `.agents/skills/<name>/` | `~/.agents/skills/<name>/` |
 | Cursor | `.cursor/skills/<name>/` (also reads `.agents/skills/`) | `~/.cursor/skills/<name>/` |
 | Antigravity | `.agents/skills/<name>/` | `~/.gemini/config/skills/<name>/` |
+| OpenCode | `.opencode/skills/<name>/` (also reads `.claude/skills/` and `.agents/skills/`) | `~/.config/opencode/skills/<name>/` |
 
-Codex CLI and Antigravity share the project path, so installing for one covers both.
+Codex CLI and Antigravity share the project path, so installing for one covers both. OpenCode also
+reads the Claude Code and `.agents` folders, so installing for Claude Code or Codex already covers it.
+
+**Model per task tier, by tool.** Tasks are rated light, standard or deep, and each coder agent runs
+on that tier's model (`models.<tool>` in `.spec-driven.yml`). Claude Code, Codex CLI, Cursor and
+OpenCode can give each subagent its own model; Antigravity only switches between Gemini tiers
+(`flash`, `pro`) for subagents. Where a tool can't switch, the batch stops and asks you to change the
+session's model for deep tasks instead of running them on a light one. Details per tool:
+`plugin/skills/spec-implement/references/host-models.md`.
 
 ### Fallback: MCP server (for tools without Agent Skills support)
 
@@ -782,17 +791,17 @@ plugin, the npx download cache), then removes it after one confirmation. Your ot
 
 ## Compatibility
 
-| Skill | Claude Code | Codex CLI | Cursor | Antigravity | Notes |
-|---|---|---|---|---|---|
-| `spec-setup` | ✅ | ✅ | ✅ | ✅ | Reads git and project files, and writes one config file |
-| `spec-investigate` | ✅ | ✅ | ✅ | ✅ | Fetches tickets via whatever access the tool has (Atlassian/Linear MCP, `gh`); otherwise asks you to paste the ticket. Files and text need nothing extra |
-| `spec-create` | ✅ | ✅ | ✅ | ✅ | Planning and writing files only |
-| `spec-implement` | ✅ | ✅ | ✅ | ✅ | Parallel agents and worktrees where the tool supports them; otherwise one task at a time |
-| `spec-verify` | ✅ | ⚠️ | ⚠️ | ⚠️ | UI checks need browser automation; API and database checks work everywhere |
-| `spec-review` | ✅ | ✅ | ✅ | ✅ | git diff, or `gh` for pull requests |
-| `spec-checkpoint` | ✅ | ✅ | ✅ | ✅ | Plain git plus your repo's own check commands |
-| `spec-ship` | ✅ | ✅ | ✅ | ✅ | git plus the GitHub CLI (`gh`) |
-| `generative-seo` | ✅ | ✅ | ✅ | ✅ | Web search and writing files |
+| Skill | Claude Code | Codex CLI | Cursor | OpenCode | Antigravity | Notes |
+|---|---|---|---|---|---|---|
+| `spec-setup` | ✅ | ✅ | ✅ | ✅ | ✅ | Reads git and project files, and writes one config file |
+| `spec-investigate` | ✅ | ✅ | ✅ | ✅ | ✅ | Fetches tickets via whatever access the tool has (Atlassian/Linear MCP, `gh`); otherwise asks you to paste the ticket. Files and text need nothing extra |
+| `spec-create` | ✅ | ✅ | ✅ | ✅ | ✅ | Planning and writing files only |
+| `spec-implement` | ✅ | ✅ | ✅ | ✅ | ✅ | Parallel agents and worktrees where the tool supports them; otherwise one task at a time |
+| `spec-verify` | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | UI checks need browser automation; API and database checks work everywhere |
+| `spec-review` | ✅ | ✅ | ✅ | ✅ | ✅ | git diff, or `gh` for pull requests |
+| `spec-checkpoint` | ✅ | ✅ | ✅ | ✅ | ✅ | Plain git plus your repo's own check commands |
+| `spec-ship` | ✅ | ✅ | ✅ | ✅ | ✅ | git plus the GitHub CLI (`gh`) |
+| `generative-seo` | ✅ | ✅ | ✅ | ✅ | ✅ | Web search and writing files |
 
 ⚠️ = works, but one step depends on a capability your tool might not have. The skill tells you and
 skips that step rather than failing.
@@ -806,16 +815,16 @@ skips that step rather than failing.
 | `spec-setup` | 0 · configure | 314 | 3,509 | 6 |
 | `spec-investigate` | 1 · understand | 395 | 3,469 | 1 |
 | `spec-create` | 2 · plan | 198 | 1,806 | 6 |
-| `spec-implement` | 3 · build | 330 | 2,813 | 3 |
+| `spec-implement` | 3 · build | 332 | 2,842 | 4 |
 | `spec-verify` | 4 · prove | 171 | 1,673 | 1 |
 | `spec-review` | 5 · review | 179 | 1,817 | 1 |
 | `spec-checkpoint` | 6 · commit | 140 | 1,168 | 0 |
 | `spec-ship` | 7 · PR | 239 | 1,507 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **2,221** | **19,971** | **25** |
+| **Total** | | **2,223** | **20,000** | **26** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
-- **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback
+- **5** tools supported natively (Claude Code, Codex CLI, Cursor, OpenCode, Antigravity), plus an MCP fallback
 - **3** layouts: single repo, monorepo, multi-repo
 - **1** npm package, `@benjaminthomas/spec-driven-dev`, plus the Claude Code plugin `ticket-to-pr` and an MCP fallback
 - **0** stack assumptions: lint, typecheck, test, build, and dev commands come from your repo

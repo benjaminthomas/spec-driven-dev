@@ -533,6 +533,14 @@ fs.writeFileSync(path.join(ta, ".spec-driven.yml"), fs.readFileSync(path.join(ta
 assert.ok(doctor(ta).out.includes("must be a tracker name"), doctor(ta).out);
 assert.throws(() => cli("setup", "--yes", `--dir=${path.join(tmp, "x")}`, "--tracker=9 bad!"), /tracker name/);
 
+// 28. OpenCode: installs into its own skills folder, and the config gets an opencode model section
+const toc = path.join(tmp, "oc"); repo(toc, {}, ["start"]);
+cli("--yes", "--no-setup", "--tools=opencode", `--dir=${toc}`);
+assert.ok(fs.existsSync(path.join(toc, ".opencode/skills/spec-create/SKILL.md")), "OpenCode project install");
+cli("setup", "--yes", `--dir=${toc}`);
+assert.ok(/models:[\s\S]*opencode:/.test(fs.readFileSync(path.join(toc, ".spec-driven.yml"), "utf8")));
+assert.equal(doctor(toc).code, 0, doctor(toc).out);
+
 // 10. --version
 assert.equal(cli("--version").trim(), JSON.parse(fs.readFileSync(path.join(path.dirname(CLI), "..", "package.json"), "utf8")).version);
 

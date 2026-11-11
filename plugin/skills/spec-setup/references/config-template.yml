@@ -67,7 +67,12 @@ models:
     standard: default
     deep: default
     escalate: default
-  antigravity:
+  antigravity:                  # subagents take a Gemini tier only: flash_lite | flash | pro | inherit
+    light: flash
+    standard: pro
+    deep: pro
+    escalate: default
+  opencode:                     # provider/model, e.g. anthropic/claude-haiku-5-5; "default" = the session's model
     light: default
     standard: default
     deep: default

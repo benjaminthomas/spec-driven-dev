@@ -56,7 +56,7 @@ the answers to `.spec-driven.yml` (keys: `layout`, `repos`, `tracker`, `git`, `c
 
 This skill's parallelism assumes your host can run multiple independent agents at once —
 Claude Code's Agent/Task tool, Codex CLI's `spawn_agent`/`wait_agent`, Cursor's Subagents or
-Background Agents, Antigravity's `invoke_subagent`, or whatever equivalent your host provides.
+Background Agents, OpenCode's subagents (task tool), Antigravity's `invoke_subagent`, or whatever equivalent your host provides.
 Use that mechanism throughout; give each dispatched agent only the context specified in Step 4
 below, never the full conversation history.
 
@@ -128,15 +128,17 @@ The coder agents should NOT commit their changes — the orchestrator handles co
 **Pick each coder's model and effort from the task's tier.** Read the task's `## Complexity` tier
 (treat a missing tier as `standard`), then look up `.spec-driven.yml` → `models.<tool>.<tier>` and
 `effort.<tier>`, where `<tool>` is the host you're running in (`claude`, `codex`, `cursor`,
-`antigravity`). Without those sections, use these defaults: Claude Code `light → haiku/low`,
+`opencode`, `antigravity`). Without those sections, use these defaults: Claude Code `light → haiku/low`,
 `standard → sonnet/medium`, `deep → opus/high`; other hosts use the session's model.
 
-- **Host can set a model per agent** (e.g. Claude Code's Agent tool `model` and `effort`
-  parameters): dispatch each coder with its tier's model and effort.
+- **Host can set a model per agent**: dispatch each coder with its tier's model and effort. How
+  depends on the host (Claude Code's Agent tool parameters, Codex `spawn_agent` or agent files,
+  Cursor's Task tool or `.cursor/agents/`, OpenCode agent files, Antigravity tiers only): read
+  `references/host-models.md` once per run.
 - **Model not available** (not on your plan or provider, or rejected by the host): fall back to the
   session's model, say which task fell back and why, and suggest fixing `models:`. Don't stop the
   batch for this.
-- **Host can't** (one model per session, as in Cursor or Codex): don't silently run deep tasks on a
+- **Host can't** (one model per session, or a host with no per-agent mechanism): don't silently run deep tasks on a
   light model. Before dispatching a batch, compare its highest tier with the model you're running
   on. If the batch needs a stronger one, stop and say:
   `Batch {N} has deep tasks ({task-nn: reason}). Switch to {models.<tool>.deep} for this batch, then

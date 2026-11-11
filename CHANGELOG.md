@@ -1,4 +1,8 @@
 # Changelog
+## 1.20.0 — 2026-11-11
+- **OpenCode support.** The installer offers OpenCode and puts the skills in `~/.config/opencode/skills` (all projects) or `.opencode/skills` (this project). OpenCode also reads the Claude Code and `.agents` skill folders, so an install for those already covers it. `models.opencode` takes `provider/model` values.
+- **Model per task tier now works beyond Claude Code.** Based on each tool's current docs: Codex CLI (`spawn_agent` or `.codex/agents/*.toml` with `model`), Cursor (Task tool `model`, or `.cursor/agents/*.md`), OpenCode (agent files with `model:`) and Antigravity (Gemini tiers only: `flash`, `pro`). A new `host-models.md` reference tells spec-implement how to dispatch on each. Before, only Claude Code switched models; the others asked you to switch the session.
+- Antigravity's tier defaults are now `flash` (light) and `pro` (standard, deep) instead of the session's model.
 ## 1.19.0 — 2026-11-11
 - **Verification screenshots on the ticket.** spec-verify now saves each screenshot as a file in `{feature}/evidence/` (kept out of git, since screenshots can show customer data); before, reports named screenshot files that were never saved. Once the final review passes, spec-ship's ticket comment attaches them: up to 6, one per UI criterion, each checked first for secrets or real customer data. It works with any tracker: it uses the connected tool's upload if there is one, or the tracker's API with credentials you already have (`trackers.md` lists each one); if neither can, it lists the files for you to drag onto the ticket. `tracker.screenshots: off` turns it off.
 ## 1.18.2 — 2026-11-11

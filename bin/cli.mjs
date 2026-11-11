@@ -37,6 +37,8 @@ const TOOLS = {
   cursor: { label: "Cursor", home: ".cursor", bin: "cursor", project: ".cursor/skills", global: ".cursor/skills" },
   codex: { label: "Codex CLI", home: ".codex", bin: "codex", project: ".agents/skills", global: ".agents/skills" }, // Codex reads $HOME/.agents/skills
   antigravity: { label: "Antigravity", home: ".gemini", bin: "antigravity", project: ".agents/skills", global: ".gemini/config/skills" },
+  // OpenCode also reads .claude/skills and .agents/skills (opencode.ai/docs/skills, checked 2026-11-11).
+  opencode: { label: "OpenCode", home: ".config/opencode", bin: "opencode", project: ".opencode/skills", global: ".config/opencode/skills" },
 };
 
 // ---------- args & prompts ----------
@@ -353,7 +355,8 @@ const MODEL_DEFAULTS = {
   claude: { light: "haiku", standard: "sonnet", deep: "opus", escalate: "fable" },
   codex: { light: "gpt-6-luna", standard: "gpt-6.1-sol", deep: "gpt-6.1-sol", escalate: "default" },
   cursor: { light: "default", standard: "default", deep: "default", escalate: "default" },
-  antigravity: { light: "default", standard: "default", deep: "default", escalate: "default" },
+  antigravity: { light: "flash", standard: "pro", deep: "pro", escalate: "default" }, // subagents take a tier only: flash_lite | flash | pro
+  opencode: { light: "default", standard: "default", deep: "default", escalate: "default" }, // provider/model, e.g. anthropic/claude-haiku-5-5; depends on your providers
 };
 // Effort / reasoning level per tier, for tools that support it (Claude Code, Codex).
 const EFFORT_DEFAULTS = { light: "low", standard: "medium", deep: "high", escalate: "xhigh" };
