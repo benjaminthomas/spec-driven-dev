@@ -485,7 +485,14 @@ const dated = fs.readdirSync(tA).find((f) => f.startsWith(".spec-driven.yml.bak-
 assert.ok(dated && fs.readFileSync(path.join(tA, dated), "utf8") === beforeA && ti.includes(dated), "old config saved under a dated name");
 assert.equal(doctor(tA).code, 0, doctor(tA).out);
 assert.ok(doctor(tA).out.includes("team rules come from"), doctor(tA).out);
+assert.ok(!/: ""$/m.test(teamYml), "team.yml leaves out unset values");
 assert.throws(() => cli("team", "init", `--dir=${tA}`), /already exists/);
+// --fresh (setup just wrote the config): no backup
+const tF = path.join(tmp, "teamF");
+repo(path.join(tF, "shop"), {}, ["STP-1: a"]); repo(path.join(tF, "fs-specs"), {}, ["docs: start"]);
+cli("setup", "--yes", `--dir=${tF}`, "--layout=multi-repo", "--repos=shop", `--workspace=${tF}`, "--specs-dir=fs-specs");
+const tif = cli("team", "init", "--fresh", `--dir=${tF}`);
+assert.ok(!fs.readdirSync(tF).some((f) => f.startsWith(".spec-driven.yml.bak")) && !tif.includes("saved as"), tif);
 sh(path.join(tA, "team-specs"), "add", "-A"); sh(path.join(tA, "team-specs"), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "team rules");
 // person B: different machine, clones the specs repo plus only shop and api
 fs.mkdirSync(tB);

@@ -223,8 +223,9 @@ for the rest.
    under `repos:` where they differ from the top level.
 2. If it's inside a repo, tell the user it's meant to be committed (so teammates get the same
    rules) — don't commit it yourself.
-   **Multi-repo with specs in a repo:** run `spec-driven-dev team init` right after writing the
-   file. It moves the team's rules (tracker, git conventions, commands, models, GitRisk, sharing)
+   **Multi-repo with specs in a repo:** run `spec-driven-dev team init --fresh` right after writing
+   the file (`--fresh` skips the backup, since you wrote the file this run; leave it off when
+   splitting a config that existed before). It moves the team's rules (tracker, git conventions, commands, models, GitRisk, sharing)
    into `{specs_dir}/team.yml`, which is committed with the specs, and leaves only local paths in
    `.spec-driven.yml`. Tell the user to commit `team.yml`, and that colleagues then just say
    "run spec-setup" and choose *Join*.

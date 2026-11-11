@@ -49,7 +49,7 @@ export function dumpYaml(obj, indent = "") {
   const scalar = (v) => (typeof v === "string" ? (/^[\w./@~-]+$/.test(v) && !/^(on|off|yes|no|true|false|null|\d.*)$/i.test(v) ? v : JSON.stringify(v)) : String(v));
   let out = "";
   for (const [k, v] of Object.entries(obj)) {
-    if (v === undefined || v === null || (isObj(v) && !Object.keys(v).length)) continue;
+    if (v === undefined || v === null || v === "" || (isObj(v) && !Object.keys(v).length)) continue; // "" means unset
     if (Array.isArray(v)) {
       out += `${indent}${k}:\n`;
       for (const item of v) {
@@ -57,7 +57,7 @@ export function dumpYaml(obj, indent = "") {
         const body = dumpYaml(item, `${indent}    `).replace(/^\s+/, "");
         out += `${indent}  - ${body}`;
       }
-    } else if (isObj(v)) out += `${indent}${k}:\n${dumpYaml(v, `${indent}  `)}`;
+    } else if (isObj(v)) { const body = dumpYaml(v, `${indent}  `); if (body) out += `${indent}${k}:\n${body}`; }
     else out += `${indent}${k}: ${scalar(v)}\n`;
   }
   return out;

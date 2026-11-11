@@ -40,7 +40,10 @@ never ask again.
 
 ## 3. Discovery questions (one round)
 
-Show the draft map first, with each line marked **detected** (with its source) or **guess**. Then
+Show the draft map first. Give it a **Source** column and fill it on every line: **detected**
+with the file or command it came from (`AGENTS.md:12`, `git log`), or **guess**. One note for the
+whole table isn't enough. Count anything you report (spec folders, repos, files) with a command,
+never by eye. Then
 ask only what the code can't answer, as **plain text in one message**, after the setup choices have
 been answered. These are open questions, so
 never put them in a menu or multiple-choice tool (a menu needs two or more real options, and these

@@ -1,4 +1,8 @@
 # Changelog
+## 1.16.2 — 2026-11-11
+- **Tidier team setup.** `team.yml` and `.spec-driven.yml` leave out unset values instead of writing `""` (and drop a section left empty).
+- `team init --fresh` skips the backup when spec-setup wrote the config in the same run, so a first-time install no longer leaves a pointless `.spec-driven.yml.bak`. spec-setup now passes it.
+- The audit's draft map gives a source on every line (file or command, or "guess"), and counts are made with a command, not by eye.
 
 ## 1.16.1 — 2026-11-11
 - **Fix: backups never overwrite an older backup.** `team init` (and `setup --join --force`) used to copy the current settings to `.spec-driven.yml.bak`, replacing any backup already there. If `.bak` exists, the new backup now gets a dated name (`.spec-driven.yml.bak-20261111-1622`). Found when a user's original config backup was lost.

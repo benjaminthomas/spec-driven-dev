@@ -987,11 +987,12 @@ function teamInit() {
   const { team, personal: mine } = splitConfig(personal);
   fs.mkdirSync(path.dirname(tf), { recursive: true });
   fs.writeFileSync(tf, TEAM_HEADER + dumpYaml(team));
-  const saved = backup(file);
+  // --fresh: spec-setup wrote this file moments ago in the same run, so a backup would only be clutter.
+  const saved = flag("fresh") ? null : backup(file);
   fs.writeFileSync(file, PERSONAL_HEADER(path.relative(path.dirname(file), tf)) + dumpYaml(mine));
   step(1, "Team rules shared", ink.cyan);
   console.log(`✓ Wrote ${tf} (tracker, git conventions, commands, models, GitRisk, sharing)
-✓ ${file} now keeps only your local settings (the old file is saved as ${path.basename(saved)})
+✓ ${file} now keeps only your local settings${saved ? ` (the old file is saved as ${path.basename(saved)})` : ""}
 Next: commit team.yml in the specs repo. Colleagues who clone it run: spec-driven-dev setup --join=<path to the specs repo>
 or say "run spec-setup" in their AI tool, which finds it and offers to join.`);
 }
