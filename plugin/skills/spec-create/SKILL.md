@@ -57,6 +57,9 @@ creates or modifies a **high** or **critical** file (from the investigation's **
 - Its **Tests** must include at least one test aimed at that past failure pattern, not just the new
   behaviour.
 
+A task that creates a **new** file next to a high or critical one (it imports it, or the hotspot will
+import it) gets the same treatment, because the new code inherits that file's failure modes.
+
 ## When to Use
 
 - After a planning conversation where requirements and technical details have been discussed

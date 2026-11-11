@@ -263,7 +263,22 @@ Risk = 0.30 × Churn + 0.35 × Bug Density + 0.20 × Fan-out + 0.15 × Security 
 | Fan-out | 20% | how many other files import it, against the repo's 90th percentile |
 | Security | 15% | share of its commits that were security fixes (security, CVE, XSS, injection…) |
 
-Tiers: critical ≥ 75, high ≥ 50, medium ≥ 25. When `risk.enabled` is on, the skills use it:
+Tiers: critical ≥ 75, high ≥ 50, medium ≥ 25. Files added in the last 90 days with fewer than 3
+commits, or not committed yet, are labelled **new** instead of being scored, because too little history isn't the same as
+safe. Each new file shows the riskiest file it imports or is imported by, and inherits that file's
+care when it's high or critical.
+
+**When it updates:** setup scores the whole history once. After that it re-scores at every batch
+commit in `spec-implement` and at `spec-checkpoint`. Each run takes under a second and uses no model,
+so later batches see the new files and the extra fan-out they add. Lookups for the files a ticket
+touches (`--files=`) always read the live history. Commits made outside the pipeline are picked up
+at the next run. It doesn't hook into every commit.
+
+`risk.md` is regenerated on every run, so the first run adds it to `.gitignore`, the way you'd ignore
+a build output. Committing it would cause merge conflicts between branches. `doctor` flags it if
+it's committed.
+
+When `risk.enabled` is on, the skills use it:
 - `spec-investigate` digs into high and critical files in the change surface (past fix commits,
   dependents) and lists them as **Risk Hotspots**;
 - `spec-create` raises those tasks one tier and requires a test aimed at each file's past failure
@@ -726,16 +741,16 @@ skips that step rather than failing.
 
 | Skill | Stage | SKILL.md lines | Words | Supporting files |
 |---|---|---:|---:|---:|
-| `spec-setup` | 0 · configure | 162 | 1,534 | 3 |
-| `spec-investigate` | 1 · understand | 370 | 3,152 | 1 |
-| `spec-create` | 2 · plan | 195 | 1,746 | 6 |
-| `spec-implement` | 3 · build | 322 | 2,683 | 3 |
+| `spec-setup` | 0 · configure | 162 | 1,545 | 3 |
+| `spec-investigate` | 1 · understand | 373 | 3,211 | 1 |
+| `spec-create` | 2 · plan | 198 | 1,782 | 6 |
+| `spec-implement` | 3 · build | 327 | 2,753 | 3 |
 | `spec-verify` | 4 · prove | 163 | 1,557 | 1 |
-| `spec-review` | 5 · review | 135 | 1,270 | 1 |
-| `spec-checkpoint` | 6 · commit | 133 | 1,046 | 0 |
+| `spec-review` | 5 · review | 137 | 1,294 | 1 |
+| `spec-checkpoint` | 6 · commit | 140 | 1,144 | 0 |
 | `spec-ship` | 7 · PR | 230 | 1,388 | 0 |
 | `generative-seo` | standalone | 255 | 2,209 | 7 |
-| **Total** | | **1,965** | **16,585** | **22** |
+| **Total** | | **1,985** | **16,883** | **22** |
 
 - **8** skills: **1** setup + **6** workflow stages + **1** standalone
 - **4** tools supported natively (Claude Code, Codex CLI, Cursor, Antigravity), plus an MCP fallback
@@ -787,7 +802,7 @@ plugin/evals/                 `claude plugin eval` cases
   1. Increase `version` in both `package.json` and `plugin/.claude-plugin/plugin.json` (the check fails if
      they differ).
   2. Add a `CHANGELOG.md` entry, then commit and push.
-  3. Tag the release and push the tag: `git tag v1.11.0 && git push origin v1.11.0`.
+  3. Tag the release and push the tag: `git tag v1.11.1 && git push origin v1.11.1`.
   4. Watch the **publish** run in the repo's Actions tab. When it's green, the new version is on
      npm. Claude Code plugin users get it from the marketplace once the commit is on `main`.
 

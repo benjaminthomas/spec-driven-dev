@@ -77,7 +77,9 @@ review on a weaker model than the code was written with misses things.
    **Risk.** When `risk.enabled` is on and `{specs_dir}/context/risk.md` exists, look up the changed
    files (`spec-driven-dev risk --files=…`). Give **high** and **critical** files a line-by-line read
    of their error paths and callers, check that the tests target their past failure patterns, and
-   put the score in any finding on them. When risk is `off`, skip this and don't mention it.
+   put the score in any finding on them. New files show as tier `new`: review them at standard care,
+   or at the tier of the high or critical file they connect to. When risk is `off`, skip this and
+   don't mention it.
 4. **Run the checks.**4. **Run the checks.** Run `commands.lint`, `typecheck`, and `test` once if verify didn't just run
    them on this exact commit. A failing check is a blocker.
 

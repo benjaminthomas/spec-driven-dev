@@ -120,7 +120,7 @@ Skip if `{specs_dir}/CONTEXT.md` already exists (offer a refresh instead, see `r
    Keep the index to 60 lines and area files to 150.
 3. **Risk scores.** For an existing project, run `spec-driven-dev risk` (or
    `npx -y @benjaminthomas/spec-driven-dev risk`) to write `{specs_dir}/context/risk.md`. It uses
-   git only, no model. Skip it for a new project with no history. Mention the hotspot count in the
+   git only, no model, and adds `risk.md` to `.gitignore` because it's regenerated on every run. Skip it for a new project with no history. Mention the hotspot count in the
    report. Set `risk.enabled: off` only if the user doesn't want it.
 4. **Offer, don't do:** ask whether to add this one line to `CLAUDE.md` / `AGENTS.md` (whichever
    the project uses), so hosts reload the pointer after compaction and in every new session:

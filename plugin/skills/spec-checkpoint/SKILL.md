@@ -66,9 +66,16 @@ Skip this step unless the changes belong to a spec (`{specs_dir}/{feature}/` exi
      one line to CONTEXT.md's **Specs** list. Follow the rules in
      references/context-template.md inside the installed `spec-setup` skill folder (not this repo): dated, with a source, added at the end, within the size
      limits, superseded lines moved to `context/archive.md`.
+   - **New areas and files.** Compare `git diff --name-status --diff-filter=A <base>...HEAD` with
+     CONTEXT.md's **Areas** table. Add a row for any new folder that holds a real area (not a
+     single helper), and one line per important new file (an entry point, a shared module others
+     will import) to its area file. Stay within the size limits.
+   - **Areas that grew.** If the feature changed what an existing area does (new commands,
+     responsibilities, or sub-folders), update that row's "What it does" in **Areas** so the
+     map stays true. Keep it to one line.
    - Show the context changes in the report so the user can correct them.
 3. If `risk.enabled` is on and the CLI is available, re-run `spec-driven-dev risk` so the scores
-   include this work. It's git-only, so it costs no tokens.
+   include this work. It's git-only, so it costs no tokens. `risk.md` is gitignored: don't stage it.
 4. No CONTEXT.md? Skip the distilling and suggest running `spec-setup` to create one.
 
 ### Step 3: Stage Everything

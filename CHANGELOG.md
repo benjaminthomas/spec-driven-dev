@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.1 — 2026-11-11
+- **GitRisk keeps up with new code.** Files added in the last 90 days with fewer than 3 commits, or not committed yet, are labelled `new` instead of scoring as low risk. Each shows the riskiest file it connects to (imports or is imported by), and skills give it that file's care when it's high or critical. Uncommitted files are now scored, so fan-out on the files they import rises straight away.
+- `spec-implement` re-scores after every batch commit, so later batches and reviewers see current scores, not the ones from before the feature started.
+- `spec-checkpoint` adds new areas to CONTEXT.md's map and notes important new files in their area file.
+- `risk.md` is now treated as a build output: the first `risk` run adds it to `.gitignore`, skills never stage it, and `doctor` flags it if it's committed. Before, re-scoring at each batch committed it every time, which means noisy diffs and merge conflicts between branches.
+- `spec-checkpoint` also updates an existing area's one-line description when a feature changes what that area does.
+- `risk.md` gets a **New files** section. The tool's own files (`.spec-driven.yml`, `experiments/`) are no longer scored.
+
 ## 1.11.0 — 2026-11-10
 - **GitRisk: historical risk per file.** `spec-driven-dev risk` scores tracked files from git alone (no model): `Risk = 0.30 × Churn + 0.35 × Bug Density + 0.20 × Fan-out + 0.15 × Security`. Security is the share of a file's commits that were security fixes. Writes `specs/context/risk.md`. `--files=` looks up chosen files, `--json` prints everything, and weights can be overridden under `risk.weights`. `doctor` checks them.
 - With `risk.enabled: on`, the skills use the scores: investigate reports **Risk Hotspots**, create raises tiers and requires tests aimed at past failures, and the batch reviewer and `spec-review` check them. With `off`, every skill ignores risk completely.

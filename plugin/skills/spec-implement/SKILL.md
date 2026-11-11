@@ -225,6 +225,11 @@ After the batch passes review (or the user chooses to proceed):
 2. **Update README.md**: change `- [ ]` to `- [x]` for each completed task
 3. **Update memory**: append a log entry (what this batch decided or changed from the spec) and
    overwrite the README's **Resume here** (`Stage: batch {N}/{total} done`, `Next: …`).
+   **Refresh risk** after the commit when `risk.enabled` is on and the CLI is available: run
+   `spec-driven-dev risk`. It takes well under a second with no model. New files from this batch
+   show as `new`, and files they import gain fan-out, so later batches and the reviewers see
+   current scores, not the ones from before this feature started. `risk.md` is gitignored (the
+   command adds it), so never stage or commit it.
 4. **Commit the batch**:
    ```
    git add -A

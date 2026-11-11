@@ -80,6 +80,9 @@ clean.
    breaking there in the report's **Risk Hotspots** section.
 3. A score is a reason to look harder, never evidence. Hotspot findings still need their
    VERIFIED / INFERRED labels.
+4. **New files** (added in the last 90 days with fewer than 3 commits, or not committed yet) show as tier `new`: too little
+   history to score, which is not the same as safe. Give them standard care. When one connects to a
+   high or critical file (`Connects to …` in the lookup), treat it at that file's tier.
 
 ## Invocation
 

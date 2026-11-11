@@ -25,7 +25,7 @@ You are reviewing the combined output of Batch {batch_number} of a feature imple
    - No duplicate or conflicting definitions
    - Shared state (env vars, config) is consistent
 4. **Code Quality**: Check for security issues, performance problems, and adherence to project conventions.
-5. **Risk**: for every task with a filled **Risk** section, check the code handles the past failure pattern it names, and that the test aimed at it exists and would fail without the fix.
+5. **Risk**: new files show as tier `new`, which means unproven, not safe; review them at standard care, or at the tier of the hotspot they connect to. For every task with a filled **Risk** section, check the code handles the past failure pattern it names, and that the test aimed at it exists and would fail without the fix.
 6. **Scope**: Verify each task stayed within its defined scope (Files to Create/Modify). Flag any unexpected file changes.
 
 ## Verdict
