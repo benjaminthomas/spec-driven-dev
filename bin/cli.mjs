@@ -14,7 +14,7 @@
 //   spec-driven-dev usage [STP-123] models and tokens a feature used, from Claude Code's session files (--summary  --json)
 //   spec-driven-dev risk            GitRisk: score files from git history into specs/context/risk.md (--files=a,b  --json  --top=N  --since=…)
 //   spec-driven-dev settings        switch features from a menu (GitRisk, run-through, sharing); or --risk=on|off --after-approval=… --share=all|memory|none
-//   spec-driven-dev risk-eval       U8 experiment: run tickets with risk on vs off and compare agent behaviour (--tickets=<file> --runs=N --model=… --arms=on,off --timeout=20)
+//   spec-driven-dev risk-eval       U8 experiment: run tickets with risk on vs off and compare agent behaviour (--tickets=<file> --runs=N --model=… --arms=on,off --timeout=20 --out=<dir>); a ticket line may end with [files: …], the files its real fix touched
 //   flags: --yes  --global  --tools=claude,cursor  --skills=spec-create,...  --no-setup  --dir=<path>
 //          --layout=single|monorepo|multi-repo  --repos=~/Projects/frontend,/srv/backend  --workspace=<config dir>
 //          --packages=apps/web,packages/ui  --after-approval=stop|run-through  --project=new|existing  --tracker=jira|github|gitlab|linear|azure-boards|clickup|<any>|none  --risk=on|off  --share=all|memory|none  --specs-dir=<path>  --version

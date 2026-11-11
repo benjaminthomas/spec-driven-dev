@@ -378,8 +378,10 @@ workflow files yourself. The command prints the exact steps.
 **Does it change what the agent does?** `spec-driven-dev risk-eval --tickets=tickets.md` runs each
 ticket twice, in fresh clones with risk on and off, through investigate and create on the same
 model. It then compares what the agent did:
-- risky files read and named in the investigation;
+- risky files (scored medium or above) read and named in the investigation;
 - risky files in the plan, and whether tests were planned for them;
+- the ticket's known culprit files, when you give them (`- the ticket text [files: app/a.ts, app/b.ts]`,
+  the files the real fix touched): looked at, planned, and with tests, whatever GitRisk scores them;
 - task tiers;
 - cost.
 

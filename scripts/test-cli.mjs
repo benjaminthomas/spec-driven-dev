@@ -252,13 +252,15 @@ ev({ type: "assistant", message: { content: [{ type: "tool_use", name: "Read", i
 ev({ type: "result", total_cost_usd: on ? 0.02 : 0.01, num_turns: 3, usage: { input_tokens: 100, output_tokens: on ? 60 : 40 } });
 `);
 fs.chmodSync(fake, 0o755);
-fs.writeFileSync(path.join(rk, "tickets.md"), "# tickets\n- Fix the a() rounding bug\n");
+fs.writeFileSync(path.join(rk, "tickets.md"), "# tickets\n- Fix the a() rounding bug [files: a.ts, zz.ts]\n");
 const evalOut = cli("risk-eval", `--dir=${rk}`, "--tickets=tickets.md", `--claude=${fake}`, `--out=${path.join(tmp, "exp")}`);
 assert.ok(evalOut.includes("t1-on-r1: read 1 risky / 1 files, 1 risky in plan") && evalOut.includes("t1-off-r1: read 0 risky"), evalOut);
 const expDir = fs.readdirSync(path.join(tmp, "exp")).find((f) => f.startsWith("risk-eval-"));
 const rep = fs.readFileSync(path.join(tmp, "exp", expDir, "report.md"), "utf8");
 assert.ok(rep.includes("| 1. Fix the a() rounding bug | Risky files looked at | 0 | 1 | 1 |"), rep);
 assert.ok(rep.includes("…of those, with tests planned | 0 | 1 | 1 |") && rep.includes("Avg tier of tasks on risky files (1–3) | 2 | 3 | 1 |"), rep);
+assert.ok(rep.includes("Known culprit files looked at | 0 | 1 | 1 |") && rep.includes("Known culprit files in the plan | 1 | 1 | 0 |") && rep.includes("Known culprit files (score) | `a.ts` (") && rep.includes("`zz.ts` (unscored)"), rep);
+assert.ok(evalOut.includes("culprits read 1/2, planned 1"), evalOut);
 assert.ok(fs.readFileSync(path.join(tmp, "exp", "LOG.md"), "utf8").includes("1 ticket(s) × 1 run(s) × 2 arms") , "experiment log not appended");
 assert.equal(JSON.parse(fs.readFileSync(path.join(tmp, "exp", expDir, "results.json"), "utf8")).results.length, 2);
 assert.ok(!fs.existsSync(path.join(rk, "specs")), "risk-eval must not write into the repo under test");

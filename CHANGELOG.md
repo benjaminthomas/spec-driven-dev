@@ -1,4 +1,7 @@
 # Changelog
+## 1.21.2 — 2026-11-11
+- **risk-eval measures the ticket's real culprit files.** A ticket line can end with `[files: app/a.ts, app/b.ts]`, the files the real fix touched; the report then shows, per arm, how many of them the agent looked at, planned, and planned tests for, plus each one's GitRisk score. Before, only files scored high or critical counted, so a bug living in medium-scored files showed as "0 risky in plan" for both arms and told you nothing (found on the first completed U8 pilot).
+- The risky set now includes medium-scored files, and the report says how many files sit in each tier. Each run's results also keep the list of risky files read and the files in the plan.
 ## 1.21.1 — 2026-11-11
 - **Cursor switches models out of the box.** New setups write `light: fast`, `standard: inherit`, `deep: inherit` for Cursor instead of `default`, which meant every task ran on the chat's model. Tried live in Cursor 3.24: the light task ran on `fast` and the deep task and reviews on the chat's model, through the Task tool's `model` argument, with no agent files needed. Existing configs keep their values; set `models.cursor.light: fast` to get the switch.
 - **Map tiers to any vendor's models.** Cursor (and OpenCode or Copilot) offer Claude, GPT/Codex and Gemini models. spec-setup now offers to put a cheaper one on light tasks and a stronger one on deep tasks, reading the names from the tool's own list of accepted models or its model picker, never from memory.
