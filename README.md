@@ -395,6 +395,9 @@ spec-driven-dev risk-eval --tickets=tickets.md --runs=10 --stages=investigate,cr
   --arms=A:off:opus,B:on:tiered --test="npm test" --timeout=60
 ```
 
+The test command sees the agent's test files as `$RISK_EVAL_TESTS`, so a repo whose full suite needs a database
+can run just those: `--test='npx mocha --exit $RISK_EVAL_TESTS'`.
+
 Results go to `experiments/` with the transcripts, and every run, including failures, is appended to
 `experiments/LOG.md`. It needs Claude Code.
 

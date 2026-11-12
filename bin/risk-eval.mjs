@@ -204,7 +204,8 @@ export async function riskEval(opts) {
     if (fs.existsSync(path.join(repo, "node_modules")) && !fs.existsSync(path.join(clone, "node_modules"))) fs.symlinkSync(path.join(repo, "node_modules"), path.join(clone, "node_modules"));
     return clone;
   };
-  const runTests = (cwd) => spawnSync("sh", ["-c", testCmd], { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 15 * 60 * 1000, stdio: ["ignore", "pipe", "pipe"] }).status === 0;
+  // The test command sees the agent's test files as $RISK_EVAL_TESTS, so a repo whose full suite needs services can run just those.
+  const runTests = (cwd, files) => spawnSync("sh", ["-c", testCmd], { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 15 * 60 * 1000, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, RISK_EVAL_TESTS: files.join(" ") } }).status === 0;
   const rotate = (n) => arms.slice(n % arms.length).concat(arms.slice(0, n % arms.length));
   for (let t = 0; t < tickets.length; t++) for (let r = 1; r <= runs; r++) for (const arm of rotate(t + r)) {
     const clone = freshClone(arm.name);
@@ -235,10 +236,10 @@ export async function riskEval(opts) {
       const testFiles = changed.filter(isTestFile);
       metrics.agent_test_files = testFiles.length;
       if (testCmd && !metrics.error) {
-        metrics.tests_pass_with_fix = runTests(clone) ? 1 : 0;
+        metrics.tests_pass_with_fix = runTests(clone, testFiles) ? 1 : 0;
         const bug = freshClone("bug");
         for (const f of testFiles) { fs.mkdirSync(path.dirname(path.join(bug, f)), { recursive: true }); fs.copyFileSync(path.join(clone, f), path.join(bug, f)); }
-        metrics.tests_fail_on_bug = testFiles.length && !runTests(bug) ? 1 : 0;
+        metrics.tests_fail_on_bug = testFiles.length && !runTests(bug, testFiles) ? 1 : 0;
         fs.rmSync(bug, { recursive: true, force: true });
         metrics.bug_caught = metrics.tests_pass_with_fix && metrics.tests_fail_on_bug ? 1 : 0;
       }

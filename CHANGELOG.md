@@ -1,4 +1,6 @@
 # Changelog
+## 1.22.1 — 2026-11-12
+- risk-eval's test command sees the agent's test files as `$RISK_EVAL_TESTS`, so a repo whose full suite needs a database can replay just those (`--test='npx mocha --exit $RISK_EVAL_TESTS'`).
 ## 1.22.0 — 2026-11-12
 - **risk-eval measures outcomes, not just plans (U8 run 3).** `--arms` takes named arms with a model policy: `A:off:opus` pins every tier to one model with no signal (how work was done before GitRisk), `B:on:tiered` lets the tier pick the model as the product ships, `C:on:opus` isolates the context effect. With `--stages=investigate,create,implement,verify` and a test command (`--test=…` or `commands.test`), each run keeps the agent's diff and replays the agent's test files on the unfixed snapshot: **bug caught** = its tests pass with its fix and fail without it. Arms rotate order per run; the report has one column per arm. `--remeasure` keeps the outcome metrics.
 ## 1.21.3 — 2026-11-12
