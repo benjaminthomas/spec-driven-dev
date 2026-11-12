@@ -1,4 +1,7 @@
 # Changelog
+## 1.21.3 — 2026-11-12
+- **risk-eval reads task files the way agents actually write them.** Plans named their files under `## Files`, their tests under ``## Tests (`npm test`)``, listed paths without backticks, or wrote `Tier: deep (…)` unbolded; the parser only accepted `## Files to Modify`, `## Tests` and `**Tier:**`, so 8 of 20 task sets in the first full U8 run counted as "nothing planned". Headings now match by prefix, plain paths of tracked files count, and the tier line can be unbolded. A task with no `## Files` heading at all (`## Changes`, paths in prose) is read whole, so it no longer scores zero.
+- `risk-eval --remeasure=<run dir>` recomputes a saved run's metrics from its transcripts and spec folders, with no agent calls. The first report and results are kept as `report-v1.md` / `results-v1.json`, and the log records the re-measure.
 ## 1.21.2 — 2026-11-11
 - **risk-eval measures the ticket's real culprit files.** A ticket line can end with `[files: app/a.ts, app/b.ts]`, the files the real fix touched; the report then shows, per arm, how many of them the agent looked at, planned, and planned tests for, plus each one's GitRisk score. Before, only files scored high or critical counted, so a bug living in medium-scored files showed as "0 risky in plan" for both arms and told you nothing (found on the first completed U8 pilot).
 - The risky set now includes medium-scored files, and the report says how many files sit in each tier. Each run's results also keep the list of risky files read and the files in the plan.

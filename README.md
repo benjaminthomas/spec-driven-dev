@@ -385,6 +385,8 @@ model. It then compares what the agent did:
 - task tiers;
 - cost.
 
+A saved run can be re-measured after a harness fix with `--remeasure=<run dir>`; the first report is kept.
+
 Results go to `experiments/` with the transcripts, and every run, including failures, is appended to
 `experiments/LOG.md`. It needs Claude Code.
 

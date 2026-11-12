@@ -246,7 +246,7 @@ const on = fs.existsSync("specs/context/risk.md") && /enabled: on/.test(fs.readF
 fs.readFileSync(0, "utf8");
 fs.mkdirSync("specs/t/tasks", { recursive: true });
 fs.writeFileSync("specs/t/investigation.md", on ? "## Risk Hotspots\\n| \\\`a.ts\\\` | 74 high |\\n" : "nothing\\n");
-fs.writeFileSync("specs/t/tasks/task-01-x.md", "## Complexity\\n**Tier:** " + (on ? "deep" : "standard") + "\\n## Files to Modify\\n- \\\`a.ts\\\` — x\\n## Tests\\n" + (on ? "- a.test.ts — past xss\\n" : "None — trivial\\n"));
+fs.writeFileSync("specs/t/tasks/task-01-x.md", "## Complexity\\n**Tier:** " + (on ? "deep" : "standard") + (on ? "\\n## Files\\n- \\\`a.ts\\\` — x\\n## Tests (\\\`npm test\\\`)\\n- a.test.ts — past xss\\n" : "\\n## Files to Modify\\n- \\\`a.ts\\\` — x\\n## Tests\\nNone — trivial\\n"));
 const ev = (o) => console.log(JSON.stringify(o));
 ev({ type: "assistant", message: { content: [{ type: "tool_use", name: "Read", input: { file_path: on ? "a.ts" : "b.ts" } }] } });
 ev({ type: "result", total_cost_usd: on ? 0.02 : 0.01, num_turns: 3, usage: { input_tokens: 100, output_tokens: on ? 60 : 40 } });
@@ -264,6 +264,32 @@ assert.ok(evalOut.includes("culprits read 1/2, planned 1"), evalOut);
 assert.ok(fs.readFileSync(path.join(tmp, "exp", "LOG.md"), "utf8").includes("1 ticket(s) × 1 run(s) × 2 arms") , "experiment log not appended");
 assert.equal(JSON.parse(fs.readFileSync(path.join(tmp, "exp", expDir, "results.json"), "utf8")).results.length, 2);
 assert.ok(!fs.existsSync(path.join(rk, "specs")), "risk-eval must not write into the repo under test");
+// measure() on its own: a read of a tracked path counts with or without a clone prefix to strip
+{
+  const { measure } = await import(path.join(path.dirname(CLI), "risk-eval.mjs"));
+  const transcript = JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", name: "Read", input: { file_path: "/c/src/a.ts" } }] } });
+  const base = { transcript, risky: new Set(["src/a.ts"]), tracked: ["src/a.ts", "src/b.ts"], featureDir: path.join(tmp, "no-such-dir"), feature: "x" };
+  assert.equal(measure({ ...base, clone: "/c" }).files_read, 1);
+  assert.equal(measure({ ...base, clone: "" }).files_read, 1, "re-measure without a clone must still count reads");
+  assert.equal(measure({ ...base, clone: "" }).risky_files_read, 1);
+  // task parsing: plain (unbackticked) paths under "## Files", and "Tier: deep (…)" without bold
+  const fd = path.join(tmp, "feat"); fs.mkdirSync(path.join(fd, "tasks"), { recursive: true });
+  fs.writeFileSync(path.join(fd, "tasks", "task-01.md"), "# T\n## Do\nstuff\n## Files\n- src/a.ts — change it\n## Validation\nmanual\nTier: deep (money)\n");
+  const m2 = measure({ ...base, clone: "", featureDir: fd, culprits: ["src/a.ts"] });
+  assert.equal(m2.culprit_plan_files, 1, "plain path under ## Files counts");
+  assert.equal(m2.culprit_files_with_tests, 0, "no Tests section means no tests planned");
+  assert.equal(m2.tier_all_tasks, 3, "unbolded Tier: line is read");
+  // no "## Files" heading: paths anywhere in the task count; a "## Files" heading still scopes to that section
+  fs.writeFileSync(path.join(fd, "tasks", "task-02.md"), "# T2\n## Changes\n1. `src/b.ts`: add it\n## Tests\nunit\n");
+  const m3 = measure({ ...base, clone: "", featureDir: fd, culprits: ["src/a.ts", "src/b.ts"] });
+  assert.equal(m3.culprit_plan_files, 2, "path under ## Changes counts when there is no ## Files");
+  assert.equal(m3.culprit_files_with_tests, 1, "only the task with a Tests section counts");
+}
+// re-measure a saved run: same numbers, first report kept, log line added
+const rm = cli("risk-eval", `--dir=${rk}`, `--remeasure=${path.join(tmp, "exp", expDir)}`);
+assert.ok(rm.includes("Re-measured") && fs.existsSync(path.join(tmp, "exp", expDir, "report-v1.md")) && fs.existsSync(path.join(tmp, "exp", expDir, "results-v1.json")), rm);
+assert.ok(fs.readFileSync(path.join(tmp, "exp", expDir, "report.md"), "utf8").includes("Known culprit files in the plan | 1 | 1 | 0 |"));
+assert.ok(fs.readFileSync(path.join(tmp, "exp", "LOG.md"), "utf8").includes("re-measured"));
 
 // 15. settings: switch features by flag, keeping comments; refuses without a terminal or flags
 const st2 = path.join(tmp, "settings");

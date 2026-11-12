@@ -20,7 +20,8 @@ export function parseTicket(line) {
 }
 
 // Behaviour metrics from the agent's transcript (stream-json) and the spec it wrote.
-export function measure({ transcript, clone, risky, tracked = [], culprits = [] }) {
+// featureDir: re-measure a saved run from its copied spec folder instead of a live clone.
+export function measure({ transcript, clone, risky, tracked = [], culprits = [], featureDir = null, feature: featureName = null }) {
   const reads = new Set();
   let cost = 0, turns = 0, inTok = 0, outTok = 0, error = "";
   for (const line of transcript.split("\n")) {
@@ -29,7 +30,8 @@ export function measure({ transcript, clone, risky, tracked = [], culprits = [] 
     if (e.type === "assistant") for (const c of e.message?.content || []) {
       // A file counts as looked at when a Read, Grep or Bash call names it (agents often use grep/sed/cat, not Read).
       if (c.type !== "tool_use" || !["Read", "Grep", "Bash", "Glob"].includes(c.name)) continue;
-      const text = JSON.stringify(c.input || {}).split(clone + "/").join("").split(clone.replace(/^\/private/, "") + "/").join("");
+      let text = JSON.stringify(c.input || {});
+      if (clone) text = text.split(clone + "/").join("").split(clone.replace(/^\/private/, "") + "/").join(""); // no clone (re-measure): paths stay as they are
       for (const f of tracked) if (text.includes(f)) reads.add(f);
     }
     if (e.type === "result") {
@@ -40,17 +42,22 @@ export function measure({ transcript, clone, risky, tracked = [], culprits = [] 
     }
   }
   const specsDir = path.join(clone, "specs");
-  const feature = (fs.existsSync(specsDir) ? fs.readdirSync(specsDir) : []).find((d) => fs.existsSync(path.join(specsDir, d, "investigation.md")) || fs.existsSync(path.join(specsDir, d, "tasks")));
+  const feature = featureDir ? featureName : (fs.existsSync(specsDir) ? fs.readdirSync(specsDir) : []).find((d) => fs.existsSync(path.join(specsDir, d, "investigation.md")) || fs.existsSync(path.join(specsDir, d, "tasks")));
+  const fdir = featureDir || (feature && path.join(specsDir, feature));
   const read = (f) => { try { return fs.readFileSync(f, "utf8"); } catch { return ""; } };
-  const inv = feature ? read(path.join(specsDir, feature, "investigation.md")) : "";
+  const inv = fdir ? read(path.join(fdir, "investigation.md")) : "";
   const tasks = [];
-  const tdir = feature && path.join(specsDir, feature, "tasks");
+  const tdir = fdir && path.join(fdir, "tasks");
   if (tdir && fs.existsSync(tdir)) for (const t of fs.readdirSync(tdir).filter((f) => f.endsWith(".md"))) {
     const text = read(path.join(tdir, t));
-    const section = (name) => (text.match(new RegExp(`^## ${name}\\s*\\n([\\s\\S]*?)(?=^## |$(?![\\s\\S]))`, "m")) || [])[1] || "";
-    const files = [...(section("Files to Create") + section("Files to Modify")).matchAll(/`([^`\s]+\.[\w]+)`/g)].map((m) => m[1]);
-    const tests = section("Tests").trim();
-    tasks.push({ name: t, files, tier: (text.match(/\*\*Tier:\*\*\s*(light|standard|deep)/i) || [])[1]?.toLowerCase(), hasTests: !!tests && !/^none\b/i.test(tests) });
+    // Agents vary the headings ("## Files", "## Files to Modify", "## Tests (`npm test`)"), so match by prefix and join all of them.
+    const sections = (prefix) => [...text.matchAll(new RegExp(`^##+ ${prefix}[^\\n]*\\n([\\s\\S]*?)(?=^##+ |$(?![\\s\\S]))`, "gm"))].map((m) => m[1]).join("\n");
+    // Files: backticked paths, plus any tracked file named plainly (agents don't always use backticks).
+    // No "## Files" heading at all ("## Changes", paths in prose): read the whole task, or the plan scores zero.
+    const filesText = sections("Files") || text;
+    const files = [...new Set([...[...filesText.matchAll(/`([^`\s]+\.[\w]+)`/g)].map((m) => m[1]), ...tracked.filter((f) => filesText.includes(f))])];
+    const tests = sections("Tests").trim();
+    tasks.push({ name: t, files, tier: (text.match(/\bTier:\**\s*(light|standard|deep)\b/i) || [])[1]?.toLowerCase(), hasTests: !!tests && !/^none\b/i.test(tests) });
   }
   const isRisky = (f) => risky.has(f);
   const planFiles = new Set(tasks.flatMap((t) => t.files));
@@ -76,6 +83,30 @@ export function measure({ transcript, clone, risky, tracked = [], culprits = [] 
     tasks: tasks.length,
     cost_usd: Math.round(cost * 10000) / 10000, turns, input_tokens: inTok, output_tokens: outTok, error,
   };
+}
+
+// Recompute every run's metrics from what the run saved (transcript + spec folder), e.g. after a parser fix.
+// The first report and results are kept as *-v1 files; the log records that it happened.
+export function remeasure({ runDir, repo, since, weights }) {
+  const { meta, results } = JSON.parse(fs.readFileSync(path.join(runDir, "results.json"), "utf8"));
+  const head = sh(repo, "git", ["rev-parse", "--short", "HEAD"]).trim();
+  if (head !== meta.head) throw new Error(`${repo} is at ${head}, but the run was measured at ${meta.head}. Check out that commit first.`);
+  const scored = scoreRepo(repo, { since, weights: normWeights(weights || meta.weights) });
+  const risky = new Set(scored.rows.filter((r) => ["medium", "high", "critical"].includes(r.tier)).map((r) => r.file));
+  const tracked = sh(repo, "git", ["ls-files"]).split("\n").filter((f) => f.includes("/") || f.includes("."));
+  for (const r of results) {
+    const tag = `t${r.ticket + 1}-${r.arm}-r${r.run}`, featureDir = path.join(runDir, tag);
+    if (!r.metrics?.feature || !fs.existsSync(featureDir)) continue;
+    const transcript = fs.readFileSync(path.join(runDir, `${tag}.jsonl`), "utf8");
+    r.metrics = { ...measure({ transcript, clone: "", risky, tracked, culprits: meta.culprits?.[r.ticket] || [], featureDir, feature: r.metrics.feature }), error: r.metrics.error };
+  }
+  for (const f of ["results.json", "report.md"]) { const v1 = path.join(runDir, f.replace(/\.(\w+)$/, "-v1.$1")); if (!fs.existsSync(v1)) fs.renameSync(path.join(runDir, f), v1); }
+  meta.risky = risky.size;
+  fs.writeFileSync(path.join(runDir, "results.json"), JSON.stringify({ meta, results }, null, 2));
+  const md = report({ meta, results });
+  fs.writeFileSync(path.join(runDir, "report.md"), md);
+  fs.appendFileSync(path.join(path.dirname(runDir), "LOG.md"), `- ${new Date().toISOString().replace(/\.\d+Z$/, "Z")} · re-measured [${path.basename(runDir)}](${path.basename(runDir)}/report.md) from its saved transcripts and specs (harness parser fix); first report kept as report-v1.md\n`);
+  return { dir: runDir, report: md, results };
 }
 
 const METRICS = [
