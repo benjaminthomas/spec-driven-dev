@@ -387,6 +387,14 @@ model. It then compares what the agent did:
 
 A saved run can be re-measured after a harness fix with `--remeasure=<run dir>`; the first report is kept.
 
+Arms can be named with a model policy, and with the implement stage and a test command each run also records
+whether the agent's own tests catch the bug (they must pass with its fix and fail on the unfixed snapshot):
+
+```
+spec-driven-dev risk-eval --tickets=tickets.md --runs=10 --stages=investigate,create,implement,verify \
+  --arms=A:off:opus,B:on:tiered --test="npm test" --timeout=60
+```
+
 Results go to `experiments/` with the transcripts, and every run, including failures, is appended to
 `experiments/LOG.md`. It needs Claude Code.
 

@@ -243,10 +243,15 @@ const fake = path.join(tmp, "fake-claude.mjs");
 fs.writeFileSync(fake, `#!/usr/bin/env node
 import fs from "node:fs";
 const on = fs.existsSync("specs/context/risk.md") && /enabled: on/.test(fs.readFileSync(".spec-driven.yml", "utf8"));
-fs.readFileSync(0, "utf8");
+const stdin = fs.readFileSync(0, "utf8");
 fs.mkdirSync("specs/t/tasks", { recursive: true });
+if (/spec-implement/.test(stdin)) { // "implement": fix a.ts and, only with the signal, write a test that needs the fix
+  fs.appendFileSync("a.ts", "\\n// fixed\\n");
+  if (on) fs.writeFileSync("a.test.mjs", "import fs from 'node:fs'; if (!/fixed/.test(fs.readFileSync('a.ts','utf8'))) process.exit(1);");
+}
 fs.writeFileSync("specs/t/investigation.md", on ? "## Risk Hotspots\\n| \\\`a.ts\\\` | 74 high |\\n" : "nothing\\n");
 fs.writeFileSync("specs/t/tasks/task-01-x.md", "## Complexity\\n**Tier:** " + (on ? "deep" : "standard") + (on ? "\\n## Files\\n- \\\`a.ts\\\` — x\\n## Tests (\\\`npm test\\\`)\\n- a.test.ts — past xss\\n" : "\\n## Files to Modify\\n- \\\`a.ts\\\` — x\\n## Tests\\nNone — trivial\\n"));
+fs.writeFileSync("specs/t/models.txt", (fs.readFileSync(".spec-driven.yml", "utf8").match(/deep: (\\S+)/) || [, "unpinned"])[1]);
 const ev = (o) => console.log(JSON.stringify(o));
 ev({ type: "assistant", message: { content: [{ type: "tool_use", name: "Read", input: { file_path: on ? "a.ts" : "b.ts" } }] } });
 ev({ type: "result", total_cost_usd: on ? 0.02 : 0.01, num_turns: 3, usage: { input_tokens: 100, output_tokens: on ? 60 : 40 } });
@@ -290,6 +295,18 @@ const rm = cli("risk-eval", `--dir=${rk}`, `--remeasure=${path.join(tmp, "exp", 
 assert.ok(rm.includes("Re-measured") && fs.existsSync(path.join(tmp, "exp", expDir, "report-v1.md")) && fs.existsSync(path.join(tmp, "exp", expDir, "results-v1.json")), rm);
 assert.ok(fs.readFileSync(path.join(tmp, "exp", expDir, "report.md"), "utf8").includes("Known culprit files in the plan | 1 | 1 | 0 |"));
 assert.ok(fs.readFileSync(path.join(tmp, "exp", "LOG.md"), "utf8").includes("re-measured"));
+
+// named arms with a model policy, implement stage, and the bug-caught outcome from replaying the agent's tests on the snapshot
+const ev3 = cli("risk-eval", `--dir=${rk}`, "--tickets=tickets.md", `--claude=${fake}`, `--out=${path.join(tmp, "exp3")}`, "--arms=A:off:opus,B:on:tiered", "--stages=investigate,create,implement", "--test=node a.test.mjs");
+assert.ok(ev3.includes("t1-A-r1:") && ev3.includes("bug not caught (0 test files)") && ev3.includes("t1-B-r1:") && ev3.includes("bug caught (1 test files)"), ev3);
+const exp3 = path.join(tmp, "exp3", fs.readdirSync(path.join(tmp, "exp3")).find((f) => f.startsWith("risk-eval-")));
+assert.equal(fs.readFileSync(path.join(exp3, "t1-A-r1", "models.txt"), "utf8"), "opus", "arm A pins every tier to opus");
+assert.equal(fs.readFileSync(path.join(exp3, "t1-B-r1", "models.txt"), "utf8"), "unpinned", "arm B leaves models as configured");
+const rep3 = fs.readFileSync(path.join(exp3, "report.md"), "utf8");
+assert.ok(rep3.includes("| Ticket | Metric | A | B | Δ (B − A) |") && rep3.includes("Bug caught: both of the above (0–1) | 0 | 1 | 1 |"), rep3);
+assert.ok(fs.existsSync(path.join(exp3, "t1-B-r1.diff")) && fs.readFileSync(path.join(exp3, "t1-B-r1.diff"), "utf8").includes("a.test.mjs"), "agent diff kept");
+assert.ok(!fs.existsSync(path.join(rk, "a.test.mjs")) && !/fixed/.test(fs.readFileSync(path.join(rk, "a.ts"), "utf8")), "repo under test untouched");
+assert.ok(fs.readFileSync(path.join(tmp, "exp3", "LOG.md"), "utf8").includes("2 arms (A/B)"));
 
 // 15. settings: switch features by flag, keeping comments; refuses without a terminal or flags
 const st2 = path.join(tmp, "settings");

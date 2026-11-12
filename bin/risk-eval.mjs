@@ -12,6 +12,21 @@ const sh = (cwd, cmd, args) => execFileSync(cmd, args, { cwd, stdio: ["ignore", 
 
 export const setRiskEnabled = (text, on) => setConfigValue(text, "risk", "enabled", on ? "on" : "off");
 
+// An arm is "on" | "off" (risk only), or "name:on|off[:model]" where model pins every tier of models.claude to one
+// model ("A:off:opus" = top model everywhere, no signal) and "tiered" (or nothing) leaves the config's tiers alone.
+export function parseArm(spec) {
+  const [a, b, c] = spec.split(":").map((x) => x.trim());
+  if (b === undefined) { if (!["on", "off"].includes(a)) throw new Error(`Arm "${spec}": use on, off, or name:on|off[:model]`); return { name: a, risk: a === "on", model: null }; }
+  if (!["on", "off"].includes(b)) throw new Error(`Arm "${spec}": second part must be on or off`);
+  return { name: a, risk: b === "on", model: c && c !== "tiered" ? c : null };
+}
+export const pinModels = (text, model) => {
+  const without = text.replace(/^models:.*\n(?:(?:[ \t]+.*|[ \t]*)\n)*/m, "");
+  return `${without.replace(/\n*$/, "\n")}models:\n  claude:\n    light: ${model}\n    standard: ${model}\n    deep: ${model}\n    escalate: ${model}\n`;
+};
+const OUTCOME_KEYS = ["agent_test_files", "tests_pass_with_fix", "tests_fail_on_bug", "bug_caught"];
+const isTestFile = (f) => /(^|\/)(tests?|__tests__|spec)\/|\.(test|spec)\.[cm]?[jt]sx?$/.test(f);
+
 // A ticket line may end with the files its real fix touched: "… [files: app/a.ts, app/b.ts]". Those are the
 // culprits: whether each arm finds and plans them is measured directly, whatever GitRisk scores them.
 export function parseTicket(line) {
@@ -98,7 +113,8 @@ export function remeasure({ runDir, repo, since, weights }) {
     const tag = `t${r.ticket + 1}-${r.arm}-r${r.run}`, featureDir = path.join(runDir, tag);
     if (!r.metrics?.feature || !fs.existsSync(featureDir)) continue;
     const transcript = fs.readFileSync(path.join(runDir, `${tag}.jsonl`), "utf8");
-    r.metrics = { ...measure({ transcript, clone: "", risky, tracked, culprits: meta.culprits?.[r.ticket] || [], featureDir, feature: r.metrics.feature }), error: r.metrics.error };
+    const kept = Object.fromEntries(OUTCOME_KEYS.filter((k) => k in r.metrics).map((k) => [k, r.metrics[k]])); // outcome metrics come from running tests, not the transcript
+    r.metrics = { ...measure({ transcript, clone: "", risky, tracked, culprits: meta.culprits?.[r.ticket] || [], featureDir, feature: r.metrics.feature }), ...kept, error: r.metrics.error };
   }
   for (const f of ["results.json", "report.md"]) { const v1 = path.join(runDir, f.replace(/\.(\w+)$/, "-v1.$1")); if (!fs.existsSync(v1)) fs.renameSync(path.join(runDir, f), v1); }
   meta.risky = risky.size;
@@ -114,24 +130,30 @@ const METRICS = [
   ["risky_plan_files", "Risky files in the plan"], ["risky_files_with_tests", "…of those, with tests planned"],
   ["culprit_files_read", "Known culprit files looked at"], ["culprit_plan_files", "Known culprit files in the plan"], ["culprit_files_with_tests", "…of those, with tests planned"],
   ["tier_on_risky_tasks", "Avg tier of tasks on risky files (1–3)"], ["files_read", "Repo files looked at (Read/Grep/Bash)"],
-  ["tasks", "Tasks"], ["cost_usd", "Cost (USD)"], ["output_tokens", "Output tokens"],
+  ["tasks", "Tasks"], ["agent_test_files", "Test files the agent wrote or changed"], ["tests_pass_with_fix", "Agent's tests pass with its fix (0–1)"],
+  ["tests_fail_on_bug", "Agent's tests fail on the unfixed snapshot (0–1)"], ["bug_caught", "Bug caught: both of the above (0–1)"],
+  ["cost_usd", "Cost (USD)"], ["output_tokens", "Output tokens"],
 ];
 
 function report({ meta, results }) {
+  // Arms as given, except the classic on/off pair, which reads off → on.
+  const arms = (meta.arms || [{ name: "on" }, { name: "off" }]).slice().sort((a, b) => (a.name === "off" && b.name === "on" ? -1 : a.name === "on" && b.name === "off" ? 1 : 0));
+  const delta = arms.length === 2, cap = (n) => n[0].toUpperCase() + n.slice(1);
   const lines = [`# GitRisk U8 experiment — ${meta.started}`, "",
     "Question: does feeding GitRisk's historical-risk signal into the spec-driven-dev workflow change what the AI agent does?", "",
     `- Repo: \`${meta.repo}\` at ${meta.head}; risky set = ${meta.risky} files scored medium or above (${meta.tiers}; weights ${JSON.stringify(meta.weights)})`,
-    `- Model: ${meta.model} · stages: ${meta.stages.join(" → ")} · runs per arm: ${meta.runs} · tickets: ${meta.tickets.length}`,
-    "- Arms: **on** = risk.enabled on + specs/context/risk.md present; **off** = risk.enabled off, no risk file. Fresh clone per run, same prompt.",
-    "", "## Results (mean per arm)", "", "| Ticket | Metric | Off | On | Δ (on − off) |", "|---|---|---|---|---|"];
+    `- Model: ${meta.model} · stages: ${meta.stages.join(" → ")} · runs per arm: ${meta.runs} · tickets: ${meta.tickets.length}${meta.testCmd ? ` · test command: \`${meta.testCmd}\`` : ""}`,
+    `- Arms: ${arms.map((a) => `**${a.name}** = risk ${a.risk ? "on (risk.md present)" : "off (no risk file)"}, ${a.model ? `every tier pinned to ${a.model}` : "models as configured (tier picks the model)"}`).join("; ")}. Fresh clone per run, same prompt.`,
+    "", "## Results (mean per arm)", "", `| Ticket | Metric | ${arms.map((a) => cap(a.name)).join(" | ")} |${delta ? ` Δ (${arms[1].name} − ${arms[0].name}) |` : ""}`, `|---|---|${arms.map(() => "---|").join("")}${delta ? "---|" : ""}`];
   const mean = (rs, k) => { const v = rs.map((r) => r.metrics?.[k]).filter((x) => typeof x === "number"); return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 100) / 100 : null; };
   meta.tickets.forEach((t, i) => {
     const c = meta.culprits?.[i] || [];
     if (c.length) lines.push(`| ${i + 1}. ${t.slice(0, 40).replace(/\|/g, "/")} | Known culprit files (score) | ${c.map((f) => `\`${f}\` (${meta.culpritScores?.[f] || "unscored"})`).join(", ")} | | |`);
-    const off = results.filter((r) => r.ticket === i && r.arm === "off" && !r.metrics?.error), on = results.filter((r) => r.ticket === i && r.arm === "on" && !r.metrics?.error);
+    const per = arms.map((a) => results.filter((r) => r.ticket === i && r.arm === a.name && !r.metrics?.error));
     for (const [k, label] of METRICS) {
-      const a = mean(off, k), b = mean(on, k);
-      lines.push(`| ${i + 1}. ${t.slice(0, 40).replace(/\|/g, "/")} | ${label} | ${a ?? "—"} | ${b ?? "—"} | ${a !== null && b !== null ? Math.round((b - a) * 100) / 100 : "—"} |`);
+      const ms = per.map((rs) => mean(rs, k));
+      if (ms.every((m) => m === null)) continue; // metric not measured in this run (e.g. no test command)
+      lines.push(`| ${i + 1}. ${t.slice(0, 40).replace(/\|/g, "/")} | ${label} | ${ms.map((m) => m ?? "—").join(" | ")} |${delta ? ` ${ms[0] !== null && ms[1] !== null ? Math.round((ms[1] - ms[0]) * 100) / 100 : "—"} |` : ""}`);
     }
   });
   const failed = results.filter((r) => r.metrics?.error || r.exit !== 0);
@@ -147,7 +169,10 @@ function report({ meta, results }) {
 }
 
 export async function riskEval(opts) {
-  const { repo, tickets, runs = 1, arms = ["on", "off"], timeoutMin = 20, model = "sonnet", stages = ["investigate", "create"], claude = "claude", out, pluginDir, since, weights, configText = "" } = opts;
+  const { repo, tickets, runs = 1, timeoutMin = 20, model = "sonnet", stages = ["investigate", "create"], claude = "claude", out, pluginDir, since, weights, configText = "", testCmd = "" } = opts;
+  const arms = (opts.arms || ["on", "off"]).map((a) => (typeof a === "string" ? parseArm(a) : a));
+  if (new Set(arms.map((a) => a.name)).size !== arms.length) throw new Error("Arm names must be unique");
+  const implementing = stages.includes("implement");
   if (!tickets.length) throw new Error("No tickets: pass --tickets=<file> with one ticket per line");
   const started = new Date().toISOString().replace(/\.\d+Z$/, "Z");
   const dir = path.join(out, `risk-eval-${started.replace(/[:]/g, "-")}`);
@@ -162,26 +187,37 @@ export async function riskEval(opts) {
   for (const { culprits } of parsed) for (const f of culprits) { const row = scored.rows.find((r) => r.file === f); culpritScores[f] = row ? `${row.tier} ${row.score}` : "unscored"; }
   const riskMd = riskMarkdown({ rows: scored.rows, repos: [{ name: path.basename(repo), head: scored.head, commits: scored.commits }], weights: w, since, top: 60 });
   fs.writeFileSync(path.join(dir, "risk.md"), riskMd);
-  const meta = { started, repo, head: scored.head, risky: risky.size, tiers: `${tierCount("critical")} critical, ${tierCount("high")} high, ${tierCount("medium")} medium`, weights: w, model, stages, runs,
+  const meta = { started, repo, head: scored.head, risky: risky.size, tiers: `${tierCount("critical")} critical, ${tierCount("high")} high, ${tierCount("medium")} medium`, weights: w, model, stages, runs, arms, testCmd,
     tickets: parsed.map((p) => p.text), culprits: parsed.map((p) => p.culprits), culpritScores };
   const stageText = stages.map((s) => `spec-${s}`).join(", then ");
   const results = [];
-  for (let t = 0; t < tickets.length; t++) for (let r = 1; r <= runs; r++) for (const arm of ((t + r) % 2 ? ["off", "on"] : ["on", "off"]).filter((a) => arms.includes(a))) {
-    const clone = fs.mkdtempSync(path.join(os.tmpdir(), `risk-eval-${arm}-`));
+  // A fresh clone of the snapshot, with the project's context copied in and node_modules linked (shortcut: no
+  // install per clone, the snapshot's dependencies are assumed current; install per clone if a ticket changes them).
+  const freshClone = (prefix) => {
+    const clone = fs.mkdtempSync(path.join(os.tmpdir(), `risk-eval-${prefix}-`));
     sh(os.tmpdir(), "git", ["clone", "-q", "--no-hardlinks", repo, clone]);
     for (const extra of ["specs/CONTEXT.md", "specs/context"]) {
       const src = path.join(repo, extra);
-      if (fs.existsSync(src) && !fs.existsSync(path.join(clone, extra))) fs.cpSync ? fs.cpSync(src, path.join(clone, extra), { recursive: true }) : sh(repo, "cp", ["-R", src, path.join(clone, extra)]);
+      if (fs.existsSync(src) && !fs.existsSync(path.join(clone, extra))) fs.cpSync(src, path.join(clone, extra), { recursive: true });
     }
     fs.rmSync(path.join(clone, "specs/context/risk.md"), { force: true });
-    fs.writeFileSync(path.join(clone, ".spec-driven.yml"), setRiskEnabled(configText || "version: 1\nlayout: single\n", arm === "on"));
-    if (arm === "on") { fs.mkdirSync(path.join(clone, "specs/context"), { recursive: true }); fs.writeFileSync(path.join(clone, "specs/context/risk.md"), riskMd); }
-    const prompt = `Use the ticket-to-pr plugin skills. This is a non-interactive run: don't ask questions, make reasonable assumptions and record them. Ticket (plain text, no tracker): ${parsed[t].text}\nRun ${stageText}. Work on the current branch; don't create branches, commit, push, or implement anything.`;
-    const res = spawnSync(claude, ["-p", "--output-format", "stream-json", "--verbose", "--model", model, "--plugin-dir", pluginDir, "--permission-mode", "acceptEdits",
-      "--allowedTools", "Read Write Edit Glob Grep Skill Bash(git:*) Bash(ls:*) Bash(cat:*) Bash(head:*) Bash(tail:*) Bash(wc:*) Bash(find:*) Bash(grep:*) Bash(node:*) Bash(npx:*) Bash(spec-driven-dev:*)"],
+    if (fs.existsSync(path.join(repo, "node_modules")) && !fs.existsSync(path.join(clone, "node_modules"))) fs.symlinkSync(path.join(repo, "node_modules"), path.join(clone, "node_modules"));
+    return clone;
+  };
+  const runTests = (cwd) => spawnSync("sh", ["-c", testCmd], { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 15 * 60 * 1000, stdio: ["ignore", "pipe", "pipe"] }).status === 0;
+  const rotate = (n) => arms.slice(n % arms.length).concat(arms.slice(0, n % arms.length));
+  for (let t = 0; t < tickets.length; t++) for (let r = 1; r <= runs; r++) for (const arm of rotate(t + r)) {
+    const clone = freshClone(arm.name);
+    let cfg = setRiskEnabled(configText || "version: 1\nlayout: single\n", arm.risk);
+    if (arm.model) cfg = pinModels(cfg, arm.model);
+    fs.writeFileSync(path.join(clone, ".spec-driven.yml"), cfg);
+    if (arm.risk) { fs.mkdirSync(path.join(clone, "specs/context"), { recursive: true }); fs.writeFileSync(path.join(clone, "specs/context/risk.md"), riskMd); }
+    const prompt = `Use the ticket-to-pr plugin skills. This is a non-interactive run: don't ask questions, make reasonable assumptions and record them. Ticket (plain text, no tracker): ${parsed[t].text}\nRun ${stageText}. Work on the current branch; don't create branches, commit or push${implementing ? ". Implement and test on this branch, leaving the changes uncommitted" : ", or implement anything"}.`;
+    const res = spawnSync(claude, ["-p", "--output-format", "stream-json", "--verbose", "--model", arm.model || model, "--plugin-dir", pluginDir, "--permission-mode", "acceptEdits",
+      "--allowedTools", `Read Write Edit Glob Grep Skill Agent Bash(git:*) Bash(ls:*) Bash(cat:*) Bash(head:*) Bash(tail:*) Bash(wc:*) Bash(find:*) Bash(grep:*) Bash(node:*) Bash(npx:*) Bash(spec-driven-dev:*)${implementing ? " Bash(npm:*) Bash(pnpm:*) Bash(yarn:*)" : ""}`],
       { cwd: clone, input: prompt, encoding: "utf8", maxBuffer: 512 * 1024 * 1024, timeout: timeoutMin * 60 * 1000 });
     const transcript = res.stdout || "";
-    const tag = `t${t + 1}-${arm}-r${r}`;
+    const tag = `t${t + 1}-${arm.name}-r${r}`;
     fs.writeFileSync(path.join(dir, `${tag}.jsonl`), transcript);
     const tracked = sh(clone, "git", ["ls-files"]).split("\n").filter((f) => f.includes("/") || f.includes("."));
     const metrics = measure({ transcript, clone, risky, tracked, culprits: parsed[t].culprits });
@@ -191,15 +227,31 @@ export async function riskEval(opts) {
       const lastTool = [...transcript.matchAll(/"type":"tool_use","id":"[^"]+","name":"(\w+)"/g)].pop()?.[1] || "none";
       metrics.error = `${res.error?.code === "ETIMEDOUT" ? `timed out after ${timeoutMin} min` : `exit ${res.status}`} · ${events} events · last tool ${lastTool} ${(res.stderr || "").slice(0, 120)}`.trim();
     }
-    if (metrics.feature) fs.cpSync ? fs.cpSync(path.join(clone, "specs", metrics.feature), path.join(dir, tag), { recursive: true }) : sh(clone, "cp", ["-R", path.join("specs", metrics.feature), path.join(dir, tag)]);
-    results.push({ ticket: t, arm, run: r, exit: res.status, metrics });
+    if (implementing) {
+      // Outcome: the agent's own tests must pass with its fix and fail on the unfixed snapshot. Its diff is kept.
+      const changed = sh(clone, "git", ["status", "--porcelain", "--untracked-files=all"]).split("\n").map((l) => l.slice(3).trim()).filter((f) => f && !f.startsWith("specs/") && f !== ".spec-driven.yml");
+      sh(clone, "git", ["add", "-A", "--", ".", ":!specs", ":!.spec-driven.yml"]);
+      fs.writeFileSync(path.join(dir, `${tag}.diff`), sh(clone, "git", ["diff", "--cached"]));
+      const testFiles = changed.filter(isTestFile);
+      metrics.agent_test_files = testFiles.length;
+      if (testCmd && !metrics.error) {
+        metrics.tests_pass_with_fix = runTests(clone) ? 1 : 0;
+        const bug = freshClone("bug");
+        for (const f of testFiles) { fs.mkdirSync(path.dirname(path.join(bug, f)), { recursive: true }); fs.copyFileSync(path.join(clone, f), path.join(bug, f)); }
+        metrics.tests_fail_on_bug = testFiles.length && !runTests(bug) ? 1 : 0;
+        fs.rmSync(bug, { recursive: true, force: true });
+        metrics.bug_caught = metrics.tests_pass_with_fix && metrics.tests_fail_on_bug ? 1 : 0;
+      }
+    }
+    if (metrics.feature) fs.cpSync(path.join(clone, "specs", metrics.feature), path.join(dir, tag), { recursive: true });
+    results.push({ ticket: t, arm: arm.name, run: r, exit: res.status, metrics });
     fs.rmSync(clone, { recursive: true, force: true });
-    console.log(`  ${tag}: ${metrics.error ? `failed (${metrics.error.slice(0, 80)})` : `read ${metrics.risky_files_read} risky / ${metrics.files_read} files, ${metrics.risky_plan_files} risky in plan${parsed[t].culprits.length ? `, culprits read ${metrics.culprit_files_read}/${parsed[t].culprits.length}, planned ${metrics.culprit_plan_files}` : ""}, $${metrics.cost_usd}`}`);
+    console.log(`  ${tag}: ${metrics.error ? `failed (${metrics.error.slice(0, 80)})` : `read ${metrics.risky_files_read} risky / ${metrics.files_read} files, ${metrics.risky_plan_files} risky in plan${parsed[t].culprits.length ? `, culprits read ${metrics.culprit_files_read}/${parsed[t].culprits.length}, planned ${metrics.culprit_plan_files}` : ""}${"bug_caught" in metrics ? `, bug ${metrics.bug_caught ? "caught" : "not caught"} (${metrics.agent_test_files} test files)` : ""}, $${metrics.cost_usd}`}`);
   }
   fs.writeFileSync(path.join(dir, "results.json"), JSON.stringify({ meta, results }, null, 2));
   const md = report({ meta, results });
   fs.writeFileSync(path.join(dir, "report.md"), md);
   const failed = results.filter((x) => x.metrics.error).length;
-  fs.appendFileSync(path.join(out, "LOG.md"), `${fs.existsSync(path.join(out, "LOG.md")) ? "" : "# GitRisk experiment log\n\nAppend-only record of every run, including failures.\n\n"}- ${started} · ${tickets.length} ticket(s) × ${runs} run(s) × 2 arms on \`${path.basename(repo)}\` at ${scored.head}, ${model}, ${stages.join("+")} · ${results.length - failed} ok, ${failed} failed · [report](${path.basename(dir)}/report.md)\n`);
+  fs.appendFileSync(path.join(out, "LOG.md"), `${fs.existsSync(path.join(out, "LOG.md")) ? "" : "# GitRisk experiment log\n\nAppend-only record of every run, including failures.\n\n"}- ${started} · ${tickets.length} ticket(s) × ${runs} run(s) × ${arms.length} arms (${arms.map((a) => a.name).join("/")}) on \`${path.basename(repo)}\` at ${scored.head}, ${model}, ${stages.join("+")} · ${results.length - failed} ok, ${failed} failed · [report](${path.basename(dir)}/report.md)\n`);
   return { dir, report: md, results };
 }
