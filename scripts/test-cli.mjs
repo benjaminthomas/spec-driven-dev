@@ -297,6 +297,7 @@ assert.ok(fs.readFileSync(path.join(tmp, "exp", expDir, "report.md"), "utf8").in
 assert.ok(fs.readFileSync(path.join(tmp, "exp", "LOG.md"), "utf8").includes("re-measured"));
 
 // named arms with a model policy, implement stage, and the bug-caught outcome from replaying the agent's tests on the snapshot
+fs.appendFileSync(path.join(rk, ".gitignore"), "specs\n"); execFileSync("git", ["add", ".gitignore"], { cwd: rk }); execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "ignore specs"], { cwd: rk }); // specs/ is gitignored in real repos
 const ev3 = cli("risk-eval", `--dir=${rk}`, "--tickets=tickets.md", `--claude=${fake}`, `--out=${path.join(tmp, "exp3")}`, "--arms=A:off:opus,B:on:tiered", "--stages=investigate,create,implement", "--test=node $RISK_EVAL_TESTS");
 assert.ok(ev3.includes("t1-A-r1:") && ev3.includes("bug not caught (0 test files)") && ev3.includes("t1-B-r1:") && ev3.includes("bug caught (1 test files)"), ev3);
 const exp3 = path.join(tmp, "exp3", fs.readdirSync(path.join(tmp, "exp3")).find((f) => f.startsWith("risk-eval-")));

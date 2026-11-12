@@ -214,7 +214,7 @@ export async function riskEval(opts) {
     fs.writeFileSync(path.join(clone, ".spec-driven.yml"), cfg);
     if (arm.risk) { fs.mkdirSync(path.join(clone, "specs/context"), { recursive: true }); fs.writeFileSync(path.join(clone, "specs/context/risk.md"), riskMd); }
     const prompt = `Use the ticket-to-pr plugin skills. This is a non-interactive run: don't ask questions, make reasonable assumptions and record them. Ticket (plain text, no tracker): ${parsed[t].text}\nRun ${stageText}. Work on the current branch; don't create branches, commit or push${implementing ? ". Implement and test on this branch, leaving the changes uncommitted" : ", or implement anything"}.`;
-    const res = spawnSync(claude, ["-p", "--output-format", "stream-json", "--verbose", "--model", arm.model || model, "--plugin-dir", pluginDir, "--permission-mode", "acceptEdits",
+    const res = spawnSync(claude, ["-p", "--output-format", "stream-json", "--verbose", "--model", arm.model || model, "--plugin-dir", pluginDir, "--add-dir", pluginDir, "--permission-mode", "acceptEdits",
       "--allowedTools", `Read Write Edit Glob Grep Skill Agent Bash(git:*) Bash(ls:*) Bash(cat:*) Bash(head:*) Bash(tail:*) Bash(wc:*) Bash(find:*) Bash(grep:*) Bash(node:*) Bash(npx:*) Bash(spec-driven-dev:*)${implementing ? " Bash(npm:*) Bash(pnpm:*) Bash(yarn:*)" : ""}`],
       { cwd: clone, input: prompt, encoding: "utf8", maxBuffer: 512 * 1024 * 1024, timeout: timeoutMin * 60 * 1000 });
     const transcript = res.stdout || "";
@@ -228,10 +228,12 @@ export async function riskEval(opts) {
       const lastTool = [...transcript.matchAll(/"type":"tool_use","id":"[^"]+","name":"(\w+)"/g)].pop()?.[1] || "none";
       metrics.error = `${res.error?.code === "ETIMEDOUT" ? `timed out after ${timeoutMin} min` : `exit ${res.status}`} · ${events} events · last tool ${lastTool} ${(res.stderr || "").slice(0, 120)}`.trim();
     }
-    if (implementing) {
+    if (implementing) try {
       // Outcome: the agent's own tests must pass with its fix and fail on the unfixed snapshot. Its diff is kept.
+      // (specs/ may be gitignored in the repo under test, so it is unstaged after the add rather than excluded by pathspec.)
       const changed = sh(clone, "git", ["status", "--porcelain", "--untracked-files=all"]).split("\n").map((l) => l.slice(3).trim()).filter((f) => f && !f.startsWith("specs/") && f !== ".spec-driven.yml");
-      sh(clone, "git", ["add", "-A", "--", ".", ":!specs", ":!.spec-driven.yml"]);
+      sh(clone, "git", ["add", "-A", "."]);
+      sh(clone, "git", ["reset", "-q", "--", "specs", ".spec-driven.yml"]);
       fs.writeFileSync(path.join(dir, `${tag}.diff`), sh(clone, "git", ["diff", "--cached"]));
       const testFiles = changed.filter(isTestFile);
       metrics.agent_test_files = testFiles.length;
@@ -243,7 +245,7 @@ export async function riskEval(opts) {
         fs.rmSync(bug, { recursive: true, force: true });
         metrics.bug_caught = metrics.tests_pass_with_fix && metrics.tests_fail_on_bug ? 1 : 0;
       }
-    }
+    } catch (e) { metrics.error = `${metrics.error ? metrics.error + " · " : ""}outcome step failed: ${String(e.message || e).slice(0, 160)}`; } // one run's outcome failing must not end the experiment
     if (metrics.feature) fs.cpSync(path.join(clone, "specs", metrics.feature), path.join(dir, tag), { recursive: true });
     results.push({ ticket: t, arm: arm.name, run: r, exit: res.status, metrics });
     fs.rmSync(clone, { recursive: true, force: true });

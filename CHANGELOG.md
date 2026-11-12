@@ -1,4 +1,6 @@
 # Changelog
+## 1.22.4 — 2026-11-12
+- risk-eval outcome step no longer fails when `specs/` is gitignored in the repo under test (found by the run 3 pilot), and a failing outcome step records an error on that run instead of ending the experiment. The headless agent can now read the plugin's own templates (`--add-dir`); before, it wrote spec files from memory.
 ## 1.22.3 — 2026-11-12
 - `spec-driven-dev risk --dependents=<json>` adds dependents found outside the repo (other services' call sites, `{file: count}`) to fan-out, for the cross-repo experiment (U7). `scoreRepo` takes `extraDependents`.
 ## 1.22.2 — 2026-11-12
