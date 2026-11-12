@@ -57,7 +57,8 @@ function fanOut(repo, files) {
 }
 
 // Score every code file in one repo, including new files not committed yet. `prefix` labels files in multi-repo workspaces.
-export function scoreRepo(repo, { since = "2 years ago", weights = DEFAULT_WEIGHTS, prefix = "" } = {}) {
+// extraDependents: { "routes/api/x.js": 12 } adds dependents found outside the repo (other services' call sites) to fan-out.
+export function scoreRepo(repo, { since = "2 years ago", weights = DEFAULT_WEIGHTS, prefix = "", extraDependents = null } = {}) {
   const committed = git(repo, ["ls-files"]).split("\n").filter((f) => f && !SKIP.test(f));
   const untracked = git(repo, ["ls-files", "--others", "--exclude-standard"]).split("\n").filter((f) => f && !SKIP.test(f));
   const files = [...committed, ...untracked];
@@ -88,6 +89,7 @@ export function scoreRepo(repo, { since = "2 years ago", weights = DEFAULT_WEIGH
   // "New" = recent AND too few commits to judge. A young file that's already been fixed a lot has real history.
   const isNew = new Set(files.filter((f) => untracked.includes(f) || (recent(f) && stats.get(f).commits < MIN_COMMITS)));
   const graph = fanOut(repo, files), fan = graph.counts;
+  if (extraDependents) for (const [f, n] of Object.entries(extraDependents)) if (fan.has(f)) fan.set(f, fan.get(f) + (Number(n) || 0));
   const expChurn = p90([...stats.values()].map((s) => s.commits)), expFan = p90([...fan.values()]);
   const rows = files.map((f) => {
     const s = stats.get(f), denom = Math.max(s.commits, MIN_COMMITS);

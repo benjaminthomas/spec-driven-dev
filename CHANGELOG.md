@@ -1,4 +1,6 @@
 # Changelog
+## 1.22.3 — 2026-11-12
+- `spec-driven-dev risk --dependents=<json>` adds dependents found outside the repo (other services' call sites, `{file: count}`) to fan-out, for the cross-repo experiment (U7). `scoreRepo` takes `extraDependents`.
 ## 1.22.2 — 2026-11-12
 - risk-eval `--config=<file>` sets the clone's `.spec-driven.yml` (a snapshot outside the workspace inherits no team config, and a tiered arm needs a `models:` block); without it a multi-repo workspace's clone now carries the team's models, effort and commands. The console banner names the arms.
 ## 1.22.1 — 2026-11-12

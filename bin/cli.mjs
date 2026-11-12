@@ -12,7 +12,7 @@
 //   spec-driven-dev status          list specs with unfinished work and each one's "Resume here" next step
 //   spec-driven-dev context         print specs/CONTEXT.md; --areas=billing,api prints only those area files
 //   spec-driven-dev usage [STP-123] models and tokens a feature used, from Claude Code's session files (--summary  --json)
-//   spec-driven-dev risk            GitRisk: score files from git history into specs/context/risk.md (--files=a,b  --json  --top=N  --since=…)
+//   spec-driven-dev risk            GitRisk: score files from git history into specs/context/risk.md (--files=a,b  --json  --top=N  --since=…  --dependents=<json: file → count of call sites in other services>)
 //   spec-driven-dev settings        switch features from a menu (GitRisk, run-through, sharing); or --risk=on|off --after-approval=… --share=all|memory|none
 //   spec-driven-dev risk-eval       U8 experiment: run tickets with risk on vs off and compare agent behaviour (--tickets=<file> --runs=N --model=… --arms=on,off --timeout=20 --out=<dir>); a ticket line may end with [files: …], the files its real fix touched; --remeasure=<run dir> recomputes a saved run's metrics
 //                                   arms can be named with a model policy (--arms=A:off:opus,B:on:tiered); with --stages=…,implement,verify and a test command (--test=… or commands.test) each run also records whether the agent's tests catch the bug; --config=<file> is the clone's .spec-driven.yml
@@ -902,7 +902,8 @@ function risk() {
   if (bad.length) throw new Error(bad.join("; "));
   const weights = normWeights(c.risk?.weights), since = opt("since") || c.risk?.since || "2 years ago";
   const repoDirs = c.layout === "multi-repo" ? (c.repos || []).map((r) => ({ dir: path.resolve(root, expandHome(r.path)), name: r.path })) : [{ dir: root, name: path.basename(root) }];
-  const scored = repoDirs.filter((r) => isRepo(r.dir)).map((r) => ({ ...r, ...scoreRepo(r.dir, { since, weights, prefix: c.layout === "multi-repo" ? r.name : "" }) }));
+  const extraDependents = opt("dependents") ? JSON.parse(fs.readFileSync(path.resolve(DIR, opt("dependents")), "utf8")) : null; // {file: count} from other services' call sites
+  const scored = repoDirs.filter((r) => isRepo(r.dir)).map((r) => ({ ...r, ...scoreRepo(r.dir, { since, weights, prefix: c.layout === "multi-repo" ? r.name : "", extraDependents }) }));
   if (!scored.length) throw new Error(`No git repo found at ${root}`);
   const rows = scored.flatMap((s) => s.rows).sort((a, b) => b.score - a.score || b.commits - a.commits);
   const wanted = splitList(opt("files"));
