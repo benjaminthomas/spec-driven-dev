@@ -1,4 +1,6 @@
 # Changelog
+## 1.22.5 — 2026-11-12
+- risk-eval tells the implementing agent the exact replay command and rules (unit tests only, helpers under test/, nothing under specs/ at replay, standard spec layout), found necessary by the run 3 pilot: both agents fixed the bug but their tests depended on a shim the replay could not see.
 ## 1.22.4 — 2026-11-12
 - risk-eval outcome step no longer fails when `specs/` is gitignored in the repo under test (found by the run 3 pilot), and a failing outcome step records an error on that run instead of ending the experiment. The headless agent can now read the plugin's own templates (`--add-dir`); before, it wrote spec files from memory.
 ## 1.22.3 — 2026-11-12

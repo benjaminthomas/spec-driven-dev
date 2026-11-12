@@ -1,6 +1,6 @@
 {
   "name": "@benjaminthomas/spec-driven-dev",
-  "version": "1.22.4",
+  "version": "1.22.5",
   "description": "Spec-driven AI development workflow (investigate → spec → implement → verify → review → ship) as Agent Skills for Claude Code, Cursor, Codex CLI and Antigravity.",
   "type": "module",
   "bin": {
