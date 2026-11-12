@@ -15,7 +15,7 @@
 //   spec-driven-dev risk            GitRisk: score files from git history into specs/context/risk.md (--files=a,b  --json  --top=N  --since=…)
 //   spec-driven-dev settings        switch features from a menu (GitRisk, run-through, sharing); or --risk=on|off --after-approval=… --share=all|memory|none
 //   spec-driven-dev risk-eval       U8 experiment: run tickets with risk on vs off and compare agent behaviour (--tickets=<file> --runs=N --model=… --arms=on,off --timeout=20 --out=<dir>); a ticket line may end with [files: …], the files its real fix touched; --remeasure=<run dir> recomputes a saved run's metrics
-//                                   arms can be named with a model policy (--arms=A:off:opus,B:on:tiered); with --stages=…,implement,verify and a test command (--test=… or commands.test) each run also records whether the agent's tests catch the bug
+//                                   arms can be named with a model policy (--arms=A:off:opus,B:on:tiered); with --stages=…,implement,verify and a test command (--test=… or commands.test) each run also records whether the agent's tests catch the bug; --config=<file> is the clone's .spec-driven.yml
 //   flags: --yes  --global  --tools=claude,cursor  --skills=spec-create,...  --no-setup  --dir=<path>
 //          --layout=single|monorepo|multi-repo  --repos=~/Projects/frontend,/srv/backend  --workspace=<config dir>
 //          --packages=apps/web,packages/ui  --after-approval=stop|run-through  --project=new|existing  --tracker=jira|github|gitlab|linear|azure-boards|clickup|<any>|none  --risk=on|off  --share=all|memory|none  --specs-dir=<path>  --version
@@ -950,11 +950,14 @@ async function riskEvalCmd() {
   if (!opt("claude") && !onPath("claude")) throw new Error("risk-eval drives Claude Code headlessly; install it first (https://code.claude.com)");
   const { riskEval } = await import("./risk-eval.mjs");
   const runs = Number(opt("runs")) || 1, stages = splitList(opt("stages") || "investigate,create");
-  console.log(`GitRisk U8 experiment: ${tickets.length} ticket(s) × ${runs} run(s) × 2 arms (risk on / off) on ${root}`);
   // A workspace config's repo paths don't resolve inside a lone clone, so a multi-repo member gets a single-repo config.
-  const configText = c.layout === "multi-repo" ? "version: 1\nlayout: single\n" : file ? fs.readFileSync(file, "utf8") : "";
+  // The clone's config: --config=<file> as given (a snapshot outside the workspace has no team config to inherit, and a
+  // tiered arm needs a models block); otherwise a single-repo copy of this config carrying the team's models, effort and commands.
+  const configText = opt("config") ? fs.readFileSync(path.resolve(DIR, opt("config")), "utf8")
+    : c.layout === "multi-repo" ? "version: 1\nlayout: single\n" + dumpYaml(Object.fromEntries(["models", "effort", "commands"].filter((k) => c[k]).map((k) => [k, c[k]]))) : file ? fs.readFileSync(file, "utf8") : "";
   const arms = splitList(opt("arms") || "on,off");
   if (!arms.length) throw new Error("--arms must be on, off, on,off, or named arms like A:off:opus,B:on:tiered");
+  console.log(`GitRisk U8 experiment: ${tickets.length} ticket(s) × ${runs} run(s) × ${arms.length} arm(s) (${arms.join(", ")}) on ${root}`);
   const { dir } = await riskEval({ repo, tickets, arms, timeoutMin: Number(opt("timeout")) || 20, runs, model: opt("model") || "sonnet", stages, claude, out: path.resolve(DIR, opt("out") || "experiments"),
     pluginDir: path.join(ROOT, "plugin"), since: c.risk?.since || "2 years ago", weights: c.risk?.weights, configText, testCmd: opt("test") || c.commands?.test || "" });
   console.log(`✓ Report: ${path.join(dir, "report.md")}`);

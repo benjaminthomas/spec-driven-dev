@@ -1,4 +1,6 @@
 # Changelog
+## 1.22.2 — 2026-11-12
+- risk-eval `--config=<file>` sets the clone's `.spec-driven.yml` (a snapshot outside the workspace inherits no team config, and a tiered arm needs a `models:` block); without it a multi-repo workspace's clone now carries the team's models, effort and commands. The console banner names the arms.
 ## 1.22.1 — 2026-11-12
 - risk-eval's test command sees the agent's test files as `$RISK_EVAL_TESTS`, so a repo whose full suite needs a database can replay just those (`--test='npx mocha --exit $RISK_EVAL_TESTS'`).
 ## 1.22.0 — 2026-11-12
